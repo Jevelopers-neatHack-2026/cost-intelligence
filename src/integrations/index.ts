@@ -1,6 +1,7 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { errorEnvelope, failure, TrustedScopeSchema, validateRequest, blockedBoundary, type RuntimePorts } from '../shared/contracts.js';
-import { validateSummarySnapshot, FinancialSummaryPageSchema, type FinancialSummaryPage } from '../reporting/index.js';
+import { errorEnvelope, failure, TrustedScopeSchema, validateRequest, blockedBoundary, type ApiResult, type RuntimePorts, type Validation } from '../shared/contracts.js';
+import { validateFinancialSummaryPageBoundary, FinancialSummaryPageSchema, type FinancialSummaryPage } from '../reporting/index.js';
+import type { SharedFinancialSummary } from '../shared/canonical.js';
 
 export const ExportRequestSchema = Type.Object({
   schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1 }), idempotencyKey: Type.String({ minLength: 1 }),
@@ -10,6 +11,15 @@ export const ExportRequestSchema = Type.Object({
   requestedBy: Type.String({ minLength: 1, maxLength: 200 }),
 }, { additionalProperties: false });
 export type ExportRequest = Omit<Static<typeof ExportRequestSchema>, 'summarySnapshot'> & { readonly summarySnapshot: FinancialSummaryPage };
+
+/** Validate both finance wrappers and the nested pinned FinancialSummary as one public boundary. */
+export function validateExportRequestBoundary(value: unknown): Validation<ExportRequest> {
+  const outer = validateRequest(ExportRequestSchema, value, 'integrations', 'exportSummary');
+  if (!outer.ok) return outer;
+  const snapshot = validateFinancialSummaryPageBoundary(outer.value.summarySnapshot, { module: 'integrations', operation: 'exportSummary' });
+  if (!snapshot.ok) return snapshot;
+  return { ok: true, value: { ...outer.value, summarySnapshot: snapshot.value } as ExportRequest };
+}
 
 export const ExportManifestSchema = Type.Object({
   schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1 }), exportId: Type.String({ minLength: 1 }),
@@ -22,21 +32,18 @@ export const ExportManifestSchema = Type.Object({
 }, { additionalProperties: false });
 export type ExportManifest = Static<typeof ExportManifestSchema>;
 
-export async function exportSummary(request: ExportRequest, ports: RuntimePorts) {
-  const validation = validateRequest(ExportRequestSchema, request, 'integrations', 'exportSummary');
+export async function exportSummary(request: ExportRequest, ports: RuntimePorts): Promise<ApiResult<ExportManifest>> {
+  const validation = validateExportRequestBoundary(request);
   if (!validation.ok) return failure(validation.error);
   const parsed = validation.value as ExportRequest;
-  const snapshotValidation = validateRequest(FinancialSummaryPageSchema, parsed.summarySnapshot, 'integrations', 'exportSummary');
-  if (!snapshotValidation.ok) return failure(snapshotValidation.error);
-  const snapshot = snapshotValidation.value as FinancialSummaryPage;
-  const canonical = validateSummarySnapshot({ summary: snapshot.summary, module: 'integrations', operation: 'exportSummary', requestId: parsed.requestId });
-  if (!canonical.ok) return failure(canonical.error);
-  const summary = canonical.value;
+  const snapshot = parsed.summarySnapshot;
+  const summary = snapshot.summary as SharedFinancialSummary;
   if (snapshot.summaryContentHash !== parsed.summaryContentHash
       || summary.tenant_id !== parsed.scope.tenantId || summary.project_id !== parsed.scope.projectId
-      || !summary.included_environments.includes(parsed.scope.environment) || !summary.included_billing_modes.includes(parsed.scope.billingMode)
-      || snapshot.filters.environments.some(value => value !== parsed.scope.environment)
-      || snapshot.filters.billingModes.some(value => value !== parsed.scope.billingMode)) {
+      || summary.included_environments.length !== 1 || summary.included_environments[0] !== parsed.scope.environment
+      || summary.included_billing_modes.length !== 1 || summary.included_billing_modes[0] !== parsed.scope.billingMode
+      || snapshot.filters.environments.length !== 1 || snapshot.filters.environments[0] !== parsed.scope.environment
+      || snapshot.filters.billingModes.length !== 1 || snapshot.filters.billingModes[0] !== parsed.scope.billingMode) {
     return failure(errorEnvelope('integrations', 'exportSummary', 'FORBIDDEN_SCOPE', parsed.requestId, 'The summary does not match the authenticated export scope.'));
   }
   return blockedBoundary<ExportRequest, ExportManifest>({ module: 'integrations', operation: 'exportSummary', schema: ExportRequestSchema, request: parsed, ports, unavailableCode: 'SOURCE_UNAVAILABLE', safeMessage: 'Export preparation is unavailable until a reviewed summary and export adapter are delivered.', retryable: true });

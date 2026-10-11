@@ -89,6 +89,7 @@ export const CompletenessSchema = Type.Union([
 ]);
 
 export type ApiResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: ErrorEnvelope };
+export type ApiErrorResult = { readonly ok: false; readonly error: ErrorEnvelope };
 export type Clock = { now(): Date };
 export type FinancialStorePort = { isAvailable(): Promise<boolean> };
 export type ProviderSourcePort = { isAvailable(): Promise<boolean> };
@@ -146,7 +147,7 @@ export function validateRequest<T extends TSchema>(
   return { ok: true, value: value as Static<T> };
 }
 
-export function failure<T>(error: ErrorEnvelope): ApiResult<T> {
+export function failure(error: ErrorEnvelope): ApiErrorResult {
   return { ok: false, error };
 }
 

@@ -1,5 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { blockedBoundary, CurrencySchema, NonNegativeDecimalAmountSchema, errorEnvelope, failure, TrustedScopeSchema, validateRequest, type RuntimePorts } from '../shared/contracts.js';
+import { blockedBoundary, CurrencySchema, NonNegativeDecimalAmountSchema, errorEnvelope, failure, TrustedScopeSchema, validateRequest, type ApiResult, type RuntimePorts, type Validation } from '../shared/contracts.js';
 import { validateCanonical, type SharedBudgetReservation, type SharedReleaseRequest, type SharedReserveRequest, type SharedSettleRequest } from '../shared/canonical.js';
 
 const VersionedReferenceSchema = Type.Object({
@@ -26,6 +26,19 @@ export const ReservationRequestSchema = Type.Object({
   allowPartialAuthorization: Type.Boolean(), attemptBinding: AttemptBindingSchema,
 }, { additionalProperties: false });
 export type ReservationRequest = Omit<Static<typeof ReservationRequestSchema>, 'canonicalRequest'> & { readonly canonicalRequest: SharedReserveRequest };
+
+/** Validate the finance wrapper and its nested pinned ReserveRequest as one public boundary. */
+export function validateReservationRequestBoundary(value: unknown): Validation<ReservationRequest> {
+  const outer = validateRequest(ReservationRequestSchema, value, 'budgets', 'authorize');
+  if (!outer.ok) return outer;
+  const canonical = validateCanonical({ contract: 'ReserveRequest', value: outer.value.canonicalRequest, module: 'budgets', operation: 'authorize', requestId: outer.value.requestId });
+  if (!canonical.ok) return canonical;
+  const request = canonical.value;
+  if (request.tenant_id !== outer.value.scope.tenantId || request.project_id !== outer.value.scope.projectId || request.environment !== outer.value.scope.environment || request.billing_mode !== outer.value.scope.billingMode) {
+    return { ok: false, error: errorEnvelope('budgets', 'authorize', 'FORBIDDEN_SCOPE', outer.value.requestId, 'The reservation does not match the authenticated tenant, project, environment, or billing mode.') };
+  }
+  return { ok: true, value: { ...outer.value, canonicalRequest: request } as ReservationRequest };
+}
 
 export const AuthorizationDecisionSchema = Type.Object({
   schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1 }), decidedAt: Type.String({ format: 'date-time' }),
@@ -78,6 +91,46 @@ export type SettleReservationCommand = Omit<Static<typeof SettleReservationComma
 export type ReleaseReservationCommand = Omit<Static<typeof ReleaseReservationCommandSchema>, 'canonicalCommand'> & { readonly canonicalCommand: SharedReleaseRequest };
 export type ReservationCommand = MarkDispatchedCommand | SettleReservationCommand | ReleaseReservationCommand;
 
+/** Validate the lifecycle command against its operation and exact pinned nested payload. */
+export function validateSettleReservationCommandBoundary(value: unknown): Validation<SettleReservationCommand> {
+  const outer = validateRequest(SettleReservationCommandSchema, value, 'budgets', 'settle');
+  if (!outer.ok) return outer;
+  const canonical = validateCanonical({ contract: 'SettleRequest', value: outer.value.canonicalCommand, module: 'budgets', operation: 'settle', requestId: outer.value.requestId });
+  if (!canonical.ok) return canonical;
+  const command = canonical.value;
+  if (command.tenant_id !== outer.value.scope.tenantId || command.project_id !== outer.value.scope.projectId || command.environment !== outer.value.scope.environment || command.billing_mode !== outer.value.scope.billingMode || command.reservation_id !== outer.value.reservationId || command.expected_revision !== outer.value.expectedRevision) {
+    return { ok: false, error: errorEnvelope('budgets', 'settle', 'FORBIDDEN_SCOPE', outer.value.requestId, 'The reservation command does not match its authenticated scope or expected revision.') };
+  }
+  return { ok: true, value: { ...outer.value, canonicalCommand: command } as SettleReservationCommand };
+}
+
+/** Validate the lifecycle command against its operation and exact pinned nested payload. */
+export function validateReleaseReservationCommandBoundary(value: unknown): Validation<ReleaseReservationCommand> {
+  const outer = validateRequest(ReleaseReservationCommandSchema, value, 'budgets', 'release');
+  if (!outer.ok) return outer;
+  const canonical = validateCanonical({ contract: 'ReleaseRequest', value: outer.value.canonicalCommand, module: 'budgets', operation: 'release', requestId: outer.value.requestId });
+  if (!canonical.ok) return canonical;
+  const command = canonical.value;
+  if (command.tenant_id !== outer.value.scope.tenantId || command.project_id !== outer.value.scope.projectId || command.environment !== outer.value.scope.environment || command.billing_mode !== outer.value.scope.billingMode || command.reservation_id !== outer.value.reservationId || command.expected_revision !== outer.value.expectedRevision) {
+    return { ok: false, error: errorEnvelope('budgets', 'release', 'FORBIDDEN_SCOPE', outer.value.requestId, 'The reservation command does not match its authenticated scope or expected revision.') };
+  }
+  return { ok: true, value: { ...outer.value, canonicalCommand: command } as ReleaseReservationCommand };
+}
+
+/** Validate the command union and dispatch to the matching complete action boundary. */
+export function validateReservationCommandBoundary(value: unknown): Validation<ReservationCommand> {
+  const outer = validateRequest(ReservationCommandSchema, value, 'budgets', 'reservationCommand');
+  if (!outer.ok) return outer;
+  switch (outer.value.action) {
+    case 'mark_dispatched': {
+      const mark = validateRequest(MarkDispatchedCommandSchema, value, 'budgets', 'markDispatched');
+      return mark.ok ? { ok: true, value: mark.value } : mark;
+    }
+    case 'settle': return validateSettleReservationCommandBoundary(value);
+    case 'release': return validateReleaseReservationCommandBoundary(value);
+  }
+}
+
 export const ReservationSnapshotSchema = Type.Object({
   schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1 }), asOf: Type.String({ format: 'date-time' }),
   reservation: Type.Unknown(), state: Type.Union([
@@ -89,6 +142,15 @@ export const ReservationSnapshotSchema = Type.Object({
   expectedRevision: Type.Integer({ minimum: 0 }), attemptBinding: AttemptBindingSchema,
 }, { additionalProperties: false });
 export type ReservationSnapshot = Omit<Static<typeof ReservationSnapshotSchema>, 'reservation'> & { readonly reservation: SharedBudgetReservation };
+
+/** Validate the snapshot wrapper and its nested pinned BudgetReservation as one public boundary. */
+export function validateReservationSnapshotBoundary(value: unknown): Validation<ReservationSnapshot> {
+  const outer = validateRequest(ReservationSnapshotSchema, value, 'budgets', 'reservationSnapshot');
+  if (!outer.ok) return outer;
+  const canonical = validateCanonical({ contract: 'BudgetReservation', value: outer.value.reservation, module: 'budgets', operation: 'reservationSnapshot', requestId: outer.value.requestId });
+  if (!canonical.ok) return canonical;
+  return { ok: true, value: { ...outer.value, reservation: canonical.value } as ReservationSnapshot };
+}
 
 export const BudgetChangeRequestSchema = Type.Object({
   schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1 }), idempotencyKey: Type.String({ minLength: 1 }),
@@ -127,15 +189,10 @@ export const PostingReceiptSchema = Type.Object({
 }, { additionalProperties: false });
 export type PostingReceipt = Static<typeof PostingReceiptSchema>;
 
-export async function authorize(request: ReservationRequest, ports: RuntimePorts) {
-  const validation = validateRequest(ReservationRequestSchema, request, 'budgets', 'authorize');
+export async function authorize(request: ReservationRequest, ports: RuntimePorts): Promise<ApiResult<AuthorizationDecision>> {
+  const validation = validateReservationRequestBoundary(request);
   if (!validation.ok) return failure(validation.error);
   const parsed = validation.value as ReservationRequest;
-  const canonical = validateCanonical({ contract: 'ReserveRequest', value: parsed.canonicalRequest, module: 'budgets', operation: 'authorize', requestId: parsed.requestId });
-  if (!canonical.ok) return failure(canonical.error);
-  if (canonical.value.tenant_id !== parsed.scope.tenantId || canonical.value.project_id !== parsed.scope.projectId || canonical.value.environment !== parsed.scope.environment || canonical.value.billing_mode !== parsed.scope.billingMode) {
-    return failure(errorEnvelope('budgets', 'authorize', 'FORBIDDEN_SCOPE', parsed.requestId, 'The reservation does not match the authenticated tenant, project, environment, or billing mode.'));
-  }
   try {
     const trusted = await ports.trustedContext.resolve(parsed.scope);
     if (!trusted || trusted.tenantId !== parsed.scope.tenantId || trusted.projectId !== parsed.scope.projectId || trusted.environment !== parsed.scope.environment || trusted.billingMode !== parsed.scope.billingMode || trusted.actorId !== parsed.scope.actorId) {
@@ -147,28 +204,37 @@ export async function authorize(request: ReservationRequest, ports: RuntimePorts
   return failure(errorEnvelope('budgets', 'authorize', 'BUDGET_UNAVAILABLE', parsed.requestId, 'Atomic reservation is not available until the budget enforcement leaf is delivered.', true));
 }
 
-async function reservationCommand(request: ReservationCommand, ports: RuntimePorts, operation: string) {
-  const validation = validateRequest(ReservationCommandSchema, request, 'budgets', operation);
+async function reservationCommand(args: {
+  request: ReservationCommand;
+  ports: RuntimePorts;
+  operation: string;
+  expectedAction: ReservationCommand['action'];
+  schema: typeof MarkDispatchedCommandSchema | typeof SettleReservationCommandSchema | typeof ReleaseReservationCommandSchema;
+  validate(value: unknown): Validation<ReservationCommand>;
+}): Promise<ApiResult<ReservationSnapshot>> {
+  const { request, ports, operation, expectedAction, schema } = args;
+  const validation = args.validate(request);
   if (!validation.ok) return failure(validation.error);
   const parsed = validation.value as ReservationCommand;
-  if (parsed.action !== 'mark_dispatched') {
-    const contract = parsed.action === 'settle' ? 'SettleRequest' : 'ReleaseRequest';
-    const canonical = validateCanonical({ contract, value: parsed.canonicalCommand, module: 'budgets', operation, requestId: parsed.requestId });
-    if (!canonical.ok) return failure(canonical.error);
-    const command = canonical.value as SharedSettleRequest | SharedReleaseRequest;
-    if (command.tenant_id !== parsed.scope.tenantId || command.project_id !== parsed.scope.projectId || command.environment !== parsed.scope.environment || command.billing_mode !== parsed.scope.billingMode || command.reservation_id !== parsed.reservationId || command.expected_revision !== parsed.expectedRevision) {
-      return failure(errorEnvelope('budgets', operation, 'FORBIDDEN_SCOPE', parsed.requestId, 'The reservation command does not match its authenticated scope or expected revision.'));
-    }
-  }
-  return blockedBoundary<ReservationCommand, ReservationSnapshot>({ module: 'budgets', operation, schema: ReservationCommandSchema, request: parsed, ports, unavailableCode: 'BUDGET_UNAVAILABLE', safeMessage: `Reservation ${operation} is not available until the budget lifecycle leaf is delivered.`, retryable: true });
+  if (parsed.action !== expectedAction) return failure(errorEnvelope('budgets', operation, 'VALIDATION_ERROR', parsed.requestId, 'The command action does not match this lifecycle operation.'));
+  return blockedBoundary<ReservationCommand, ReservationSnapshot>({ module: 'budgets', operation, schema, request: parsed, ports, unavailableCode: 'BUDGET_UNAVAILABLE', safeMessage: `Reservation ${operation} is not available until the budget lifecycle leaf is delivered.`, retryable: true });
 }
 
-export async function markDispatched(request: MarkDispatchedCommand, ports: RuntimePorts) { return reservationCommand(request, ports, 'markDispatched'); }
-export async function settle(request: SettleReservationCommand, ports: RuntimePorts) { return reservationCommand(request, ports, 'settle'); }
-export async function release(request: ReleaseReservationCommand, ports: RuntimePorts) { return reservationCommand(request, ports, 'release'); }
-export async function changeBudget(request: BudgetChangeRequest, ports: RuntimePorts) {
+export async function markDispatched(request: MarkDispatchedCommand, ports: RuntimePorts): Promise<ApiResult<ReservationSnapshot>> {
+  return reservationCommand({ request, ports, operation: 'markDispatched', expectedAction: 'mark_dispatched', schema: MarkDispatchedCommandSchema, validate: value => {
+    const result = validateRequest(MarkDispatchedCommandSchema, value, 'budgets', 'markDispatched');
+    return result.ok ? { ok: true, value: result.value } : result;
+  } });
+}
+export async function settle(request: SettleReservationCommand, ports: RuntimePorts): Promise<ApiResult<ReservationSnapshot>> {
+  return reservationCommand({ request, ports, operation: 'settle', expectedAction: 'settle', schema: SettleReservationCommandSchema, validate: value => validateSettleReservationCommandBoundary(value) });
+}
+export async function release(request: ReleaseReservationCommand, ports: RuntimePorts): Promise<ApiResult<ReservationSnapshot>> {
+  return reservationCommand({ request, ports, operation: 'release', expectedAction: 'release', schema: ReleaseReservationCommandSchema, validate: value => validateReleaseReservationCommandBoundary(value) });
+}
+export async function changeBudget(request: BudgetChangeRequest, ports: RuntimePorts): Promise<ApiResult<BudgetChangeReceipt>> {
   return blockedBoundary<BudgetChangeRequest, BudgetChangeReceipt>({ module: 'budgets', operation: 'changeBudget', schema: BudgetChangeRequestSchema, request, ports, unavailableCode: 'BUDGET_UNAVAILABLE', safeMessage: 'Budget policy evaluation is not available until the budget enforcement leaf is delivered.', retryable: true });
 }
-export async function recordExpenseAdjustment(request: ExpenseAdjustmentRequest, ports: RuntimePorts) {
+export async function recordExpenseAdjustment(request: ExpenseAdjustmentRequest, ports: RuntimePorts): Promise<ApiResult<PostingReceipt>> {
   return blockedBoundary<ExpenseAdjustmentRequest, PostingReceipt>({ module: 'budgets', operation: 'recordExpenseAdjustment', schema: ExpenseAdjustmentRequestSchema, request, ports, unavailableCode: 'SOURCE_UNAVAILABLE', safeMessage: 'Expense adjustment posting is not available until the accounting leaf is delivered.', retryable: true });
 }

@@ -1,5 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { blockedBoundary, CurrencySchema, DecimalAmountSchema, TrustedScopeSchema, type RuntimePorts } from '../shared/contracts.js';
+import { blockedBoundary, CurrencySchema, DecimalAmountSchema, TrustedScopeSchema, type ApiResult, type RuntimePorts } from '../shared/contracts.js';
 import { PostingReceiptSchema, type PostingReceipt } from '../budgets/index.js';
 
 const VersionedReferenceSchema = Type.Object({
@@ -44,7 +44,7 @@ export const FinancialEventSchema = Type.Union([
 ]);
 export type FinancialEvent = Static<typeof FinancialEventSchema>;
 
-export async function ingestFinancial(request: FinancialEvent, ports: RuntimePorts) {
+export async function ingestFinancial(request: FinancialEvent, ports: RuntimePorts): Promise<ApiResult<PostingReceipt>> {
   return blockedBoundary<FinancialEvent, PostingReceipt>({ module: 'ledger', operation: 'ingestFinancial', schema: FinancialEventSchema, request, ports, unavailableCode: 'SOURCE_UNAVAILABLE', safeMessage: 'Financial posting is not available until the accounting leaf is delivered.', retryable: true });
 }
 

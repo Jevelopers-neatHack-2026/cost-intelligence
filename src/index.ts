@@ -1,14 +1,14 @@
 export * from './shared/index.js';
-export { ingestUsage, UsageObservationSchema, IngestionReceiptSchema } from './metering/index.js';
+export { ingestUsage, validateUsageObservationBoundary, UsageObservationSchema, IngestionReceiptSchema } from './metering/index.js';
 export type { UsageObservation, IngestionReceipt } from './metering/index.js';
-export { estimate, RateCardSchema, EstimateRequestSchema, EstimateResultSchema } from './pricing/index.js';
+export { estimate, validateEstimateRequestBoundary, RateCardSchema, EstimateRequestSchema, EstimateResultSchema } from './pricing/index.js';
 export type { RateCard, EstimateRequest, EstimateResult } from './pricing/index.js';
 export * from './budgets/index.js';
 export { ingestFinancial, FinancialEventSchema } from './ledger/index.js';
 export type { FinancialEvent } from './ledger/index.js';
-export { querySummary, FinancialSummaryFiltersSchema, FinancialSummaryQuerySchema, SummarySourceWatermarkSchema, FinancialSummaryPageSchema } from './reporting/index.js';
+export { querySummary, validateFinancialSummaryPageBoundary, FinancialSummaryFiltersSchema, FinancialSummaryQuerySchema, SummarySourceWatermarkSchema, FinancialSummaryPageSchema } from './reporting/index.js';
 export type { FinancialSummaryFilters, FinancialSummaryQuery, FinancialSummaryPage } from './reporting/index.js';
 export { startReconciliation, getReconciliation, ReconciliationRequestSchema, ReconciliationRunSchema, ReconciliationResultSchema } from './reconciliation/index.js';
 export type { ReconciliationRequest, ReconciliationRun, ReconciliationResult } from './reconciliation/index.js';
-export { exportSummary, ExportRequestSchema, ExportManifestSchema } from './integrations/index.js';
+export { exportSummary, validateExportRequestBoundary, ExportRequestSchema, ExportManifestSchema } from './integrations/index.js';
 export type { ExportRequest, ExportManifest } from './integrations/index.js';

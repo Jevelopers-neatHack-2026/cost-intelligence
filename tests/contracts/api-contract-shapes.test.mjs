@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -106,4 +107,127 @@ test('finance-owned summary query and snapshot wrappers carry reproducible ident
     schemaVersion: '1.0.0', requestId: 'export-1', idempotencyKey: 'export-idem', scope, summarySnapshot: page, summaryContentHash: hash,
     destination: 'cfo.ai', format: 'json', requestedAt: '2026-10-02T00:01:00Z', evidenceMode: 'mocked', requestedBy: 'finance-user',
   }), true);
+});
+
+test('combined public validators enforce every nested pinned canonical request and response', async () => {
+  const load = async name => JSON.parse(await readFile(join(root, `node_modules/@jevelopers/shared-contracts/fixtures/${name}.json`), 'utf8')).valid;
+  const [usageEvent, reserveRequest, settleRequest, releaseRequest, reservation, summary] = await Promise.all([
+    load('UsageEvent'), load('ReserveRequest'), load('SettleRequest'), load('ReleaseRequest'), load('BudgetReservation'), load('FinancialSummary'),
+  ]);
+  const scopeFor = value => ({ tenantId: value.tenant_id, projectId: value.project_id, environment: value.environment, billingMode: value.billing_mode, actorId: 'fixture-actor' });
+  const attemptBinding = {
+    logicalOperationId: usageEvent.logical_operation_id, transportAttemptId: usageEvent.transport_attempt_id,
+    providerRequestId: usageEvent.provider_request_id, providerAttemptId: usageEvent.provider_attempt_id,
+    billableAttemptId: usageEvent.billable_attempt_id,
+  };
+  const usageObservation = {
+    schemaVersion: '1.0.0', requestId: 'combined-usage', idempotencyKey: 'combined-usage-idem', scope: scopeFor(usageEvent),
+    usageEvent, evidenceMode: 'mocked', verificationStatus: 'verified', evidenceProvenanceRef: 'fixture:usage',
+  };
+  const estimateRequest = {
+    schemaVersion: '1.0.0', requestId: 'combined-estimate', idempotencyKey: 'combined-estimate-idem', scope: scopeFor(usageEvent), usageEvent,
+    selection: { policy: 'event_time', effectiveAt: '2026-10-10T12:00:00Z', requestedCurrency: 'USD', rateCardRef: null },
+  };
+  const reservationRequest = {
+    schemaVersion: '1.0.0', requestId: 'combined-reserve', idempotencyKey: 'combined-reserve-idem', scope: scopeFor(reserveRequest), canonicalRequest: reserveRequest,
+    estimate: { completeness: 'complete', knownSubtotal: '0.000003', currency: 'USD', rateCardRef: null, missingDimensions: [] },
+    allowPartialAuthorization: false, attemptBinding,
+  };
+  const reference = (contract, id, revision = 1) => ({ contract, schema_version: '1.0.0', id, revision, content_hash: hash });
+  const commandBase = {
+    schemaVersion: '1.0.0', idempotencyKey: 'combined-command-idem', actorReference: 'fixture-worker',
+    sourceAuthorityRef: reference('BudgetReservation', settleRequest.reservation_id, settleRequest.expected_revision),
+    attemptBinding, reservationId: settleRequest.reservation_id, expectedRevision: settleRequest.expected_revision,
+  };
+  const settleCommand = {
+    ...commandBase, requestId: 'combined-settle', scope: scopeFor(settleRequest), action: 'settle', canonicalCommand: settleRequest,
+    settlement: { measure: 'cumulative', finality: 'final', sequence: 1, cumulativeAmount: settleRequest.consumed.amount, currency: settleRequest.currency,
+      usageCompleteness: 'complete', sourceObservationRefs: [reference('UsageEvent', usageEvent.source_observation_id)], allowObservedOverrun: true },
+  };
+  const releaseCommand = {
+    ...commandBase, requestId: 'combined-release', scope: scopeFor(releaseRequest), action: 'release', canonicalCommand: releaseRequest,
+    reservationId: releaseRequest.reservation_id, expectedRevision: releaseRequest.expected_revision,
+    release: { amount: '0.009000', currency: releaseRequest.currency, reason: 'fixture-fenced-release', proof: 'never_dispatched_fenced', evidenceRefs: [reference('DispatchFence', 'fence-1')] },
+  };
+  const reservationSnapshot = {
+    schemaVersion: '1.0.0', requestId: 'combined-snapshot', asOf: '2026-10-10T12:00:00Z', reservation,
+    state: 'held', heldAmount: reservation.held.amount, effectiveConsumedAmount: reservation.consumed.amount,
+    releasedAmount: '0', latestCumulativeSettlement: '0', overrunAmount: '0', usageFinality: 'unknown', expectedRevision: reservation.revision, attemptBinding,
+  };
+  const filters = { environments: ['test'], billingModes: ['simulated'], currency: summary.currency };
+  const summaryPage = {
+    schemaVersion: '1.0.0', requestId: 'combined-page', snapshotId: 'snapshot-1', queryContentHash: hash,
+    asOf: '2026-10-10T12:00:00Z', timezone: 'UTC',
+    watermark: { watermarkId: 'watermark-1', capturedAt: '2026-10-10T12:00:00Z', sources: [{ source: 'fixture-ledger', revision: 'r1', observedThrough: '2026-10-10T12:00:00Z', contentHash: hash, completeness: 'complete' }] },
+    filters, summaryContentHash: hash, summary, hasMore: false, nextCursor: null,
+  };
+  const exportRequest = {
+    schemaVersion: '1.0.0', requestId: 'combined-export', idempotencyKey: 'combined-export-idem',
+    scope: { ...scopeFor(summary), environment: 'test', billingMode: 'simulated' }, summarySnapshot: summaryPage, summaryContentHash: hash,
+    destination: 'cfo.ai', format: 'json', requestedAt: '2026-10-10T12:01:00Z', evidenceMode: 'mocked', requestedBy: 'fixture-user',
+  };
+  const cases = [
+    { validate: api.validateUsageObservationBoundary, request: usageObservation, nestedPath: ['usageEvent'] },
+    { validate: api.validateEstimateRequestBoundary, request: estimateRequest, nestedPath: ['usageEvent'] },
+    { validate: api.validateReservationRequestBoundary, request: reservationRequest, nestedPath: ['canonicalRequest'] },
+    { validate: api.validateSettleReservationCommandBoundary, request: settleCommand, nestedPath: ['canonicalCommand'] },
+    { validate: api.validateReleaseReservationCommandBoundary, request: releaseCommand, nestedPath: ['canonicalCommand'] },
+    { validate: api.validateReservationCommandBoundary, request: settleCommand, nestedPath: ['canonicalCommand'] },
+    { validate: api.validateReservationSnapshotBoundary, request: reservationSnapshot, nestedPath: ['reservation'] },
+    { validate: api.validateFinancialSummaryPageBoundary, request: summaryPage, nestedPath: ['summary'] },
+    { validate: api.validateExportRequestBoundary, request: exportRequest, nestedPath: ['summarySnapshot', 'summary'] },
+  ];
+  const nestedAt = (object, path) => path.slice(0, -1).reduce((current, key) => current[key], object)[path.at(-1)];
+  const replaceNested = (object, path, nested) => {
+    const copy = structuredClone(object);
+    path.slice(0, -1).reduce((current, key) => current[key], copy)[path.at(-1)] = nested;
+    return copy;
+  };
+
+  for (const item of cases) {
+    const valid = item.validate(item.request);
+    assert.equal(valid.ok, true, 'pinned canonical fixture must pass the combined public boundary');
+    const nested = nestedAt(item.request, item.nestedPath);
+    assert.equal(item.validate(replaceNested(item.request, item.nestedPath, {})).error.code, 'VALIDATION_ERROR', 'missing canonical fields reject');
+    assert.equal(item.validate(replaceNested(item.request, item.nestedPath, { ...structuredClone(nested), unexpectedCanonicalCanary: true })).error.code, 'VALIDATION_ERROR', 'unknown canonical fields reject');
+    assert.equal(item.validate(replaceNested(item.request, item.nestedPath, { ...structuredClone(nested), schema_version: '99.0.0' })).error.code, 'UNSUPPORTED_VERSION', 'unsupported canonical versions reject');
+  }
+  const malformedPage = { ...summaryPage, summary: { secret: 'not a FinancialSummary' } };
+  assert.equal(Value.Check(api.FinancialSummaryPageSchema, malformedPage), true, 'raw TypeBox artifact is explicitly a partial wrapper');
+  assert.equal(api.validateFinancialSummaryPageBoundary(malformedPage).error.code, 'VALIDATION_ERROR');
+  const malformedExport = { ...exportRequest, summarySnapshot: malformedPage };
+  assert.equal(Value.Check(api.ExportRequestSchema, malformedExport), true, 'raw export artifact is explicitly a partial wrapper');
+  assert.equal(api.validateExportRequestBoundary(malformedExport).error.code, 'VALIDATION_ERROR');
+
+  const markDispatched = {
+    ...commandBase, requestId: 'combined-dispatch', scope: scopeFor(usageEvent), action: 'mark_dispatched',
+    dispatchIntentRef: reference('DispatchIntent', 'dispatch-1'), workerLeaseId: 'lease-1', workerLeaseExpiresAt: '2026-10-10T12:05:00Z',
+  };
+  assert.equal(api.validateReservationCommandBoundary(markDispatched).ok, true, 'union validator dispatches mark action');
+  assert.equal(api.validateReservationCommandBoundary({ ...settleCommand, canonicalCommand: {} }).error.code, 'VALIDATION_ERROR');
+});
+
+test('generated partial wrapper schemas name their complete public validator in both catalog and artifact', async () => {
+  const index = JSON.parse(await readFile(join(root, 'docs/api/schema-index.json'), 'utf8'));
+  for (const entry of index.schemas) {
+    const bytes = await readFile(join(root, entry.path));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), entry.sha256, `generated schema digest ${entry.path}`);
+  }
+  const expected = new Map([
+    ['UsageObservationSchema', 'validateUsageObservationBoundary'], ['EstimateRequestSchema', 'validateEstimateRequestBoundary'],
+    ['ReservationRequestSchema', 'validateReservationRequestBoundary'], ['SettleReservationCommandSchema', 'validateSettleReservationCommandBoundary'],
+    ['ReleaseReservationCommandSchema', 'validateReleaseReservationCommandBoundary'], ['ReservationCommandSchema', 'validateReservationCommandBoundary'],
+    ['ReservationSnapshotSchema', 'validateReservationSnapshotBoundary'], ['FinancialSummaryPageSchema', 'validateFinancialSummaryPageBoundary'],
+    ['ExportRequestSchema', 'validateExportRequestBoundary'],
+  ]);
+  for (const [name, validator] of expected) {
+    const entry = index.schemas.find(schema => schema.name === name);
+    assert.ok(entry, `schema catalog has ${name}`);
+    assert.equal(entry.completeness, 'partial_wrapper_requires_combined_validation');
+    assert.equal(entry.combined_validator, validator);
+    assert.equal(typeof api[validator], 'function');
+    const artifact = JSON.parse(await readFile(join(root, entry.path), 'utf8'));
+    assert.equal(artifact['x-schema-completeness'], entry.completeness);
+    assert.equal(artifact['x-combined-validator'], validator);
+  }
 });

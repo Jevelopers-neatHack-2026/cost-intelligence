@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/FinancialSummaryFiltersSchema/1.0.0",
+  "x-schema-completeness": "complete",
   "additionalProperties": false,
   "type": "object",
   "required": [

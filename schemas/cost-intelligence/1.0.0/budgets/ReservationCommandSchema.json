@@ -1,6 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schemas.jevelopers.org/cost-intelligence/budgets/ReservationCommandSchema/1.0.0",
+  "x-schema-completeness": "partial_wrapper_requires_combined_validation",
+  "x-combined-validator": "validateReservationCommandBoundary",
   "anyOf": [
     {
       "additionalProperties": false,

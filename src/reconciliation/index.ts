@@ -1,5 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { blockedBoundary, CurrencySchema, DecimalAmountSchema, TrustedScopeSchema, type RuntimePorts } from '../shared/contracts.js';
+import { blockedBoundary, CurrencySchema, DecimalAmountSchema, TrustedScopeSchema, type ApiResult, type RuntimePorts } from '../shared/contracts.js';
 
 const SourceSnapshotSchema = Type.Object({
   name: Type.String({ minLength: 1 }), revision: Type.String({ minLength: 1 }), contentHash: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }),
@@ -37,9 +37,9 @@ export const ReconciliationResultSchema = Type.Object({
 }, { additionalProperties: false });
 export type ReconciliationResult = Static<typeof ReconciliationResultSchema>;
 
-export async function startReconciliation(request: ReconciliationRequest, ports: RuntimePorts) {
+export async function startReconciliation(request: ReconciliationRequest, ports: RuntimePorts): Promise<ApiResult<ReconciliationRun>> {
   return blockedBoundary<ReconciliationRequest, ReconciliationRun>({ module: 'reconciliation', operation: 'startReconciliation', schema: ReconciliationRequestSchema, request, ports, unavailableCode: 'RECONCILIATION_PENDING', safeMessage: 'Reconciliation cannot start until its source adapters and matching rules are delivered.', retryable: true });
 }
-export async function getReconciliation(request: ReconciliationRequest, ports: RuntimePorts) {
+export async function getReconciliation(request: ReconciliationRequest, ports: RuntimePorts): Promise<ApiResult<ReconciliationResult>> {
   return blockedBoundary<ReconciliationRequest, ReconciliationResult>({ module: 'reconciliation', operation: 'getReconciliation', schema: ReconciliationRequestSchema, request, ports, unavailableCode: 'RECONCILIATION_PENDING', safeMessage: 'Reconciliation results are unavailable until its source adapters and matching rules are delivered.', retryable: true });
 }

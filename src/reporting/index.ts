@@ -1,5 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { blockedBoundary, CurrencySchema, TrustedScopeSchema, errorEnvelope, failure, validateRequest, type RuntimePorts } from '../shared/contracts.js';
+import { blockedBoundary, CurrencySchema, TrustedScopeSchema, errorEnvelope, failure, validateRequest, type ApiResult, type RuntimePorts, type Validation } from '../shared/contracts.js';
 import { validateCanonical, type SharedFinancialSummary } from '../shared/canonical.js';
 
 const EnvironmentFilterSchema = Type.Array(Type.Union([
@@ -77,7 +77,21 @@ export const FinancialSummaryPageSchema = Type.Object({
 }, { additionalProperties: false });
 export type FinancialSummaryPage = Omit<Static<typeof FinancialSummaryPageSchema>, 'summary'> & { readonly summary: SharedFinancialSummary };
 
-export async function querySummary(request: FinancialSummaryQuery, ports: RuntimePorts) {
+/** Validate the page wrapper and its nested pinned FinancialSummary as one public boundary. */
+export function validateFinancialSummaryPageBoundary(
+  value: unknown,
+  context: { module?: string; operation?: string } = {},
+): Validation<FinancialSummaryPage> {
+  const module = context.module ?? 'reporting';
+  const operation = context.operation ?? 'financialSummaryPage';
+  const outer = validateRequest(FinancialSummaryPageSchema, value, module, operation);
+  if (!outer.ok) return outer;
+  const canonical = validateCanonical({ contract: 'FinancialSummary', value: outer.value.summary, module, operation, requestId: outer.value.requestId });
+  if (!canonical.ok) return canonical;
+  return { ok: true, value: { ...outer.value, summary: canonical.value } as FinancialSummaryPage };
+}
+
+export async function querySummary(request: FinancialSummaryQuery, ports: RuntimePorts): Promise<ApiResult<FinancialSummaryPage>> {
   const validation = validateRequest(FinancialSummaryQuerySchema, request, 'reporting', 'querySummary');
   if (!validation.ok) return failure(validation.error);
   const parsed = validation.value as FinancialSummaryQuery;

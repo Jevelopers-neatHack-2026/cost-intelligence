@@ -1,5 +1,5 @@
 import { Type, type Static } from '@sinclair/typebox';
-import { blockedBoundary, CurrencySchema, DecimalAmountSchema, errorEnvelope, failure, TrustedScopeSchema, validateRequest, type RuntimePorts } from '../shared/contracts.js';
+import { blockedBoundary, CurrencySchema, DecimalAmountSchema, errorEnvelope, failure, TrustedScopeSchema, validateRequest, type ApiResult, type RuntimePorts, type Validation } from '../shared/contracts.js';
 import { validateCanonical, type SharedUsageEvent } from '../shared/canonical.js';
 
 const VersionedReferenceSchema = Type.Object({
@@ -31,6 +31,15 @@ export const EstimateRequestSchema = Type.Object({
 }, { additionalProperties: false });
 export type EstimateRequest = Omit<Static<typeof EstimateRequestSchema>, 'usageEvent'> & { readonly usageEvent: SharedUsageEvent };
 
+/** Validate the finance wrapper and its nested pinned UsageEvent as one public boundary. */
+export function validateEstimateRequestBoundary(value: unknown): Validation<EstimateRequest> {
+  const outer = validateRequest(EstimateRequestSchema, value, 'pricing', 'estimate');
+  if (!outer.ok) return outer;
+  const canonical = validateCanonical({ contract: 'UsageEvent', value: outer.value.usageEvent, module: 'pricing', operation: 'estimate', requestId: outer.value.requestId });
+  if (!canonical.ok) return canonical;
+  return { ok: true, value: { ...outer.value, usageEvent: canonical.value } as EstimateRequest };
+}
+
 export const EstimateResultSchema = Type.Object({
   schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1 }), estimatedAt: Type.String({ format: 'date-time' }),
   status: Type.Union([Type.Literal('complete'), Type.Literal('partial'), Type.Literal('unknown'), Type.Literal('stale'), Type.Literal('pricing_unknown')]),
@@ -43,13 +52,12 @@ export const EstimateResultSchema = Type.Object({
 }, { additionalProperties: false });
 export type EstimateResult = Static<typeof EstimateResultSchema>;
 
-export async function estimate(request: EstimateRequest, ports: RuntimePorts) {
-  const validation = validateRequest(EstimateRequestSchema, request, 'pricing', 'estimate');
+export async function estimate(request: EstimateRequest, ports: RuntimePorts): Promise<ApiResult<EstimateResult>> {
+  const validation = validateEstimateRequestBoundary(request);
   if (!validation.ok) return failure(validation.error);
   const parsed = validation.value as EstimateRequest;
-  const canonical = validateCanonical({ contract: 'UsageEvent', value: parsed.usageEvent, module: 'pricing', operation: 'estimate', requestId: parsed.requestId });
-  if (!canonical.ok) return failure(canonical.error);
-  if (canonical.value.tenant_id !== parsed.scope.tenantId || canonical.value.project_id !== parsed.scope.projectId || canonical.value.environment !== parsed.scope.environment || canonical.value.billing_mode !== parsed.scope.billingMode) {
+  const event = parsed.usageEvent;
+  if (event.tenant_id !== parsed.scope.tenantId || event.project_id !== parsed.scope.projectId || event.environment !== parsed.scope.environment || event.billing_mode !== parsed.scope.billingMode) {
     return failure(errorEnvelope('pricing', 'estimate', 'FORBIDDEN_SCOPE', parsed.requestId, 'The usage event does not match the authenticated financial scope.'));
   }
   return blockedBoundary<EstimateRequest, EstimateResult>({ module: 'pricing', operation: 'estimate', schema: EstimateRequestSchema, request: parsed, ports, unavailableCode: 'PRICING_UNKNOWN', safeMessage: 'No reviewed rate card is available for the requested event-time selection.', retryable: false });

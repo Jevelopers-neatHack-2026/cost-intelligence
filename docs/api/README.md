@@ -34,7 +34,7 @@ Filters are proposed for environments, billing modes, currency, repository, work
 
 ## Schema artifacts and proposal pin
 
-`npm run build` generates the local TypeBox schemas in `schemas/cost-intelligence/1.0.0/` and their SHA-256 list in `docs/api/schema-index.json`. The build records shared-contract adoption state from `contracts.lock.json`.
+`npm run build` generates the local TypeBox schemas in `schemas/cost-intelligence/1.0.0/` and their SHA-256 list in `docs/api/schema-index.json`. The build records shared-contract adoption state from `contracts.lock.json`. Schemas whose JSON artifact contains an unconstrained nested canonical value are marked `partial_wrapper_requires_combined_validation` in both the schema (`x-schema-completeness`) and catalog. Consumers must use the named, exported combined validator from the corresponding ESM subpath; it validates the wrapper and the exact pinned shared-contract schema together. The paired validator names are recorded in `x-combined-validator` and `combined_validator`. This applies to usage observations, estimates, reservation requests and commands, reservation snapshots, summary pages, and export requests. The finance package does not copy or redefine the producer's canonical nested schemas.
 
 The checked-in archive under `vendor/` is exactly pinned by SHA-256 and installed as a real package dependency. Tests verify the installed version, archive digest, selected schema/fixture digests, Git blob IDs, and producer fixtures. The pin remains proposal-only with unresolved finance findings:
 

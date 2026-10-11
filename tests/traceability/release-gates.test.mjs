@@ -1,14 +1,23 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFile, readdir } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
-import test from 'node:test';
+import test, { after } from 'node:test';
 import { foundationTestFiles, databaseTestFiles, deferredDomainSuites, requiredDomainSuites, suitePlan } from '../../scripts/suite-policy.mjs';
 import { sanitizeOutput } from '../../scripts/sanitize.mjs';
-import { summarizeTap } from '../../scripts/tap-summary.mjs';
+import { requiredFilesHavePassingEvidence, runTestFile } from '../../scripts/test-file-evidence.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const evidenceFixtureDirectory = await mkdtemp(join(tmpdir(), 'ci01-test-evidence-'));
+after(async () => rm(evidenceFixtureDirectory, { recursive: true, force: true }));
+
+async function writeTestFixture(name, source) {
+  const path = join(evidenceFixtureDirectory, name);
+  await writeFile(path, source);
+  return path;
+}
 
 async function testFilesBelow(directory) {
   const result = new Set();
@@ -57,12 +66,14 @@ test('foundation suites name nonempty real evidence and integration/release fail
 
 test('release suite requires domain leaves and never treats an empty test set as passing', async () => {
   const runner = await readFile(join(root, 'scripts/run-suite.mjs'), 'utf8');
-  assert.match(runner, /summary\.meaningfulPass/);
+  assert.match(runner, /fileResultsPassed/);
   assert.match(runner, /plan\.missingFiles\.length === 0/);
-  assert.match(runner, /empty_test_suite/);
+  assert.match(runner, /empty_required_test_file/);
   assert.match(runner, /required_test_files_missing/);
   assert.match(runner, /invalid_suite_selector/);
   assert.match(runner, /adoptionAccepted: false/);
+  assert.match(runner, /testFileEvidence/);
+  assert.match(await readFile(join(root, 'scripts/run-suite.mjs'), 'utf8'), /runTestFile/);
 });
 
 test('runner rejects invalid and empty selectors without falling back to the full suite', async () => {
@@ -82,14 +93,61 @@ test('runner rejects invalid and empty selectors without falling back to the ful
   }
 });
 
-test('TAP evidence rejects empty, skipped, todo, cancelled, and failed suites', () => {
-  const successful = '1..2\n# tests 2\n# pass 2\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n';
-  assert.equal(summarizeTap(successful, 0).meaningfulPass, true);
-  assert.equal(summarizeTap('# tests 0\n# pass 0\n# fail 0\n', 0).meaningfulPass, false);
-  assert.equal(summarizeTap('# tests 2\n# pass 1\n# fail 0\n# skipped 1\n# todo 0\n# cancelled 0\n', 0).meaningfulPass, false);
-  assert.equal(summarizeTap('# tests 2\n# pass 1\n# fail 0\n# skipped 0\n# todo 1\n# cancelled 0\n', 0).meaningfulPass, false);
-  assert.equal(summarizeTap('# tests 1\n# pass 0\n# fail 0\n# skipped 0\n# todo 0\n# cancelled 1\n', 0).meaningfulPass, false);
-  assert.equal(summarizeTap('# tests 1\n# pass 0\n# fail 1\n# skipped 0\n# todo 0\n# cancelled 0\n', 1).meaningfulPass, false);
+test('Node 22 structured evidence rejects empty files and empty describe suites', async () => {
+  const commentOnly = await writeTestFixture('comment-only.test.mjs', '// deliberately contains no tests\n');
+  const emptyDescribe = await writeTestFixture('empty-describe.test.mjs', "import { describe } from 'node:test'; describe('empty suite', () => {});\n");
+  const commentEvidence = runTestFile(commentOnly, { cwd: evidenceFixtureDirectory });
+  const describeEvidence = runTestFile(emptyDescribe, { cwd: evidenceFixtureDirectory });
+  assert.equal(commentEvidence.passed, false);
+  assert.equal(commentEvidence.reason, 'required_test_file_empty');
+  assert.equal(commentEvidence.registeredTestCaseCount, 0);
+  assert.equal(describeEvidence.passed, false);
+  assert.equal(describeEvidence.reason, 'required_test_file_empty');
+  assert.equal(describeEvidence.registeredTestCaseCount, 0);
+});
+
+test('each required file needs its own nonempty executed evidence', async () => {
+  const real = await writeTestFixture('one-real.test.mjs', "import test from 'node:test'; test('real assertion', () => { if (2 + 2 !== 4) throw new Error('bad arithmetic'); });\n");
+  const empty = await writeTestFixture('one-empty.test.mjs', '// empty required leaf\n');
+  const mixedEvidence = [
+    runTestFile(real, { cwd: evidenceFixtureDirectory }),
+    runTestFile(empty, { cwd: evidenceFixtureDirectory }),
+  ].map((entry, index) => ({ path: index === 0 ? 'required-real.test.mjs' : 'required-empty.test.mjs', ...entry }));
+  assert.equal(mixedEvidence[0].passed, true);
+  assert.equal(mixedEvidence[0].registeredTestCaseCount, 1);
+  assert.equal(mixedEvidence[1].passed, false);
+  assert.equal(requiredFilesHavePassingEvidence(['required-real.test.mjs', 'required-empty.test.mjs'], mixedEvidence), false, 'an unrelated real file cannot satisfy an empty required file');
+  assert.equal(requiredFilesHavePassingEvidence(['required-real.test.mjs'], [mixedEvidence[0]]), true);
+  assert.equal(requiredFilesHavePassingEvidence(['required-real.test.mjs', 'missing.test.mjs'], [mixedEvidence[0]]), false);
+});
+
+test('Node 22 structured evidence rejects skipped, todo, cancelled, and failing cases', async () => {
+  const skipped = await writeTestFixture('all-skipped.test.mjs', "import test from 'node:test'; test('skipped', { skip: true }, () => {});\n");
+  const todo = await writeTestFixture('all-todo.test.mjs', "import test from 'node:test'; test('todo', { todo: true }, () => {});\n");
+  const mixed = await writeTestFixture('mixed-pass-skip.test.mjs', "import test from 'node:test'; test('pass', () => {}); test('skip', { skip: true }, () => {});\n");
+  const mixedTodo = await writeTestFixture('mixed-pass-todo.test.mjs', "import test from 'node:test'; test('pass', () => {}); test('todo', { todo: true }, () => {});\n");
+  const cancelled = await writeTestFixture('cancelled.test.mjs', "import test from 'node:test'; test('cancelled', { signal: AbortSignal.abort() }, () => {});\n");
+  const failed = await writeTestFixture('failed.test.mjs', "import test from 'node:test'; test('failure', () => { throw new Error('fixture failure'); });\n");
+  const cases = [
+    [runTestFile(skipped, { cwd: evidenceFixtureDirectory }), 'skipped_test_case_present'],
+    [runTestFile(todo, { cwd: evidenceFixtureDirectory }), 'todo_test_case_present'],
+    [runTestFile(mixed, { cwd: evidenceFixtureDirectory }), 'skipped_test_case_present'],
+    [runTestFile(mixedTodo, { cwd: evidenceFixtureDirectory }), 'todo_test_case_present'],
+    [runTestFile(cancelled, { cwd: evidenceFixtureDirectory }), 'cancelled_test_case_present'],
+    [runTestFile(failed, { cwd: evidenceFixtureDirectory }), 'test_case_failed'],
+  ];
+  for (const [evidence, expectedReason] of cases) {
+    assert.equal(evidence.passed, false, expectedReason);
+    assert.equal(evidence.reason, expectedReason);
+  }
+});
+
+test('missing required file cannot produce structured test evidence', async () => {
+  const missing = join(evidenceFixtureDirectory, 'missing-required.test.mjs');
+  const evidence = runTestFile(missing, { cwd: evidenceFixtureDirectory });
+  assert.equal(evidence.passed, false);
+  assert.equal(evidence.reason, 'structured_file_summary_missing');
+  assert.equal(evidence.registeredTestCaseCount, 0);
 });
 
 test('child output redacts database URLs, bearer tokens, password fields, and canaries', () => {

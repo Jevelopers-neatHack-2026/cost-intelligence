@@ -92,6 +92,16 @@ test('public domain boundaries return explicit unavailable results and never fab
   };
   await checkBoundary('release', release, 'BUDGET_UNAVAILABLE');
 
+  for (const [operation, command] of [
+    ['markDispatched', settle], ['markDispatched', release],
+    ['settle', dispatch], ['settle', release],
+    ['release', dispatch], ['release', settle],
+  ]) {
+    assertError(await api[operation](command, ports), 'VALIDATION_ERROR', `${operation} rejects ${command.action} action`);
+  }
+  assertError(await api.settle({ ...settle, canonicalCommand: {} }, ports), 'VALIDATION_ERROR', 'settle validates its pinned nested command');
+  assertError(await api.release({ ...release, canonicalCommand: {} }, ports), 'VALIDATION_ERROR', 'release validates its pinned nested command');
+
   const changeBudget = {
     ...base, newLimit: '100', currency: 'USD', expectedPolicyRevision: 4, expectedLedgerRevision: 8,
     actorReference: 'finance-controller', reasonReference: 'monthly-budget-review',
@@ -130,6 +140,21 @@ test('public domain boundaries return explicit unavailable results and never fab
     requestedAt: '2026-10-10T12:00:00Z', evidenceMode: 'mocked', requestedBy: 'finance-user',
   };
   await checkBoundary('exportSummary', exportRequest, 'SOURCE_UNAVAILABLE');
+  const scopeViolations = [
+    ['summary includes an additional production environment', value => { value.summarySnapshot.summary.included_environments = ['test', 'production']; }],
+    ['summary substitutes production for the authorized environment', value => { value.summarySnapshot.summary.included_environments = ['production']; }],
+    ['summary includes an additional live billing mode', value => { value.summarySnapshot.summary.included_billing_modes = ['simulated', 'live']; }],
+    ['summary substitutes live for the authorized billing mode', value => { value.summarySnapshot.summary.included_billing_modes = ['live']; }],
+    ['page filters add production', value => { value.summarySnapshot.filters.environments = ['test', 'production']; }],
+    ['page filters add live', value => { value.summarySnapshot.filters.billingModes = ['simulated', 'live']; }],
+    ['page environment selection differs from export scope', value => { value.summarySnapshot.filters.environments = ['production']; }],
+    ['page billing mode selection differs from export scope', value => { value.summarySnapshot.filters.billingModes = ['live']; }],
+  ];
+  for (const [label, mutate] of scopeViolations) {
+    const invalidScope = structuredClone(exportRequest);
+    mutate(invalidScope);
+    assertError(await api.exportSummary(invalidScope, ports), 'FORBIDDEN_SCOPE', label);
+  }
 
   assert.deepEqual(new Set(validRequests.map(({ operation }) => operation)), new Set([
     'ingestUsage', 'estimate', 'authorize', 'markDispatched', 'settle', 'release', 'changeBudget',

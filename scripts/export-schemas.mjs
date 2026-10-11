@@ -6,6 +6,17 @@ import * as api from '../dist/index.js';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const version = '1.0.0';
+const combinedValidators = Object.freeze({
+  UsageObservationSchema: 'validateUsageObservationBoundary',
+  EstimateRequestSchema: 'validateEstimateRequestBoundary',
+  ReservationRequestSchema: 'validateReservationRequestBoundary',
+  SettleReservationCommandSchema: 'validateSettleReservationCommandBoundary',
+  ReleaseReservationCommandSchema: 'validateReleaseReservationCommandBoundary',
+  ReservationCommandSchema: 'validateReservationCommandBoundary',
+  ReservationSnapshotSchema: 'validateReservationSnapshotBoundary',
+  FinancialSummaryPageSchema: 'validateFinancialSummaryPageBoundary',
+  ExportRequestSchema: 'validateExportRequestBoundary',
+});
 const entries = [
   ['shared', 'ErrorEnvelopeSchema'], ['shared', 'TrustedScopeSchema'],
   ['metering', 'UsageObservationSchema'], ['metering', 'IngestionReceiptSchema'],
@@ -24,13 +35,21 @@ const entries = [
 const outputs = [];
 for (const entry of entries) {
   if (!entry.schema || typeof entry.schema !== 'object') throw new Error(`Missing schema export: ${entry.module}.${entry.name}`);
-  const schema = { $schema: 'https://json-schema.org/draft/2020-12/schema', $id: `https://schemas.jevelopers.org/cost-intelligence/${entry.module}/${entry.name}/${version}`, ...entry.schema };
+  const combinedValidator = combinedValidators[entry.name];
+  const completeness = combinedValidator ? 'partial_wrapper_requires_combined_validation' : 'complete';
+  const schema = {
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    $id: `https://schemas.jevelopers.org/cost-intelligence/${entry.module}/${entry.name}/${version}`,
+    'x-schema-completeness': completeness,
+    ...(combinedValidator ? { 'x-combined-validator': combinedValidator } : {}),
+    ...entry.schema,
+  };
   const relative = `schemas/cost-intelligence/${version}/${entry.module}/${entry.name}.json`;
   const absolute = join(root, relative);
   const bytes = `${JSON.stringify(schema, null, 2)}\n`;
   await mkdir(dirname(absolute), { recursive: true });
   await writeFile(absolute, bytes);
-  outputs.push({ module: entry.module, name: entry.name, path: relative, sha256: createHash('sha256').update(bytes).digest('hex') });
+  outputs.push({ module: entry.module, name: entry.name, path: relative, completeness, ...(combinedValidator ? { combined_validator: combinedValidator } : {}), sha256: createHash('sha256').update(bytes).digest('hex') });
 }
 
 const contractLock = JSON.parse(await readFile(join(root, 'contracts.lock.json'), 'utf8'));
