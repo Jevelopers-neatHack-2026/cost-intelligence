@@ -1,0 +1,6 @@
+{
+  "image": "postgres@sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d",
+  "major": 16,
+  "source": "official Docker Hub library/postgres image",
+  "platform_selection": "Docker selects the platform-specific image from this immutable manifest digest"
+}

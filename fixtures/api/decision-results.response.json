@@ -1,0 +1,38 @@
+{
+  "budgetChange": [
+    {
+      "schemaVersion": "1.0.0",
+      "requestId": "budget-change-1",
+      "status": "applied",
+      "requestedLimit": "10",
+      "previousLimit": "12",
+      "effectiveLimit": "10",
+      "effectiveConsumedSpend": "4",
+      "activeUnconsumedCommitments": "5",
+      "expectedPolicyRevision": 2,
+      "resultingPolicyRevision": 3,
+      "alertThresholdPercent": 80,
+      "decisionPolicyVersion": "ci-budget-policy-1.0.0",
+      "decisionReference": { "contract": "BudgetDecision", "schema_version": "1.0.0", "id": "decision-1", "revision": 3, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    },
+    {
+      "schemaVersion": "1.0.0", "requestId": "budget-change-1", "status": "denied", "requestedLimit": "3", "previousLimit": "12", "effectiveLimit": "12", "effectiveConsumedSpend": "4", "activeUnconsumedCommitments": "5", "expectedPolicyRevision": 2, "resultingPolicyRevision": 2, "alertThresholdPercent": 80, "decisionPolicyVersion": "ci-budget-policy-1.0.0", "decisionReference": { "contract": "BudgetDecision", "schema_version": "1.0.0", "id": "decision-2", "revision": 2, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    },
+    {
+      "schemaVersion": "1.0.0", "requestId": "budget-change-1", "status": "stale", "requestedLimit": "10", "previousLimit": "12", "effectiveLimit": "12", "effectiveConsumedSpend": "4", "activeUnconsumedCommitments": "5", "expectedPolicyRevision": 1, "resultingPolicyRevision": 2, "alertThresholdPercent": 80, "decisionPolicyVersion": "ci-budget-policy-1.0.0", "decisionReference": { "contract": "BudgetDecision", "schema_version": "1.0.0", "id": "decision-3", "revision": 2, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    },
+    {
+      "schemaVersion": "1.0.0", "requestId": "budget-change-1", "status": "replay", "requestedLimit": "10", "previousLimit": "10", "effectiveLimit": "10", "effectiveConsumedSpend": "4", "activeUnconsumedCommitments": "5", "expectedPolicyRevision": 2, "resultingPolicyRevision": 3, "alertThresholdPercent": 80, "decisionPolicyVersion": "ci-budget-policy-1.0.0", "decisionReference": { "contract": "BudgetDecision", "schema_version": "1.0.0", "id": "decision-1", "revision": 3, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    },
+    {
+      "schemaVersion": "1.0.0", "requestId": "budget-change-1", "status": "conflict", "requestedLimit": "9", "previousLimit": "10", "effectiveLimit": "10", "effectiveConsumedSpend": "4", "activeUnconsumedCommitments": "5", "expectedPolicyRevision": 2, "resultingPolicyRevision": 3, "alertThresholdPercent": 80, "decisionPolicyVersion": "ci-budget-policy-1.0.0", "decisionReference": { "contract": "BudgetDecision", "schema_version": "1.0.0", "id": "decision-1", "revision": 3, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }
+    }
+  ],
+  "expenseAdjustment": [
+    { "schemaVersion": "1.0.0", "requestId": "adjustment-1", "postingId": "adjustment-posting-1", "status": "applied", "ledgerRevision": 9, "originalPostingRef": { "contract": "FinancialEvent", "schema_version": "1.0.0", "id": "posting-1", "revision": 8, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+    { "schemaVersion": "1.0.0", "requestId": "adjustment-1", "postingId": "adjustment-posting-1", "status": "denied", "ledgerRevision": 8, "originalPostingRef": { "contract": "FinancialEvent", "schema_version": "1.0.0", "id": "posting-1", "revision": 8, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+    { "schemaVersion": "1.0.0", "requestId": "adjustment-1", "postingId": "adjustment-posting-1", "status": "stale", "ledgerRevision": 8, "originalPostingRef": { "contract": "FinancialEvent", "schema_version": "1.0.0", "id": "posting-1", "revision": 8, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+    { "schemaVersion": "1.0.0", "requestId": "adjustment-1", "postingId": "adjustment-posting-1", "status": "replay", "ledgerRevision": 9, "originalPostingRef": { "contract": "FinancialEvent", "schema_version": "1.0.0", "id": "posting-1", "revision": 8, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+    { "schemaVersion": "1.0.0", "requestId": "adjustment-1", "postingId": "adjustment-posting-1", "status": "conflict", "ledgerRevision": 9, "originalPostingRef": { "contract": "FinancialEvent", "schema_version": "1.0.0", "id": "posting-1", "revision": 8, "content_hash": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } }
+  ]
+}

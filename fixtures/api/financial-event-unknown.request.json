@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0.0",
+  "requestId": "fixture-financial-event",
+  "idempotencyKey": "fixture-financial-event-idem",
+  "eventId": "financial-event-1",
+  "scope": {
+    "tenantId": "123e4567-e89b-42d3-a456-426614174000",
+    "projectId": "123e4567-e89b-42d3-a456-426614174000",
+    "environment": "test",
+    "billingMode": "simulated",
+    "actorId": "actor-1"
+  },
+  "sourceIdentity": {
+    "source": "fixture",
+    "sourceEventId": "evt-1",
+    "sourceRevision": "r1",
+    "contentHash": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "correlationId": "corr-1",
+  "occurredAt": "2026-10-10T11:59:00Z",
+  "observedAt": "2026-10-10T12:00:00Z",
+  "ingestedAt": "2026-10-10T12:00:01Z",
+  "evidenceMode": "mocked",
+  "verificationStatus": "unknown",
+  "classification": "direct_cost",
+  "amount": null,
+  "currency": "USD",
+  "scale": 18,
+  "valuation": "unknown",
+  "settlement": "unpaid",
+  "reconciliation": "unmatched",
+  "sourceRefs": [],
+  "dimensions": { "provider": "provider-a" }
+}

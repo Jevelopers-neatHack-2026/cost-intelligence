@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/shared/TrustedScopeSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "tenantId",
+    "projectId",
+    "environment",
+    "billingMode",
+    "actorId"
+  ],
+  "properties": {
+    "tenantId": {
+      "minLength": 1,
+      "maxLength": 128,
+      "type": "string"
+    },
+    "projectId": {
+      "minLength": 1,
+      "maxLength": 128,
+      "type": "string"
+    },
+    "environment": {
+      "anyOf": [
+        {
+          "const": "development",
+          "type": "string"
+        },
+        {
+          "const": "test",
+          "type": "string"
+        },
+        {
+          "const": "production",
+          "type": "string"
+        }
+      ]
+    },
+    "billingMode": {
+      "anyOf": [
+        {
+          "const": "live",
+          "type": "string"
+        },
+        {
+          "const": "sandbox",
+          "type": "string"
+        },
+        {
+          "const": "simulated",
+          "type": "string"
+        }
+      ]
+    },
+    "actorId": {
+      "minLength": 1,
+      "maxLength": 128,
+      "type": "string"
+    }
+  }
+}

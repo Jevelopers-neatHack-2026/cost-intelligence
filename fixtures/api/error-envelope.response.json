@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0.0",
+  "module": "budgets",
+  "operation": "authorize",
+  "code": "BUDGET_UNAVAILABLE",
+  "retryable": true,
+  "safe_message": "Atomic reservation is temporarily unavailable.",
+  "diagnostic_ref": "ci1:123e4567-e89b-42d3-a456-426614174000"
+}

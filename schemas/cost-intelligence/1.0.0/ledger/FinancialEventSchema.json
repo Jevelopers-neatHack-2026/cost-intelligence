@@ -1,0 +1,1035 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/ledger/FinancialEventSchema/1.0.0",
+  "anyOf": [
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "idempotencyKey",
+        "eventId",
+        "scope",
+        "sourceIdentity",
+        "correlationId",
+        "occurredAt",
+        "observedAt",
+        "ingestedAt",
+        "evidenceMode",
+        "verificationStatus",
+        "classification",
+        "currency",
+        "scale",
+        "settlement",
+        "reconciliation",
+        "sourceRefs",
+        "dimensions",
+        "amount",
+        "valuation"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "requestId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "eventId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "tenantId",
+            "projectId",
+            "environment",
+            "billingMode",
+            "actorId"
+          ],
+          "properties": {
+            "tenantId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "projectId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "environment": {
+              "anyOf": [
+                {
+                  "const": "development",
+                  "type": "string"
+                },
+                {
+                  "const": "test",
+                  "type": "string"
+                },
+                {
+                  "const": "production",
+                  "type": "string"
+                }
+              ]
+            },
+            "billingMode": {
+              "anyOf": [
+                {
+                  "const": "live",
+                  "type": "string"
+                },
+                {
+                  "const": "sandbox",
+                  "type": "string"
+                },
+                {
+                  "const": "simulated",
+                  "type": "string"
+                }
+              ]
+            },
+            "actorId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            }
+          }
+        },
+        "sourceIdentity": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "source",
+            "sourceEventId",
+            "sourceRevision",
+            "contentHash"
+          ],
+          "properties": {
+            "source": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            },
+            "sourceEventId": {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            "sourceObjectId": {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            "sourceRevision": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "contentHash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "correlationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "observedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "ingestedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "evidenceMode": {
+          "anyOf": [
+            {
+              "const": "mocked",
+              "type": "string"
+            },
+            {
+              "const": "sandbox",
+              "type": "string"
+            },
+            {
+              "const": "live",
+              "type": "string"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "anyOf": [
+            {
+              "const": "verified",
+              "type": "string"
+            },
+            {
+              "const": "unverified",
+              "type": "string"
+            },
+            {
+              "const": "unknown",
+              "type": "string"
+            }
+          ]
+        },
+        "classification": {
+          "anyOf": [
+            {
+              "const": "sale",
+              "type": "string"
+            },
+            {
+              "const": "discount",
+              "type": "string"
+            },
+            {
+              "const": "refund",
+              "type": "string"
+            },
+            {
+              "const": "credit",
+              "type": "string"
+            },
+            {
+              "const": "tax",
+              "type": "string"
+            },
+            {
+              "const": "fee",
+              "type": "string"
+            },
+            {
+              "const": "reimbursement",
+              "type": "string"
+            },
+            {
+              "const": "payout",
+              "type": "string"
+            },
+            {
+              "const": "direct_cost",
+              "type": "string"
+            },
+            {
+              "const": "expense",
+              "type": "string"
+            },
+            {
+              "const": "revenue",
+              "type": "string"
+            },
+            {
+              "const": "cash_movement",
+              "type": "string"
+            },
+            {
+              "const": "reversal",
+              "type": "string"
+            },
+            {
+              "const": "adjustment",
+              "type": "string"
+            }
+          ]
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "scale": {
+          "minimum": 0,
+          "maximum": 18,
+          "type": "integer"
+        },
+        "settlement": {
+          "anyOf": [
+            {
+              "const": "unpaid",
+              "type": "string"
+            },
+            {
+              "const": "partly_paid",
+              "type": "string"
+            },
+            {
+              "const": "paid",
+              "type": "string"
+            }
+          ]
+        },
+        "reconciliation": {
+          "anyOf": [
+            {
+              "const": "unmatched",
+              "type": "string"
+            },
+            {
+              "const": "matched",
+              "type": "string"
+            },
+            {
+              "const": "exception",
+              "type": "string"
+            }
+          ]
+        },
+        "sourceRefs": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "contract",
+              "schema_version",
+              "id",
+              "revision",
+              "content_hash"
+            ],
+            "properties": {
+              "contract": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "schema_version": {
+                "const": "1.0.0",
+                "type": "string"
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "revision": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "content_hash": {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "originalPostingRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "relatedEventRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "pricingPolicyRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "fxEvidenceRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "dimensions": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "repo": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "feature": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "provider": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "workflowId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "productId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "orderId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "channel": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        },
+        "reasonReference": {
+          "minLength": 1,
+          "maxLength": 200,
+          "type": "string"
+        },
+        "amount": {
+          "type": "null"
+        },
+        "valuation": {
+          "const": "unknown",
+          "type": "string"
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "idempotencyKey",
+        "eventId",
+        "scope",
+        "sourceIdentity",
+        "correlationId",
+        "occurredAt",
+        "observedAt",
+        "ingestedAt",
+        "evidenceMode",
+        "verificationStatus",
+        "classification",
+        "currency",
+        "scale",
+        "settlement",
+        "reconciliation",
+        "sourceRefs",
+        "dimensions",
+        "amount",
+        "valuation"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "requestId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "eventId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "tenantId",
+            "projectId",
+            "environment",
+            "billingMode",
+            "actorId"
+          ],
+          "properties": {
+            "tenantId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "projectId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "environment": {
+              "anyOf": [
+                {
+                  "const": "development",
+                  "type": "string"
+                },
+                {
+                  "const": "test",
+                  "type": "string"
+                },
+                {
+                  "const": "production",
+                  "type": "string"
+                }
+              ]
+            },
+            "billingMode": {
+              "anyOf": [
+                {
+                  "const": "live",
+                  "type": "string"
+                },
+                {
+                  "const": "sandbox",
+                  "type": "string"
+                },
+                {
+                  "const": "simulated",
+                  "type": "string"
+                }
+              ]
+            },
+            "actorId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            }
+          }
+        },
+        "sourceIdentity": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "source",
+            "sourceEventId",
+            "sourceRevision",
+            "contentHash"
+          ],
+          "properties": {
+            "source": {
+              "minLength": 1,
+              "maxLength": 120,
+              "type": "string"
+            },
+            "sourceEventId": {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            "sourceObjectId": {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            "sourceRevision": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "contentHash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "correlationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "occurredAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "observedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "ingestedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "evidenceMode": {
+          "anyOf": [
+            {
+              "const": "mocked",
+              "type": "string"
+            },
+            {
+              "const": "sandbox",
+              "type": "string"
+            },
+            {
+              "const": "live",
+              "type": "string"
+            }
+          ]
+        },
+        "verificationStatus": {
+          "anyOf": [
+            {
+              "const": "verified",
+              "type": "string"
+            },
+            {
+              "const": "unverified",
+              "type": "string"
+            },
+            {
+              "const": "unknown",
+              "type": "string"
+            }
+          ]
+        },
+        "classification": {
+          "anyOf": [
+            {
+              "const": "sale",
+              "type": "string"
+            },
+            {
+              "const": "discount",
+              "type": "string"
+            },
+            {
+              "const": "refund",
+              "type": "string"
+            },
+            {
+              "const": "credit",
+              "type": "string"
+            },
+            {
+              "const": "tax",
+              "type": "string"
+            },
+            {
+              "const": "fee",
+              "type": "string"
+            },
+            {
+              "const": "reimbursement",
+              "type": "string"
+            },
+            {
+              "const": "payout",
+              "type": "string"
+            },
+            {
+              "const": "direct_cost",
+              "type": "string"
+            },
+            {
+              "const": "expense",
+              "type": "string"
+            },
+            {
+              "const": "revenue",
+              "type": "string"
+            },
+            {
+              "const": "cash_movement",
+              "type": "string"
+            },
+            {
+              "const": "reversal",
+              "type": "string"
+            },
+            {
+              "const": "adjustment",
+              "type": "string"
+            }
+          ]
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "scale": {
+          "minimum": 0,
+          "maximum": 18,
+          "type": "integer"
+        },
+        "settlement": {
+          "anyOf": [
+            {
+              "const": "unpaid",
+              "type": "string"
+            },
+            {
+              "const": "partly_paid",
+              "type": "string"
+            },
+            {
+              "const": "paid",
+              "type": "string"
+            }
+          ]
+        },
+        "reconciliation": {
+          "anyOf": [
+            {
+              "const": "unmatched",
+              "type": "string"
+            },
+            {
+              "const": "matched",
+              "type": "string"
+            },
+            {
+              "const": "exception",
+              "type": "string"
+            }
+          ]
+        },
+        "sourceRefs": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "contract",
+              "schema_version",
+              "id",
+              "revision",
+              "content_hash"
+            ],
+            "properties": {
+              "contract": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "schema_version": {
+                "const": "1.0.0",
+                "type": "string"
+              },
+              "id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "revision": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "content_hash": {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "originalPostingRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "relatedEventRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "pricingPolicyRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "fxEvidenceRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "dimensions": {
+          "additionalProperties": false,
+          "type": "object",
+          "properties": {
+            "repo": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "feature": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "provider": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "model": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "workflowId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "productId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "orderId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "channel": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        },
+        "reasonReference": {
+          "minLength": 1,
+          "maxLength": 200,
+          "type": "string"
+        },
+        "amount": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "valuation": {
+          "anyOf": [
+            {
+              "const": "estimated",
+              "type": "string"
+            },
+            {
+              "const": "provider_confirmed",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

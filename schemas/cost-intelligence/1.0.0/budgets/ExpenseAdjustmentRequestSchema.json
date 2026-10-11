@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/budgets/ExpenseAdjustmentRequestSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "idempotencyKey",
+    "scope",
+    "adjustmentId",
+    "amount",
+    "currency",
+    "direction",
+    "expectedLedgerRevision",
+    "actorReference",
+    "reasonReference",
+    "originalPostingRef",
+    "sourceReference",
+    "sourceContentHash",
+    "evidenceMode"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tenantId",
+        "projectId",
+        "environment",
+        "billingMode",
+        "actorId"
+      ],
+      "properties": {
+        "tenantId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "const": "development",
+              "type": "string"
+            },
+            {
+              "const": "test",
+              "type": "string"
+            },
+            {
+              "const": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "billingMode": {
+          "anyOf": [
+            {
+              "const": "live",
+              "type": "string"
+            },
+            {
+              "const": "sandbox",
+              "type": "string"
+            },
+            {
+              "const": "simulated",
+              "type": "string"
+            }
+          ]
+        },
+        "actorId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        }
+      }
+    },
+    "adjustmentId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "amount": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "direction": {
+      "anyOf": [
+        {
+          "const": "increase_expense",
+          "type": "string"
+        },
+        {
+          "const": "decrease_expense",
+          "type": "string"
+        }
+      ]
+    },
+    "expectedLedgerRevision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "actorReference": {
+      "minLength": 1,
+      "maxLength": 200,
+      "type": "string"
+    },
+    "reasonReference": {
+      "minLength": 1,
+      "maxLength": 200,
+      "type": "string"
+    },
+    "originalPostingRef": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "contract",
+        "schema_version",
+        "id",
+        "revision",
+        "content_hash"
+      ],
+      "properties": {
+        "contract": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "content_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        }
+      }
+    },
+    "sourceReference": {
+      "minLength": 1,
+      "maxLength": 240,
+      "type": "string"
+    },
+    "sourceContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "evidenceMode": {
+      "anyOf": [
+        {
+          "const": "mocked",
+          "type": "string"
+        },
+        {
+          "const": "sandbox",
+          "type": "string"
+        },
+        {
+          "const": "live",
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,312 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/budgets/AuthorizationDecisionSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "decidedAt",
+    "status",
+    "reservationId",
+    "heldAmount",
+    "availableAmount",
+    "currency",
+    "estimateCompleteness",
+    "knownSubtotal",
+    "boundedConservativeMaximum",
+    "rateCardRef",
+    "policyRef",
+    "expiryEligibility",
+    "attemptBinding",
+    "partialAuthorization",
+    "retryAfterMs"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "decidedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "authorized",
+          "type": "string"
+        },
+        {
+          "const": "denied",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "type": "string"
+        }
+      ]
+    },
+    "reservationId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "heldAmount": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "availableAmount": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "estimateCompleteness": {
+      "anyOf": [
+        {
+          "const": "unknown",
+          "type": "string"
+        },
+        {
+          "const": "incomplete",
+          "type": "string"
+        },
+        {
+          "const": "complete",
+          "type": "string"
+        }
+      ]
+    },
+    "knownSubtotal": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "boundedConservativeMaximum": {
+      "anyOf": [
+        {
+          "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "rateCardRef": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "policyRef": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "contract",
+        "schema_version",
+        "id",
+        "revision",
+        "content_hash"
+      ],
+      "properties": {
+        "contract": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "content_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        }
+      }
+    },
+    "expiryEligibility": {
+      "anyOf": [
+        {
+          "const": "eligible_if_never_dispatched",
+          "type": "string"
+        },
+        {
+          "const": "not_expired",
+          "type": "string"
+        },
+        {
+          "const": "held_for_reconciliation",
+          "type": "string"
+        }
+      ]
+    },
+    "attemptBinding": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "logicalOperationId",
+        "transportAttemptId",
+        "providerRequestId",
+        "providerAttemptId",
+        "billableAttemptId"
+      ],
+      "properties": {
+        "logicalOperationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "transportAttemptId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "providerRequestId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "providerAttemptId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "billableAttemptId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    },
+    "partialAuthorization": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "allowedAmount",
+            "allowedWorkUnits",
+            "unit",
+            "callerAcknowledgementRequired",
+            "replanBeforeDispatch"
+          ],
+          "properties": {
+            "allowedAmount": {
+              "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+              "maxLength": 40,
+              "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+              "type": "string"
+            },
+            "allowedWorkUnits": {
+              "anyOf": [
+                {
+                  "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unit": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "callerAcknowledgementRequired": {
+              "const": true,
+              "type": "boolean"
+            },
+            "replanBeforeDispatch": {
+              "const": true,
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    },
+    "retryAfterMs": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

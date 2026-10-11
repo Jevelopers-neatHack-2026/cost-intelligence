@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0.0",
+  "requestId": "query-fixture-1",
+  "idempotencyKey": "query-fixture-idem",
+  "scope": {
+    "tenantId": "tenant-a",
+    "projectId": "project-a",
+    "environment": "test",
+    "billingMode": "simulated",
+    "actorId": "actor-a"
+  },
+  "period": {
+    "start": "2026-10-01T00:00:00Z",
+    "end": "2026-10-02T00:00:00Z"
+  },
+  "timezone": "America/New_York",
+  "requestedAsOf": "2026-10-02T00:00:00Z",
+  "pageSize": 100,
+  "filters": {
+    "environments": ["test"],
+    "billingModes": ["simulated"],
+    "currency": "USD",
+    "repositories": ["cost-intelligence"],
+    "workstreams": ["finance"],
+    "providers": ["openai"],
+    "models": ["model-a"],
+    "workflowIds": ["workflow-a"],
+    "jobIds": ["job-a"],
+    "featureCategories": ["analytics"],
+    "orderIds": ["order-a"],
+    "customerIds": ["customer-a"]
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/budgets/BudgetChangeRequestSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "idempotencyKey",
+    "scope",
+    "newLimit",
+    "currency",
+    "expectedPolicyRevision",
+    "expectedLedgerRevision",
+    "actorReference",
+    "reasonReference"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tenantId",
+        "projectId",
+        "environment",
+        "billingMode",
+        "actorId"
+      ],
+      "properties": {
+        "tenantId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "const": "development",
+              "type": "string"
+            },
+            {
+              "const": "test",
+              "type": "string"
+            },
+            {
+              "const": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "billingMode": {
+          "anyOf": [
+            {
+              "const": "live",
+              "type": "string"
+            },
+            {
+              "const": "sandbox",
+              "type": "string"
+            },
+            {
+              "const": "simulated",
+              "type": "string"
+            }
+          ]
+        },
+        "actorId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        }
+      }
+    },
+    "newLimit": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "expectedPolicyRevision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "expectedLedgerRevision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "actorReference": {
+      "minLength": 1,
+      "maxLength": 200,
+      "type": "string"
+    },
+    "reasonReference": {
+      "minLength": 1,
+      "maxLength": 200,
+      "type": "string"
+    }
+  }
+}

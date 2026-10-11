@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/pricing/RateCardSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "revision",
+    "provider",
+    "product",
+    "modelOrSku",
+    "currency",
+    "unitRates",
+    "effectiveFrom",
+    "effectiveTo",
+    "retrievedAt",
+    "sourceUrl",
+    "sourceContentHash",
+    "approvalRef",
+    "provenance"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "revision": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "provider": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "product": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "modelOrSku": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "unitRates": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "category",
+          "unit",
+          "rate",
+          "relation"
+        ],
+        "properties": {
+          "category": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "unit": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "rate": {
+            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+            "maxLength": 40,
+            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+            "type": "string"
+          },
+          "relation": {
+            "anyOf": [
+              {
+                "const": "standalone",
+                "type": "string"
+              },
+              {
+                "const": "included_subset",
+                "type": "string"
+              },
+              {
+                "const": "unknown_relation",
+                "type": "string"
+              }
+            ]
+          },
+          "includedIn": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "serviceTier": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "reasoningMode": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "toolClass": {
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      }
+    },
+    "effectiveFrom": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "effectiveTo": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "retrievedAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "sourceUrl": {
+      "format": "uri",
+      "type": "string"
+    },
+    "sourceContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "approvalRef": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "contract",
+        "schema_version",
+        "id",
+        "revision",
+        "content_hash"
+      ],
+      "properties": {
+        "contract": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "content_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        }
+      }
+    },
+    "provenance": {
+      "anyOf": [
+        {
+          "const": "synthetic_fixture",
+          "type": "string"
+        },
+        {
+          "const": "documented_tariff",
+          "type": "string"
+        },
+        {
+          "const": "owner_approved",
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

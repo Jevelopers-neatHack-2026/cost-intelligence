@@ -1,8 +1,8 @@
 # `cost-intelligence`
 
-**Repository status:** Verified existing on GitHub, private, October 10, 2026.
+**Repository status:** Verified existing on GitHub, public, October 10, 2026.
 **Proposed owner:** Finance and reliability.
-**Delivery state:** Architecture plan; implementation criteria remain planned until evidence is recorded.
+**Delivery state:** Foundation implementation candidate is under review; financial domain acceptance remains planned until evidence is recorded.
 
 ## Responsibility
 

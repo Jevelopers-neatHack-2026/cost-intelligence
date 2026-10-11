@@ -1,0 +1,162 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/budgets/ReservationSnapshotSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "asOf",
+    "reservation",
+    "state",
+    "heldAmount",
+    "effectiveConsumedAmount",
+    "releasedAmount",
+    "latestCumulativeSettlement",
+    "overrunAmount",
+    "usageFinality",
+    "expectedRevision",
+    "attemptBinding"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "asOf": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "reservation": {},
+    "state": {
+      "anyOf": [
+        {
+          "const": "held",
+          "type": "string"
+        },
+        {
+          "const": "dispatched",
+          "type": "string"
+        },
+        {
+          "const": "outcome_unknown",
+          "type": "string"
+        },
+        {
+          "const": "partially_settled",
+          "type": "string"
+        },
+        {
+          "const": "settled",
+          "type": "string"
+        },
+        {
+          "const": "released",
+          "type": "string"
+        },
+        {
+          "const": "expired",
+          "type": "string"
+        },
+        {
+          "const": "held_for_reconciliation",
+          "type": "string"
+        }
+      ]
+    },
+    "heldAmount": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "effectiveConsumedAmount": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "releasedAmount": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "latestCumulativeSettlement": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "overrunAmount": {
+      "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+      "type": "string"
+    },
+    "usageFinality": {
+      "anyOf": [
+        {
+          "const": "unknown",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "type": "string"
+        },
+        {
+          "const": "final",
+          "type": "string"
+        }
+      ]
+    },
+    "expectedRevision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "attemptBinding": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "logicalOperationId",
+        "transportAttemptId",
+        "providerRequestId",
+        "providerAttemptId",
+        "billableAttemptId"
+      ],
+      "properties": {
+        "logicalOperationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "transportAttemptId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "providerRequestId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "providerAttemptId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "billableAttemptId": {
+          "minLength": 1,
+          "type": "string"
+        }
+      }
+    }
+  }
+}

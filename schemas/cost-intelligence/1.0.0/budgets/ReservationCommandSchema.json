@@ -1,0 +1,778 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/budgets/ReservationCommandSchema/1.0.0",
+  "anyOf": [
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "idempotencyKey",
+        "scope",
+        "reservationId",
+        "expectedRevision",
+        "actorReference",
+        "sourceAuthorityRef",
+        "attemptBinding",
+        "action",
+        "dispatchIntentRef",
+        "workerLeaseId",
+        "workerLeaseExpiresAt"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "requestId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "tenantId",
+            "projectId",
+            "environment",
+            "billingMode",
+            "actorId"
+          ],
+          "properties": {
+            "tenantId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "projectId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "environment": {
+              "anyOf": [
+                {
+                  "const": "development",
+                  "type": "string"
+                },
+                {
+                  "const": "test",
+                  "type": "string"
+                },
+                {
+                  "const": "production",
+                  "type": "string"
+                }
+              ]
+            },
+            "billingMode": {
+              "anyOf": [
+                {
+                  "const": "live",
+                  "type": "string"
+                },
+                {
+                  "const": "sandbox",
+                  "type": "string"
+                },
+                {
+                  "const": "simulated",
+                  "type": "string"
+                }
+              ]
+            },
+            "actorId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            }
+          }
+        },
+        "reservationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "expectedRevision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "actorReference": {
+          "minLength": 1,
+          "maxLength": 200,
+          "type": "string"
+        },
+        "sourceAuthorityRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "attemptBinding": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "logicalOperationId",
+            "transportAttemptId",
+            "providerRequestId",
+            "providerAttemptId",
+            "billableAttemptId"
+          ],
+          "properties": {
+            "logicalOperationId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "transportAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "providerRequestId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "providerAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "billableAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        },
+        "action": {
+          "const": "mark_dispatched",
+          "type": "string"
+        },
+        "dispatchIntentRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "workerLeaseId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "workerLeaseExpiresAt": {
+          "format": "date-time",
+          "type": "string"
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "idempotencyKey",
+        "scope",
+        "reservationId",
+        "expectedRevision",
+        "actorReference",
+        "sourceAuthorityRef",
+        "attemptBinding",
+        "action",
+        "canonicalCommand",
+        "settlement"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "requestId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "tenantId",
+            "projectId",
+            "environment",
+            "billingMode",
+            "actorId"
+          ],
+          "properties": {
+            "tenantId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "projectId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "environment": {
+              "anyOf": [
+                {
+                  "const": "development",
+                  "type": "string"
+                },
+                {
+                  "const": "test",
+                  "type": "string"
+                },
+                {
+                  "const": "production",
+                  "type": "string"
+                }
+              ]
+            },
+            "billingMode": {
+              "anyOf": [
+                {
+                  "const": "live",
+                  "type": "string"
+                },
+                {
+                  "const": "sandbox",
+                  "type": "string"
+                },
+                {
+                  "const": "simulated",
+                  "type": "string"
+                }
+              ]
+            },
+            "actorId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            }
+          }
+        },
+        "reservationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "expectedRevision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "actorReference": {
+          "minLength": 1,
+          "maxLength": 200,
+          "type": "string"
+        },
+        "sourceAuthorityRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "attemptBinding": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "logicalOperationId",
+            "transportAttemptId",
+            "providerRequestId",
+            "providerAttemptId",
+            "billableAttemptId"
+          ],
+          "properties": {
+            "logicalOperationId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "transportAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "providerRequestId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "providerAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "billableAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        },
+        "action": {
+          "const": "settle",
+          "type": "string"
+        },
+        "canonicalCommand": {},
+        "settlement": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "measure",
+            "finality",
+            "sequence",
+            "cumulativeAmount",
+            "currency",
+            "usageCompleteness",
+            "sourceObservationRefs",
+            "allowObservedOverrun"
+          ],
+          "properties": {
+            "measure": {
+              "const": "cumulative",
+              "type": "string"
+            },
+            "finality": {
+              "anyOf": [
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "final",
+                  "type": "string"
+                }
+              ]
+            },
+            "sequence": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "cumulativeAmount": {
+              "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+              "maxLength": 40,
+              "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+              "type": "string"
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "usageCompleteness": {
+              "anyOf": [
+                {
+                  "const": "unknown",
+                  "type": "string"
+                },
+                {
+                  "const": "incomplete",
+                  "type": "string"
+                },
+                {
+                  "const": "complete",
+                  "type": "string"
+                }
+              ]
+            },
+            "sourceObservationRefs": {
+              "minItems": 1,
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "contract",
+                  "schema_version",
+                  "id",
+                  "revision",
+                  "content_hash"
+                ],
+                "properties": {
+                  "contract": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "schema_version": {
+                    "const": "1.0.0",
+                    "type": "string"
+                  },
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "content_hash": {
+                    "pattern": "^sha256:[a-f0-9]{64}$",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "allowObservedOverrun": {
+              "const": true,
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "requestId",
+        "idempotencyKey",
+        "scope",
+        "reservationId",
+        "expectedRevision",
+        "actorReference",
+        "sourceAuthorityRef",
+        "attemptBinding",
+        "action",
+        "canonicalCommand",
+        "release"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0",
+          "type": "string"
+        },
+        "requestId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "idempotencyKey": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "scope": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "tenantId",
+            "projectId",
+            "environment",
+            "billingMode",
+            "actorId"
+          ],
+          "properties": {
+            "tenantId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "projectId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            },
+            "environment": {
+              "anyOf": [
+                {
+                  "const": "development",
+                  "type": "string"
+                },
+                {
+                  "const": "test",
+                  "type": "string"
+                },
+                {
+                  "const": "production",
+                  "type": "string"
+                }
+              ]
+            },
+            "billingMode": {
+              "anyOf": [
+                {
+                  "const": "live",
+                  "type": "string"
+                },
+                {
+                  "const": "sandbox",
+                  "type": "string"
+                },
+                {
+                  "const": "simulated",
+                  "type": "string"
+                }
+              ]
+            },
+            "actorId": {
+              "minLength": 1,
+              "maxLength": 128,
+              "type": "string"
+            }
+          }
+        },
+        "reservationId": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "expectedRevision": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "actorReference": {
+          "minLength": 1,
+          "maxLength": 200,
+          "type": "string"
+        },
+        "sourceAuthorityRef": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "contract",
+            "schema_version",
+            "id",
+            "revision",
+            "content_hash"
+          ],
+          "properties": {
+            "contract": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "schema_version": {
+              "const": "1.0.0",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "revision": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "content_hash": {
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "type": "string"
+            }
+          }
+        },
+        "attemptBinding": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "logicalOperationId",
+            "transportAttemptId",
+            "providerRequestId",
+            "providerAttemptId",
+            "billableAttemptId"
+          ],
+          "properties": {
+            "logicalOperationId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "transportAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "providerRequestId": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "providerAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "billableAttemptId": {
+              "minLength": 1,
+              "type": "string"
+            }
+          }
+        },
+        "action": {
+          "const": "release",
+          "type": "string"
+        },
+        "canonicalCommand": {},
+        "release": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "amount",
+            "currency",
+            "reason",
+            "proof",
+            "evidenceRefs"
+          ],
+          "properties": {
+            "amount": {
+              "pattern": "^(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+              "maxLength": 40,
+              "description": "Non-negative base-10 decimal string with at most 18 fractional digits.",
+              "type": "string"
+            },
+            "currency": {
+              "pattern": "^[A-Z]{3}$",
+              "type": "string"
+            },
+            "reason": {
+              "minLength": 1,
+              "maxLength": 240,
+              "type": "string"
+            },
+            "proof": {
+              "anyOf": [
+                {
+                  "const": "never_dispatched_fenced",
+                  "type": "string"
+                },
+                {
+                  "const": "final_usage_known",
+                  "type": "string"
+                }
+              ]
+            },
+            "evidenceRefs": {
+              "minItems": 1,
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "contract",
+                  "schema_version",
+                  "id",
+                  "revision",
+                  "content_hash"
+                ],
+                "properties": {
+                  "contract": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "schema_version": {
+                    "const": "1.0.0",
+                    "type": "string"
+                  },
+                  "id": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "content_hash": {
+                    "pattern": "^sha256:[a-f0-9]{64}$",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

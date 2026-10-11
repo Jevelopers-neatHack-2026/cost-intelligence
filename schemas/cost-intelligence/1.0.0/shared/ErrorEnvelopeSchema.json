@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/shared/ErrorEnvelopeSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "module",
+    "operation",
+    "code",
+    "retryable",
+    "safe_message",
+    "diagnostic_ref"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "module": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "operation": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "code": {
+      "anyOf": [
+        {
+          "const": "VALIDATION_ERROR",
+          "type": "string"
+        },
+        {
+          "const": "UNSUPPORTED_VERSION",
+          "type": "string"
+        },
+        {
+          "const": "FORBIDDEN_SCOPE",
+          "type": "string"
+        },
+        {
+          "const": "IDEMPOTENCY_CONFLICT",
+          "type": "string"
+        },
+        {
+          "const": "PRICING_UNKNOWN",
+          "type": "string"
+        },
+        {
+          "const": "BUDGET_EXCEEDED",
+          "type": "string"
+        },
+        {
+          "const": "BUDGET_UNAVAILABLE",
+          "type": "string"
+        },
+        {
+          "const": "RECONCILIATION_PENDING",
+          "type": "string"
+        },
+        {
+          "const": "SOURCE_UNAVAILABLE",
+          "type": "string"
+        }
+      ]
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "safe_message": {
+      "minLength": 1,
+      "maxLength": 240,
+      "type": "string"
+    },
+    "diagnostic_ref": {
+      "minLength": 1,
+      "maxLength": 160,
+      "type": "string"
+    }
+  }
+}

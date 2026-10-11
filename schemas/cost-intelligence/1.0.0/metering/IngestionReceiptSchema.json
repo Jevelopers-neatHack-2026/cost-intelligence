@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/metering/IngestionReceiptSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "asOf",
+    "status",
+    "eventId",
+    "sourceObservationId",
+    "logicalOperationId",
+    "providerAttemptId",
+    "billableAttemptId",
+    "transportAttemptId",
+    "completeness",
+    "valuation",
+    "durableCommit"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "asOf": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "accepted",
+          "type": "string"
+        },
+        {
+          "const": "duplicate",
+          "type": "string"
+        },
+        {
+          "const": "quarantined",
+          "type": "string"
+        },
+        {
+          "const": "conflict",
+          "type": "string"
+        }
+      ]
+    },
+    "eventId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "sourceObservationId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "logicalOperationId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "providerAttemptId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "billableAttemptId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "transportAttemptId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "completeness": {
+      "anyOf": [
+        {
+          "const": "unknown",
+          "type": "string"
+        },
+        {
+          "const": "incomplete",
+          "type": "string"
+        },
+        {
+          "const": "complete",
+          "type": "string"
+        }
+      ]
+    },
+    "valuation": {
+      "anyOf": [
+        {
+          "const": "unknown",
+          "type": "string"
+        },
+        {
+          "const": "estimated",
+          "type": "string"
+        },
+        {
+          "const": "provider_confirmed",
+          "type": "string"
+        }
+      ]
+    },
+    "durableCommit": {
+      "type": "boolean"
+    },
+    "existingEventId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "quarantineCode": {
+      "minLength": 1,
+      "type": "string"
+    }
+  }
+}

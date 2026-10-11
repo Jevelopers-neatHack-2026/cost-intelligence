@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reconciliation/ReconciliationResultSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "runId",
+    "status",
+    "asOf",
+    "currency",
+    "matchedCount",
+    "unmatchedCount",
+    "exceptionCount",
+    "knownVariance",
+    "unknownVarianceCount",
+    "missingSources",
+    "sourceSnapshots",
+    "ownerReference",
+    "nextAction"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "runId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "pending",
+          "type": "string"
+        },
+        {
+          "const": "running",
+          "type": "string"
+        },
+        {
+          "const": "complete",
+          "type": "string"
+        },
+        {
+          "const": "needs_review",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "type": "string"
+        }
+      ]
+    },
+    "asOf": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "matchedCount": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "unmatchedCount": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "exceptionCount": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "knownVariance": {
+      "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+      "maxLength": 40,
+      "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+      "type": "string"
+    },
+    "unknownVarianceCount": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "missingSources": {
+      "maxItems": 100,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "sourceSnapshots": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "revision",
+          "contentHash",
+          "evidenceMode",
+          "verificationStatus"
+        ],
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "revision": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "contentHash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "evidenceMode": {
+            "anyOf": [
+              {
+                "const": "mocked",
+                "type": "string"
+              },
+              {
+                "const": "sandbox",
+                "type": "string"
+              },
+              {
+                "const": "live",
+                "type": "string"
+              }
+            ]
+          },
+          "verificationStatus": {
+            "anyOf": [
+              {
+                "const": "verified",
+                "type": "string"
+              },
+              {
+                "const": "unverified",
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "ownerReference": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "nextAction": {
+      "minLength": 1,
+      "type": "string"
+    }
+  }
+}

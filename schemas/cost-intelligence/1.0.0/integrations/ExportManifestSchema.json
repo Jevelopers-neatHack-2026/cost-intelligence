@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/integrations/ExportManifestSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "exportId",
+    "status",
+    "destination",
+    "summaryId",
+    "summaryRevision",
+    "summaryContentHash",
+    "snapshotId",
+    "snapshotAsOf",
+    "snapshotTimezone",
+    "watermarkId",
+    "queryContentHash",
+    "createdAt",
+    "itemCount",
+    "evidenceMode",
+    "deliveryReference"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "exportId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "prepared",
+          "type": "string"
+        },
+        {
+          "const": "delivered",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "type": "string"
+        }
+      ]
+    },
+    "destination": {
+      "const": "cfo.ai",
+      "type": "string"
+    },
+    "summaryId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "summaryRevision": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "summaryContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "snapshotId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "snapshotAsOf": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "snapshotTimezone": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "watermarkId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "queryContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "itemCount": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "evidenceMode": {
+      "anyOf": [
+        {
+          "const": "mocked",
+          "type": "string"
+        },
+        {
+          "const": "sandbox",
+          "type": "string"
+        },
+        {
+          "const": "live",
+          "type": "string"
+        }
+      ]
+    },
+    "deliveryReference": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

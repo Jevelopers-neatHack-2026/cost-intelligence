@@ -1,0 +1,298 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/FinancialSummaryPageSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "snapshotId",
+    "queryContentHash",
+    "asOf",
+    "timezone",
+    "watermark",
+    "filters",
+    "summaryContentHash",
+    "summary",
+    "hasMore",
+    "nextCursor"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "snapshotId": {
+      "minLength": 1,
+      "maxLength": 200,
+      "type": "string"
+    },
+    "queryContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "asOf": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "timezone": {
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z_+-]+(?:/[A-Za-z0-9_+.-]+)*$",
+      "type": "string"
+    },
+    "watermark": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "watermarkId",
+        "capturedAt",
+        "sources"
+      ],
+      "properties": {
+        "watermarkId": {
+          "minLength": 1,
+          "maxLength": 200,
+          "type": "string"
+        },
+        "capturedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "sources": {
+          "minItems": 1,
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "source",
+              "revision",
+              "observedThrough",
+              "contentHash",
+              "completeness"
+            ],
+            "properties": {
+              "source": {
+                "minLength": 1,
+                "maxLength": 120,
+                "type": "string"
+              },
+              "revision": {
+                "minLength": 1,
+                "maxLength": 128,
+                "type": "string"
+              },
+              "observedThrough": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "contentHash": {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "completeness": {
+                "anyOf": [
+                  {
+                    "const": "complete",
+                    "type": "string"
+                  },
+                  {
+                    "const": "partial",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unknown",
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "filters": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "environments",
+        "billingModes"
+      ],
+      "properties": {
+        "environments": {
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "const": "development",
+                "type": "string"
+              },
+              {
+                "const": "test",
+                "type": "string"
+              },
+              {
+                "const": "production",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "billingModes": {
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "const": "live",
+                "type": "string"
+              },
+              {
+                "const": "sandbox",
+                "type": "string"
+              },
+              {
+                "const": "simulated",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "repositories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "workstreams": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "providers": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "models": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "workflowIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "jobIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "featureCategories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "orderIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "customerIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        }
+      }
+    },
+    "summaryContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "summary": {},
+    "hasMore": {
+      "type": "boolean"
+    },
+    "nextCursor": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "maxLength": 2048,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

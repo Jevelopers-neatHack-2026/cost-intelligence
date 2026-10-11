@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reconciliation/ReconciliationRequestSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "idempotencyKey",
+    "scope",
+    "sourceSnapshots",
+    "windowStart",
+    "windowEnd",
+    "pageSize",
+    "requestedBy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "idempotencyKey": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tenantId",
+        "projectId",
+        "environment",
+        "billingMode",
+        "actorId"
+      ],
+      "properties": {
+        "tenantId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "const": "development",
+              "type": "string"
+            },
+            {
+              "const": "test",
+              "type": "string"
+            },
+            {
+              "const": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "billingMode": {
+          "anyOf": [
+            {
+              "const": "live",
+              "type": "string"
+            },
+            {
+              "const": "sandbox",
+              "type": "string"
+            },
+            {
+              "const": "simulated",
+              "type": "string"
+            }
+          ]
+        },
+        "actorId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        }
+      }
+    },
+    "sourceSnapshots": {
+      "minItems": 1,
+      "maxItems": 100,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "revision",
+          "contentHash",
+          "evidenceMode",
+          "verificationStatus"
+        ],
+        "properties": {
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "revision": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "contentHash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "evidenceMode": {
+            "anyOf": [
+              {
+                "const": "mocked",
+                "type": "string"
+              },
+              {
+                "const": "sandbox",
+                "type": "string"
+              },
+              {
+                "const": "live",
+                "type": "string"
+              }
+            ]
+          },
+          "verificationStatus": {
+            "anyOf": [
+              {
+                "const": "verified",
+                "type": "string"
+              },
+              {
+                "const": "unverified",
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "windowStart": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "windowEnd": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "runId": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "cursor": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "pageSize": {
+      "minimum": 1,
+      "maximum": 500,
+      "type": "integer"
+    },
+    "requestedBy": {
+      "minLength": 1,
+      "maxLength": 200,
+      "type": "string"
+    }
+  }
+}

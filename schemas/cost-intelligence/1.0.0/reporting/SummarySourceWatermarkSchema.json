@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/SummarySourceWatermarkSchema/1.0.0",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "source",
+    "revision",
+    "observedThrough",
+    "contentHash",
+    "completeness"
+  ],
+  "properties": {
+    "source": {
+      "minLength": 1,
+      "maxLength": 120,
+      "type": "string"
+    },
+    "revision": {
+      "minLength": 1,
+      "maxLength": 128,
+      "type": "string"
+    },
+    "observedThrough": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "contentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "completeness": {
+      "anyOf": [
+        {
+          "const": "complete",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "type": "string"
+        }
+      ]
+    }
+  }
+}
