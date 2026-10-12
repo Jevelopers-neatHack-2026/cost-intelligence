@@ -365,7 +365,7 @@ export async function recordExpenseAdjustment(request:ExpenseAdjustmentRequest|V
 }
 
 // Explicit host composition connects the public CI05A facades to this engine.
-// Reported settlement additionally requires the explicit private development decoder mount.
+// Reported settlement requires an independently authenticated collector and an explicit supported decoder mode.
 export * from './reservation-store.js';
 export * from './authority.js';
 export * from './evidence.js';
@@ -399,18 +399,29 @@ export async function retainUnknownOutcome(request:import('./reservation-store.j
   return failure(errorEnvelope('budgets','retainUnknown','BUDGET_UNAVAILABLE',request.requestId,'The durable outcome queue is not configured.',true));
 }
 export async function expireAuthorization(request:import('./reservation-store.js').ExpireReservationRequest,ports:RuntimePorts){
-  const engine=budgetPorts(ports);if(!engine)return failure(errorEnvelope('budgets','expireAuthorization','BUDGET_UNAVAILABLE',request.requestId,'The durable lifecycle authority is not configured.',true));
+  const engine=budgetPorts(ports);if(!engine){const module=await import('./reservation-store.js');return blockedBoundary<import('./reservation-store.js').ExpireReservationRequest,never>({module:'budgets',operation:'expireAuthorization',authorityOperation:'budgets.release',schema:module.ExpireReservationRequestSchema,request,ports,unavailableCode:'BUDGET_UNAVAILABLE',safeMessage:'The durable lifecycle authority is not configured.',retryable:true});}
   return import('./reservation-store.js').then(module=>module.expireReservation(request,engine));
 }
 export async function recoverReservations(request:import('./reservation-store.js').BudgetRecoveryRequest,ports:RuntimePorts){
-  const engine=budgetPorts(ports);if(!engine)return failure(errorEnvelope('budgets','recoverReservations','BUDGET_UNAVAILABLE',request.requestId,'The durable recovery queue is not configured.',true));
+  const engine=budgetPorts(ports);if(!engine){const module=await import('./reservation-store.js');return blockedBoundary<import('./reservation-store.js').BudgetRecoveryRequest,never>({module:'budgets',operation:'recoverReservations',authorityOperation:'reconciliation.startReconciliation',schema:module.BudgetRecoveryRequestSchema,request,ports,unavailableCode:'BUDGET_UNAVAILABLE',safeMessage:'The durable recovery queue is not configured.',retryable:true});}
   return import('./reservation-store.js').then(module=>module.recoverReservationBatch(request,engine));
 }
 export async function acknowledgeException(request:import('./reservation-store.js').BudgetExceptionActionRequest,ports:RuntimePorts){
-  const engine=budgetPorts(ports);if(!engine)return failure(errorEnvelope('budgets','acknowledgeException','RECONCILIATION_PENDING',request.requestId,'The durable reconciliation queue is not configured.',true));
+  const engine=budgetPorts(ports);if(!engine){const module=await import('./reservation-store.js');return blockedBoundary<import('./reservation-store.js').BudgetExceptionActionRequest,never>({module:'budgets',operation:'acknowledgeException',authorityOperation:'reconciliation.startReconciliation',schema:module.BudgetExceptionActionRequestSchema,request,ports,unavailableCode:'RECONCILIATION_PENDING',safeMessage:'The durable reconciliation queue is not configured.',retryable:true});}
   return import('./reservation-store.js').then(module=>module.actOnBudgetException(request,engine));
 }
 export async function getExceptions(request:import('./reservation-store.js').BudgetExceptionQuery,ports:RuntimePorts){
-  const engine=budgetPorts(ports);if(!engine)return failure(errorEnvelope('budgets','getExceptions','RECONCILIATION_PENDING',request.requestId,'The durable reconciliation queue is not configured.',true));
+  const engine=budgetPorts(ports);if(!engine){
+    const module=await import('./reservation-store.js');const valid=validateRequest(module.BudgetExceptionQuerySchema,request,'budgets','getExceptions');if(!valid.ok)return failure(valid.error);
+    const auth=await authorizeFinanceOperation({module:'budgets',requestOperation:'getExceptions',operation:'reconciliation.getReconciliation',scope:valid.value.scope,requestId:valid.value.requestId,clock:ports.clock,...(ports.financeAuthority?{financeAuthority:ports.financeAuthority}:{})});
+    if(!auth.ok)return failure(auth.error);
+    return failure(errorEnvelope('budgets','getExceptions','RECONCILIATION_PENDING',valid.value.requestId,'The durable reconciliation queue is not configured.',true));
+  }
   return import('./reservation-store.js').then(module=>module.readBudgetExceptions(request,engine));
+}
+/** Public root/subpath source reconciliation uses the same configured PostgreSQL budget authority as settlement. */
+export async function reconcileEvidence(request:import('./reservation-store.js').ReconcileReservationEvidenceRequest,ports:RuntimePorts){
+  const engine=budgetPorts(ports);const module=await import('./reservation-store.js');
+  if(!engine)return blockedBoundary<import('./reservation-store.js').ReconcileReservationEvidenceRequest,never>({module:'budgets',operation:'reconcileEvidence',authorityOperation:'reconciliation.startReconciliation',schema:module.ReconcileReservationEvidenceRequestSchema,request,ports,unavailableCode:'RECONCILIATION_PENDING',safeMessage:'The authenticated source reconciliation authority is not configured.',retryable:true});
+  return module.reconcileReservationEvidence(request,engine);
 }

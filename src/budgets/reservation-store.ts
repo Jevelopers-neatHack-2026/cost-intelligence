@@ -277,7 +277,10 @@ class DeadlineGate {
       })]);
     } finally { if(timer!==undefined)clearTimeout(timer); }
   }
-  checkpoint(): void { if (this.expired) throw new DeadlineExceeded('budget deadline exceeded'); }
+  checkpoint(): void {
+    // Timer delivery can lag asynchronous continuations; elapsed time is also a hard pre-effect boundary.
+    if (this.expired || Date.now() >= this.deadlineAt) { this.expired = true; throw new DeadlineExceeded('budget deadline exceeded'); }
+  }
   /** The commit is the point of no return: its outcome is unknown until acknowledged, and the deadline still applies. */
   beginCommit(): void { this.checkpoint(); this.committing = true; }
 }
@@ -1872,7 +1875,8 @@ export async function reconcileReservationEvidence(value:unknown,ports:BudgetRun
 export interface BudgetRecoveryBatch {
   readonly schemaVersion:'1.0.0';readonly requestId:string;readonly status:'applied'|'replay'|'stale_revision';readonly cursorRevision:number;
   readonly completedCycle:boolean;readonly candidates:readonly {reservationId:string;revision:number;state:ReservationLifecycleState;
-    attemptBinding:ReservationRequest['attemptBinding'];sourceAuthorityRef:VersionedReference;expiresAt:string;outstandingHold:string}[];
+    attemptBinding:ReservationRequest['attemptBinding'];authorityBinding:NonNullable<ReservationRequest['authorityBinding']>;
+    sourceAuthorityRef:VersionedReference;expiresAt:string;outstandingHold:string}[];
 }
 /** Durable keyset progress visits every row, including timestamp ties, rather than repeatedly selecting the oldest hold. */
 export async function recoverReservationBatch(value:unknown,ports:BudgetRuntimePorts):Promise<ApiResult<BudgetRecoveryBatch>>{
@@ -1911,10 +1915,11 @@ export async function recoverReservationBatch(value:unknown,ports:BudgetRuntimeP
       const candidates:BudgetRecoveryBatch['candidates'][number][]=[];
       for(const row of visited){
         gate.checkpoint();const state=await loadReservation(client,scope,asString(row.reservation_id));
-        if(!state?.authorizationRequest?.sourceAuthorityRef||state.usageFinality==='final'||state.held<=state.released+state.consumed)continue;
+        // A final/released hold can still acquire a genuine late charge. Scan the immutable attempt, not just positive holds.
+        if(!state?.authorizationRequest?.sourceAuthorityRef||!state.authorizationRequest.authorityBinding)continue;
         candidates.push({reservationId:asString(row.reservation_id),revision:state.revision,state:stateFor(state.lastType,state.usageFinality),
-          attemptBinding:state.authorizationRequest.attemptBinding,sourceAuthorityRef:state.authorizationRequest.sourceAuthorityRef,
-          expiresAt:state.financialExpiresAt??state.authorizationRequest.canonicalRequest.expires_at,outstandingHold:formatScaledDecimal(state.held-state.released-state.consumed)});
+          attemptBinding:state.authorizationRequest.attemptBinding,authorityBinding:state.authorizationRequest.authorityBinding,sourceAuthorityRef:state.authorizationRequest.sourceAuthorityRef,
+          expiresAt:state.financialExpiresAt??state.authorizationRequest.canonicalRequest.expires_at,outstandingHold:formatScaledDecimal(state.held>state.released+state.consumed?state.held-state.released-state.consumed:0n)});
       }
       const receipt:BudgetRecoveryBatch={schemaVersion:'1.0.0',requestId:request.requestId,status:'applied',cursorRevision:revision+1,completedCycle,candidates};
       const last=visited.at(-1);
@@ -1980,7 +1985,7 @@ export async function actOnBudgetException(value:unknown,ports:BudgetRuntimePort
       if(request.action==='hold'&&row.state==='resolved'||request.action==='reopen'&&row.state!=='resolved')
         return failure(makeError('actOnException','VALIDATION_ERROR',request.requestId,'The action does not match the current exception state.'));
       const nextState=request.action==='hold'?'held_for_reconciliation':request.action==='reopen'?'reopened':'resolved';
-      async function refreshFinality():Promise<ApiResult<readonly TimedBudgetProof[]>>{
+      async function refreshFinality():Promise<ApiResult<readonly AuthenticatedBudgetSource[]>>{
         if(request.action!=='resolve')return {ok:true,value:[]};
         if(!ports.sourceCollector||request.evidenceReference===null||!state?.authorizationRequest?.authorityBinding)return failure(makeError('actOnException','SOURCE_UNAVAILABLE',request.requestId,'Resolution requires current authenticated finality, not an acknowledgement or caller reference.'));
         const binding=state.authorizationRequest.authorityBinding;
@@ -1995,6 +2000,7 @@ export async function actOnBudgetException(value:unknown,ports:BudgetRuntimePort
         return {ok:true,value:[source]};
       }
       const source=await refreshFinality();if(!source.ok)return source;proofs.push(...source.value);
+      for(const record of source.value){await persistBudgetSource(client,record);gate.checkpoint();}
       const nextRevision=request.expectedRevision+1;
       const normalized=normalizedBudgetRequest(request);
       await client.query(`INSERT INTO cost_intelligence.budget_reconciliation_exceptions

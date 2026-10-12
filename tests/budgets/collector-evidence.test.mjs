@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {createAuthenticatedBudgetSourceResolver,budgetCollectorSigningBytes,budgetSourceBytesHash,budgetDigest} from '../../dist/budgets/index.js';
+import * as publicBudget from '../../dist/budgets/index.js';
 
 async function fixture(){
   let now=Date.parse('2026-10-12T12:00:00Z');const clock={now:()=>new Date(now)};
@@ -43,4 +44,25 @@ test('owner revocation during key resolution invalidates the earlier signed curr
   const f=await fixture();const original=f.backend.loadCurrentIssuerKey;let calls=0;
   f.backend.loadCurrentIssuerKey=async id=>{const key=await original(id);if(++calls===1){f.envelope.current.revoked=true;f.envelope.currentSignature=await f.sign('current',f.envelope.current);}return key;};
   assert.equal(await f.resolver.resolveCurrent(f.query),null);
+});
+test('public recovery/reconciliation boundaries deny current Finance permission before unconfigured domain and validate malformed requests first',async()=>{
+ const scope={tenantId:randomUUID(),projectId:randomUUID(),environment:'test',billingMode:'simulated',actorId:'synthetic-recovery-owner'};
+ const ref={contract:'ci-budget-source',schema_version:'1.0.0',id:randomUUID(),revision:1,content_hash:`sha256:${'a'.repeat(64)}`};
+ const attemptBinding={logicalOperationId:randomUUID(),transportAttemptId:randomUUID(),providerAttemptId:randomUUID(),billableAttemptId:randomUUID(),providerRequestId:null};
+ const base={schemaVersion:'1.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope};
+ const expiry={...base,reservationId:randomUUID(),expectedRevision:2,actorReference:scope.actorId,sourceAuthorityRef:ref,attemptBinding,reasonReference:'review-expired-unresolved'};
+ const cases=[
+  [publicBudget.expireAuthorization,expiry,'budgets.release'],
+  [publicBudget.recoverReservations,{...base,currency:'USD',jobReference:'recovery-fixture',expectedCursorRevision:0,pageSize:1,ownerReference:scope.actorId,actionReference:'inspect-current-evidence'},'reconciliation.startReconciliation'],
+  [publicBudget.acknowledgeException,{...base,currency:'USD',exceptionId:'synthetic-exception',expectedRevision:1,action:'hold',ownerReference:scope.actorId,actionReference:'inspect-current-evidence',evidenceReference:null},'reconciliation.startReconciliation'],
+  [publicBudget.getExceptions,{schemaVersion:'1.0.0',requestId:randomUUID(),scope,currency:'USD',pageSize:1,afterExceptionId:null,includeResolved:false},'reconciliation.getReconciliation'],
+  [publicBudget.reconcileEvidence,{...base,reservationId:expiry.reservationId,expectedRevision:2,actorReference:scope.actorId,sourceAuthorityRef:ref,attemptBinding,ownerReference:scope.actorId,actionReference:'inspect-current-evidence',finalityReference:null},'reconciliation.startReconciliation'],
+ ];
+ for(const [operation,request,expectedOperation] of cases){
+  let authorizations=0;const ports={clock:{now:()=>new Date('2026-10-12T12:00:00Z')},trustedContext:{resolve:async()=>scope},financeAuthority:{authorizeCurrent:async query=>{
+   authorizations++;assert.equal(query.operation,expectedOperation);return {status:'denied',decisionId:'synthetic-current-denial',operation:query.operation,permission:query.permission};
+  }}};
+  const denied=await operation(request,ports);assert.equal(denied.ok,false);assert.equal(denied.error.code,'FORBIDDEN_SCOPE');assert.equal(authorizations,1);
+  const invalid=await operation({...request,schemaVersion:'invalid'},ports);assert.equal(invalid.ok,false);assert.equal(invalid.error.code,'UNSUPPORTED_VERSION');assert.equal(authorizations,1);
+ }
 });
