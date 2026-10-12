@@ -40,7 +40,7 @@ The public script names are `test:accounting`, `test:adapters`, `test:budgets`, 
 | --- | --- | --- |
 | `contracts` | `tests/contracts/shared-contracts.test.mjs`, `tests/contracts/api-contract-shapes.test.mjs` | Node only |
 | `exports` | `tests/exports/public-exports.test.mjs` (includes the `npm pack` clean-consumer check) | Node only |
-| `smoke` | `tests/smoke/api-boundaries.test.mjs` | Node only |
+| `smoke` | `tests/smoke/api-boundaries.test.mjs`, `tests/smoke/postgres-cleanup.test.mjs` | Node only |
 | `traceability` | `tests/traceability/release-gates.test.mjs` | Node only |
 | `unit` | the five foundation files above | Node only |
 | `pricing` | `tests/pricing/pricing.test.mjs` | PostgreSQL 16 |
@@ -54,7 +54,7 @@ Leaf suites that are not implemented yet deliberately exit nonzero with an evide
 
 ## PostgreSQL lifecycle
 
-Docker Engine with a working local daemon is required for database-backed tests (`budgets`, `integration`, `ledger`, `migrations`, `pricing`, `recovery`, `release`, all run through [`scripts/with-postgres.mjs`](../scripts/with-postgres.mjs)). The lifecycle wrapper creates a PostgreSQL 16 container from the immutable digest in [`postgres-test-image.json`](../postgres-test-image.json), binds its random port to loopback, generates a random test-only database password in memory, waits for readiness, marks the disposable database, applies checksummed migrations, runs the selected suite, retains sanitized logs, and removes the container in `finally`. The password is not written to logs or manifests. `--offline` means tests do not call providers or external accounting services; Docker may fetch the pinned image when it is not cached.
+Docker Engine with a working local daemon is required for database-backed tests (`budgets`, `integration`, `ledger`, `migrations`, `pricing`, `recovery`, `release`, all run through [`scripts/with-postgres.mjs`](../scripts/with-postgres.mjs)). The lifecycle wrapper creates a PostgreSQL 16 container from the immutable digest in [`postgres-test-image.json`](../postgres-test-image.json), binds its random port to loopback, generates a random test-only database password in memory, waits for readiness, marks the disposable database, applies checksummed migrations, runs the selected suite, retains sanitized logs, and removes the container and its anonymous data volume in `finally` (`docker rm --force --volumes <container-name>`; named volumes are left alone). The password is not written to logs or manifests. `--offline` means tests do not call providers or external accounting services; Docker may fetch the pinned image when it is not cached.
 
 `npm run test:migrations -- --offline` checks both an empty database and a previous-foundation fixture containing migration `0001`. It creates a uniquely named sibling database for the previous fixture, applies the pending upgrade, verifies health and durable records from a separate worker process, and drops that sibling database in cleanup.
 
