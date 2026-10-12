@@ -412,6 +412,8 @@ async function bindDeadline(client: BudgetTransactionPort, gate: DeadlineGate): 
 }
 
 /** Acquire the per-partition authority lock within the transaction's bounded deadline. */
+class FinancialPrivacyRestrictedError extends Error {}
+
 async function acquirePartitionLock(
   client: BudgetTransactionPort,
   scope: TrustedScope,
@@ -431,7 +433,7 @@ async function acquirePartitionLock(
     WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 LIMIT 1`,
     [scope.tenantId,scope.projectId,scope.environment,scope.billingMode]);
   gate.checkpoint();
-  if(restricted.rows.length)throw new Error('Financial history is restricted pending financial review.');
+  if(restricted.rows.length)throw new FinancialPrivacyRestrictedError('Financial history is restricted pending financial review.');
   return true;
 }
 
@@ -827,6 +829,12 @@ export async function authorizeReservation(
   const validated = validateReservationRequestBoundary(value);
   if (!validated.ok) return failure(validated.error);
   const request = structuredClone(validated.value) as ReservationRequest;
+  // Structural contradictions cannot become an unavailable financial decision when a database/proof is absent.
+  const estimate=request.estimate,canonical=request.canonicalRequest;
+  if(estimate.currency!==canonical.currency||canonical.requested.currency!==canonical.currency
+    ||estimate.completeness==='complete'&&estimate.maximumPolicyRef===undefined&&!sameAmount(canonical.requested.amount,estimate.knownSubtotal)
+    ||estimate.boundedConservativeMaximum!==undefined&&parseScaledDecimal(estimate.boundedConservativeMaximum)<parseScaledDecimal(estimate.knownSubtotal))
+    return failure(makeError('authorize','VALIDATION_ERROR',request.requestId,'The estimate and exact requested money are contradictory.'));
   const scope = request.scope as TrustedScope;
   const requestId = request.requestId;
   const waitMs = resolveWaitMs(ports);
@@ -1032,8 +1040,9 @@ export async function authorizeReservation(
         ok: true,
         value: buildDecision({ requestId, request, currency, now, status, reservationId, held: hold, available: availableAfter, partialAllowed, policyRef, rateCardRef: request.estimate.rateCardRef, evidenceRef: `ci05a:${eventId}`, evidenceHash: contentHash, authorizedCap: need, authorityExpiresAt:returnedBound.expiresAt }),
       };
-    } catch {
+    } catch (error) {
       if (client && inTransaction) await rollback(client);
+      if(error instanceof FinancialPrivacyRestrictedError)return failure(makeError('authorize','BUDGET_UNAVAILABLE',requestId,'Financial history is restricted pending current financial review.',true));
       return unavailable();
     } finally {
       if(client&&inTransaction)await rollback(client);

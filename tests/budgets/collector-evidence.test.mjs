@@ -86,3 +86,34 @@ test('root and reconciliation subpath version2 require current exact grants and 
   principal:{kind:'service',actorId:scope.actorId,serviceStatus:'active',serviceGrantRevision:'synthetic-1'},verifiedAt:'2026-10-12T12:00:00Z',expiresAt:'2026-10-12T12:01:00Z'});
  const unavailable=await root.startReconciliation(start,ports);assert.equal(unavailable.ok,false);assert.equal(unavailable.error.code,'RECONCILIATION_PENDING');assert.equal(connects,0);
 });
+
+test('root and reconciliation subpath reject null, undefined and non-object requests through typed validation',async()=>{
+ const root=await import('../../dist/index.js'),module=await import('../../dist/reconciliation/index.js');
+ let domain=0,authority=0;const ports={clock:{now:()=>new Date('2026-10-12T12:00:00Z')},trustedContext:{resolve:async()=>{domain++;return null;}},
+  financeAuthority:{authorizeCurrent:async()=>{authority++;throw new Error('must validate first');}}};
+ for(const api of [root,module])for(const operation of [api.startReconciliation,api.getReconciliation])for(const value of [null,undefined,0,'request',[]]){
+  const result=await operation(value,ports);assert.equal(result.ok,false);assert.equal(result.error.code,'VALIDATION_ERROR');
+ }
+ assert.equal(domain,0);assert.equal(authority,0);
+});
+test('reconciliation caller deadline bounds pending BEGIN, query and ROLLBACK without reusing an in-flight connection',async()=>{
+ const api=await import('../../dist/reconciliation/index.js');
+ for(const operation of ['startReconciliation','getReconciliation'])for(const stall of ['BEGIN','scope','ROLLBACK']){
+  const scope={tenantId:randomUUID(),projectId:randomUUID(),environment:'test',billingMode:'simulated',actorId:'synthetic-deadline-owner'};
+  const request=operation==='startReconciliation'?{schemaVersion:'2.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope,currency:'USD',jobReference:'synthetic-bounded',expectedCursorRevision:0,pageSize:1,ownerReference:scope.actorId,actionReference:'verify-current-source'}:
+   {schemaVersion:'2.0.0',requestId:randomUUID(),scope,runId:`sha256:${'a'.repeat(64)}`};
+  let unblock,released=0;const queries=[];
+  const withheld=new Promise(resolve=>{unblock=()=>resolve({rows:[],rowCount:0});});
+  const ports={clock:{now:()=>new Date('2026-10-12T12:00:00Z')},trustedContext:{resolve:async()=>scope},budgets:{authorityWaitMs:30,
+   reportedCostContractMode:'finance_collector_v1',sourceCollector:{findAttemptEvidence:async()=>null},database:{connect:async()=>({release(){released++;},query:async text=>{
+    const phase=text.trim().toUpperCase();queries.push(phase.startsWith('SELECT SET_CONFIG')?'scope':phase==='BEGIN'||phase==='ROLLBACK'?phase:'query');
+    if(phase===stall||stall==='scope'&&phase.startsWith('SELECT SET_CONFIG'))return withheld;return {rows:[],rowCount:0};
+   }})}},financeAuthority:{authorizeCurrent:async query=>({status:'allowed',decisionId:'synthetic-current-grant',operation:query.operation,permission:query.permission,scope,
+    principal:{kind:'service',actorId:scope.actorId,serviceStatus:'active',serviceGrantRevision:'synthetic-1'},verifiedAt:'2026-10-12T12:00:00Z',expiresAt:'2026-10-12T12:01:00Z'})}};
+  const started=Date.now();let observationTimer;
+  const result=await Promise.race([api[operation](request,ports),new Promise(resolve=>{observationTimer=setTimeout(()=>resolve(null),200);})]);clearTimeout(observationTimer);
+  assert.notEqual(result,null);assert.equal(result.ok,false);assert.equal(result.error.code,'RECONCILIATION_PENDING');assert.ok(Date.now()-started<180);
+  assert.equal(released,0,'a pending query or cleanup never returns the connection for reuse');assert.equal(queries.includes('COMMIT'),false);
+  unblock();await new Promise(resolve=>setTimeout(resolve,10));assert.equal(released,1);assert.equal(queries.includes('COMMIT'),false);
+ }
+});

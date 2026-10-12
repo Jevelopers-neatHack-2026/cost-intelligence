@@ -31,13 +31,22 @@ class CycleGate{
   finally{if(timer!==undefined)clearTimeout(timer);}
  }
 }
+/** The caller deadline is independent of pending query/cleanup promises. Cleanup owns its connection until every in-flight query finishes. */
+async function runCycle<T>(milliseconds:number,requestId:string,work:(gate:CycleGate)=>Promise<ApiResult<T>>):Promise<ApiResult<T>>{
+ const gate=new CycleGate(milliseconds);let timer:ReturnType<typeof setTimeout>|undefined;
+ const pending=Promise.resolve().then(()=>work(gate)).catch(()=>unavailable(requestId));
+ try{return await Promise.race([pending,new Promise<ApiResult<T>>(resolve=>{
+  timer=setTimeout(()=>{gate.expired=true;resolve(unavailable(requestId));},milliseconds);
+ })]);}finally{if(timer!==undefined)clearTimeout(timer);}
+}
 function guardedDatabase(ports:BudgetRuntimePorts,gate:CycleGate):BudgetRuntimePorts['database']{
  return {connect:async()=>{
   const pending=ports.database.connect().then(client=>{if(gate.expired||Date.now()>=gate.until){client.release();throw new Error('late reconciliation connection');}return client;});
   const client=await gate.wait(pending);
   return {release:()=>client.release(),query:async(text,values)=>{
    // Cleanup must remain possible after cancellation. In-flight COMMIT stays an uncertain durable outcome.
-   if(text.trim().toUpperCase()!=='ROLLBACK')gate.checkpoint();return client.query(text,values);
+   const cleanup=text.trim().toUpperCase()==='ROLLBACK';
+   if(!cleanup)gate.checkpoint();const result=await client.query(text,values);if(!cleanup)gate.checkpoint();return result;
   }};
  }};
 }
@@ -71,7 +80,8 @@ export async function startBudgetReconciliation(value:unknown,ports:RuntimePorts
  if(!Value.Check(BudgetReconciliationRequestSchema,value))return failure(errorEnvelope('reconciliation','startReconciliation','VALIDATION_ERROR',String((value as {requestId?:unknown})?.requestId??'unknown'),'The Finance reconciliation request is malformed.'));
  const request=structuredClone(value),engine=runtime(ports),milliseconds=engine?.authorityWaitMs??2000;
  if(!Number.isSafeInteger(milliseconds)||milliseconds<1||milliseconds>60000)return unavailable(request.requestId);
- const gate=new CycleGate(milliseconds),proofs:Proof[]=[];let client:BudgetTransactionPort|undefined,transaction=false;
+ return runCycle(milliseconds,request.requestId,async gate=>{
+ const proofs:Proof[]=[];let client:BudgetTransactionPort|undefined,transaction=false;
  try{
   const granted=await permission(ports,request,'reconciliation.startReconciliation',proofs,gate);if(!granted.ok)return failure(granted.error);
   if(!engine||!engine.sourceCollector?.findAttemptEvidence||!engine.reportedCostContractMode)return unavailable(request.requestId);
@@ -144,13 +154,15 @@ export async function startBudgetReconciliation(value:unknown,ports:RuntimePorts
   const acknowledged=await permission(ports,request,'reconciliation.startReconciliation',proofs,gate);if(!acknowledged.ok)return unavailable(request.requestId);
   return {ok:true,value:receipt};
  }catch{return unavailable(request.requestId);}finally{if(client&&transaction)await client.query('ROLLBACK').catch(()=>{});client?.release();}
+ });
 }
 
 export async function getBudgetReconciliation(value:unknown,ports:RuntimePorts):Promise<ApiResult<BudgetReconciliationReceipt>>{
  if(!Value.Check(BudgetReconciliationQuerySchema,value))return failure(errorEnvelope('reconciliation','getReconciliation','VALIDATION_ERROR',String((value as {requestId?:unknown})?.requestId??'unknown'),'The Finance reconciliation query is malformed.'));
  const request=structuredClone(value),engine=runtime(ports),milliseconds=engine?.authorityWaitMs??2000;
  if(!Number.isSafeInteger(milliseconds)||milliseconds<1||milliseconds>60000)return unavailable(request.requestId);
- const gate=new CycleGate(milliseconds),proofs:Proof[]=[];let client:BudgetTransactionPort|undefined,transaction=false;
+ return runCycle(milliseconds,request.requestId,async gate=>{
+ const proofs:Proof[]=[];let client:BudgetTransactionPort|undefined,transaction=false;
  try{
   const granted=await permission(ports,request,'reconciliation.getReconciliation',proofs,gate);if(!granted.ok)return failure(granted.error);if(!engine)return unavailable(request.requestId);
   client=await guardedDatabase(engine,gate).connect();transaction=true;await begin(client,request.scope,gate);
@@ -161,4 +173,5 @@ export async function getBudgetReconciliation(value:unknown,ports:RuntimePorts):
   const acknowledged=await permission(ports,request,'reconciliation.getReconciliation',proofs,gate);if(!acknowledged.ok)return unavailable(request.requestId);
   return {ok:true,value:{...structuredClone(result.rows[0].command_receipt) as BudgetReconciliationReceipt,requestId:request.requestId,replay:true}};
  }catch{return unavailable(request.requestId);}finally{if(client&&transaction)await client.query('ROLLBACK').catch(()=>{});client?.release();}
+ });
 }

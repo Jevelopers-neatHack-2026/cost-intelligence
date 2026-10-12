@@ -4,16 +4,17 @@ import './settlement-integrity.test.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import {diagnosticTest} from './static-diagnostics.mjs';
+import {diagnosticTest,diagnosticBudgetOperation} from './static-diagnostics.mjs';
 const test=diagnosticTest('authorization.test.mjs');
 import {
-  authorizeReservation, changeBudgetPolicy, readCapacity, markReservationDispatched, normalizedBudgetRequest,
+  authorizeReservation as rawAuthorizeReservation, changeBudgetPolicy as rawChangeBudgetPolicy, readCapacity, markReservationDispatched, normalizedBudgetRequest,
 } from '../../dist/index.js';
 import {
   loadReserveFixture, setBudgetLimit, reservationPool, makePorts, makeScope, policyChange, reservationRequest,
   scriptedClient, scriptedPorts, partitionRows, delay,
 } from './reservation-harness.mjs';
 
+const authorizeReservation=diagnosticBudgetOperation(rawAuthorizeReservation),changeBudgetPolicy=diagnosticBudgetOperation(rawChangeBudgetPolicy);
 const fixturePromise = loadReserveFixture();
 
 async function intakeObservation(scope, { binding, money } = {}) {

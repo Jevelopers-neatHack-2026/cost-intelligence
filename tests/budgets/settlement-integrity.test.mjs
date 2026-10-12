@@ -1,11 +1,12 @@
-import {diagnosticTest} from './static-diagnostics.mjs';
+import {diagnosticTest,diagnosticBudgetApi} from './static-diagnostics.mjs';
 const test=diagnosticTest('settlement-integrity.test.mjs');
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Value} from '@sinclair/typebox/value';
 import pg from 'pg';
 import {databaseConfigFromEnvironment} from '../../scripts/test-db-lifecycle.mjs';
-import * as api from '../../dist/budgets/index.js';
+import * as rawApi from '../../dist/budgets/index.js';
+const api=diagnosticBudgetApi(rawApi);
 import * as reconciliation from '../../dist/reconciliation/index.js';
 import {appendLedgerEvent} from '../../dist/ledger/store.js';
 import {loadReserveFixture,setBudgetLimit,reservationPool,makeScope,makePorts,reservationRequest,markDispatchedCommand,settleCommand,releaseCommand,FIXED_TIME} from './reservation-harness.mjs';
@@ -280,7 +281,7 @@ test('CI05B public partial acknowledgement persists SHA text, replays one receip
   assert.equal(Value.Check(api.PartialAcknowledgementRequestSchema,ack),true);
   const accepted=await api.acknowledgePartial(ack,f.ports);assert.equal(accepted.ok,true,JSON.stringify(accepted));assert.equal(accepted.value.state,'held');assert.equal(accepted.value.revision,2);
   const replay=await api.acknowledgePartial(ack,f.ports);assert.equal(replay.ok,true);assert.equal(replay.value.status,'replay');
-  const command=markDispatchedCommand(f.scope,f.reservationId,2,{attemptBinding:f.request.attemptBinding});const dispatched=await api.markDispatched(command,f.ports);assert.equal(dispatched.ok,true,JSON.stringify(dispatched));assert.equal(dispatched.value.state,'dispatched');assert.equal(dispatched.value.revision,3);
+  const command=markDispatchedCommand(f.scope,f.reservationId,2,{attemptBinding:f.request.attemptBinding});const dispatched=await api.markDispatched(command,f.ports);assert.equal(dispatched.ok,true,JSON.stringify(dispatched));assert.equal(dispatched.value.state,'dispatched');assert.equal(dispatched.value.expectedRevision,3);
   const rows=await f.pool.query(`SELECT count(*)::int AS n,min(content_hash)::text AS digest FROM cost_intelligence.budget_reservation_acknowledgements WHERE reservation_id=$1`,[f.reservationId]);assert.equal(rows.rows[0].n,1);assert.match(rows.rows[0].digest,/^sha256:[a-f0-9]{64}$/);
   const capacity=await api.readCapacity(f.scope,'USD','partial-conservation',{...f.ports,...f.ports.budgets});assert.equal(capacity.value.outstandingHolds,'1');assert.equal(capacity.value.usedCapacity,'1');
  }finally{await f.pool.end();}

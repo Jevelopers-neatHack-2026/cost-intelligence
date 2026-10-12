@@ -18,3 +18,18 @@ export function diagnosticTest(file){if(!files.has(file))throw new Error('unknow
 export function diagnosticBudgetClient(client){return {release:()=>client.release(),query:async(...args)=>{
  try{return await client.query(...args);}catch(error){const entry=context.getStore();if(entry&&entry.sqlStates.length<16)entry.sqlStates.push(codes.has(error?.code)?error.code:'bounded_other');throw error;}
 }};}
+
+const resultCodes=new Set(['FORBIDDEN_SCOPE','VALIDATION_ERROR','IDEMPOTENCY_CONFLICT','SOURCE_UNAVAILABLE','BUDGET_UNAVAILABLE','RECONCILIATION_PENDING','UNSUPPORTED_VERSION']);
+const statuses=new Set(['authorized','denied','partial','unavailable','applied','replay','stale_revision','conflict','pending','running','complete','needs_review','accepted','duplicate']);
+/** Only established result codes/statuses are retained; no error messages, request fields or receipt payloads. */
+export function diagnosticBudgetOperation(operation){return async(...args)=>{
+ const result=await operation(...args),entry=context.getStore();
+ if(entry&&result&&typeof result.ok==='boolean'){
+  entry.results??=[];if(entry.results.length<40)entry.results.push({ok:result.ok,
+   code:result.ok?null:resultCodes.has(result.error?.code)?result.error.code:'bounded_other',
+   status:result.ok&&statuses.has(result.value?.status)?result.value.status:null});
+ }
+ return result;
+};}
+const operations=new Set(['authorize','markDispatched','settle','release','retainUnknownOutcome','getReservationSnapshot','recordExpenseAdjustment','expireAuthorization','getExceptions','acknowledgeException','revalidateAuthorization','acknowledgePartial','readCapacity','reconcileEvidence']);
+export function diagnosticBudgetApi(module){return new Proxy(module,{get(target,name){const value=Reflect.get(target,name);return operations.has(String(name))&&typeof value==='function'?diagnosticBudgetOperation(value):value;}});}
