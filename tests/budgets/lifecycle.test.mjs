@@ -236,6 +236,19 @@ async function scriptedSignedFixture(scope,overrides={},intercept) {
 
 const scopeFor = label => makeScope(label);
 
+function correlationProbe() {
+  const calls={source:0,issuer:0};
+  return {
+    sourceCollector:{loadCurrent:async()=>{calls.source+=1;return null;},loadCurrentIssuerKey:async()=>{calls.issuer+=1;return null;}},
+    assertRefused(result) {
+      assert.equal(result.ok,false);
+      assert.equal(result.error.code,'VALIDATION_ERROR');
+      assert.equal(result.error.safe_message,"The attempt binding does not match the reservation's original attempt.");
+      assert.deepEqual(calls,{source:0,issuer:0},'attempt correlation must reject before resolving cost, finality or pricing evidence');
+    },
+  };
+}
+
 test('CI-05A.2 release of a dispatched reservation never frees capacity without authoritative evidence', async () => {
   const scope = scopeFor('release-dispatched');
   const dispatched = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
@@ -323,9 +336,9 @@ test('CI-05A.3 a partially authorized reservation cannot dispatch without acknow
 test('CI-05A.3 dispatch is bound to the original attempt binding', async () => {
   const scope = scopeFor('dispatch-binding');
   const unrelated = markDispatchedCommand(scope, R1, 1);
-  const refused = await run(unrelated, markReservationDispatched, reservationRow());
-  assert.equal(refused.result.ok, false);
-  assert.equal(refused.result.error.code, 'VALIDATION_ERROR');
+  const probe=correlationProbe();
+  const refused = await run(unrelated, markReservationDispatched, reservationRow(),undefined,{sourceCollector:probe.sourceCollector});
+  probe.assertRefused(refused.result);
   assert.equal(refused.script.wrote(), false);
   const matching = markDispatchedCommand(scope, R1, 1, { attemptBinding: ATTEMPT });
   const accepted = await run(matching, markReservationDispatched, reservationRow());
@@ -523,16 +536,16 @@ const OTHER_ATTEMPT = { ...ATTEMPT, logicalOperationId: '123e4567-e89b-42d3-a456
 test('CI-05A.2 settle and release from an unrelated attempt are rejected without writing', async () => {
   const scope = scopeFor('unrelated-attempt');
   const dispatched = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
-  const settle = await run(settleCommand(scope, R1, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: OTHER_ATTEMPT }), settleReservation, dispatched);
-  assert.equal(settle.result.ok, false);
-  assert.equal(settle.result.error.code, 'VALIDATION_ERROR');
+  const settlementProbe=correlationProbe();
+  const settle = await run(settleCommand(scope, R1, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: OTHER_ATTEMPT }), settleReservation, dispatched,undefined,{sourceCollector:settlementProbe.sourceCollector});
+  settlementProbe.assertRefused(settle.result);
   assert.equal(settle.script.wrote(), false);
   assert.equal(settle.script.committed(), false);
 
   const settled = reservationRow({ revision: 3, last_type: 'settled', last_finality: 'final', ever_dispatched: true });
-  const release = await run(releaseCommand(scope, R1, 3, { amount: '1.000000', proof: 'final_usage_known', attemptBinding: OTHER_ATTEMPT }), releaseReservation, settled);
-  assert.equal(release.result.ok, false);
-  assert.equal(release.result.error.code, 'VALIDATION_ERROR');
+  const releaseProbe=correlationProbe();
+  const release = await run(releaseCommand(scope, R1, 3, { amount: '1.000000', proof: 'final_usage_known', attemptBinding: OTHER_ATTEMPT }), releaseReservation, settled,undefined,{sourceCollector:releaseProbe.sourceCollector});
+  releaseProbe.assertRefused(release.result);
   assert.equal(release.script.wrote(), false);
 
   // The original attempt still settles and releases.
@@ -584,17 +597,18 @@ test('CI-05A.2 PostgreSQL: unrelated-attempt settle/release and a contradictory 
     assert.equal(dispatched.ok, true, dispatched.ok ? '' : dispatched.error.code);
     const events = await count(scope);
 
-    const unrelatedSettle = await settleReservation(settleCommand(scope, id, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: other }), makePorts(pool, scope));
-    assert.equal(unrelatedSettle.ok, false);
-    assert.equal(unrelatedSettle.error.code, 'VALIDATION_ERROR');
+    const settlementProbe=correlationProbe();
+    const unrelatedSettle = await settleReservation(settleCommand(scope, id, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: other }), {...ports,sourceCollector:settlementProbe.sourceCollector});
+    settlementProbe.assertRefused(unrelatedSettle);
 
     const contradictory = settleCommand(scope, id, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: own });
     contradictory.canonicalCommand.consumed = { amount: '9', currency: 'EUR', scale: 0 };
     const mismatch = await settleReservation(contradictory, makePorts(pool, scope));
     assert.equal(mismatch.ok, false);
 
-    const unrelatedRelease = await releaseReservation(releaseCommand(scope, id, 2, { amount: '1.000000', proof: 'final_usage_known', attemptBinding: other }), makePorts(pool, scope));
-    assert.equal(unrelatedRelease.ok, false);
+    const releaseProbe=correlationProbe();
+    const unrelatedRelease = await releaseReservation(releaseCommand(scope, id, 2, { amount: '1.000000', proof: 'final_usage_known', attemptBinding: other }), {...ports,sourceCollector:releaseProbe.sourceCollector});
+    releaseProbe.assertRefused(unrelatedRelease);
 
     assert.equal(await count(scope), events, 'no event is written by any rejected command');
     const expensesBefore=await pool.query('SELECT count(*)::int AS count FROM cost_intelligence.financial_ledger_events WHERE tenant_id=$1 AND project_id=$2',[scope.tenantId,scope.projectId]);
@@ -608,8 +622,9 @@ test('CI-05A.2 PostgreSQL: unrelated-attempt settle/release and a contradictory 
     assert.equal(settled.value.consumedAmount,'0.25');
     assert.equal(settled.value.releasedAmount,'0.75');
     assert.equal(settled.value.outstandingHold,'0');
-    const unrelatedAfter = await releaseReservation(releaseCommand(scope, id, 3, { amount: '0.750000', proof: 'final_usage_known', attemptBinding: other }), makePorts(pool, scope));
-    assert.equal(unrelatedAfter.ok, false);
+    const afterProbe=correlationProbe();
+    const unrelatedAfter = await releaseReservation(releaseCommand(scope, id, 3, { amount: '0.750000', proof: 'final_usage_known', attemptBinding: other }), {...ports,sourceCollector:afterProbe.sourceCollector});
+    afterProbe.assertRefused(unrelatedAfter);
     const released = await releaseReservation(releaseCommand(scope, id, 3, { amount: '0.750000', proof: 'final_usage_known', attemptBinding: own }), ports);
     assert.equal(released.ok,false,'the original attempt cannot release its final remainder twice');
     assert.equal(released.error.code,'VALIDATION_ERROR');
