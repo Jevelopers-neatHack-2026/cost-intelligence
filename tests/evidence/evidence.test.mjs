@@ -353,3 +353,113 @@ test('URL-shaped ids are rejected for every kind, including paths and query stri
     for (const id of urls) assert.equal(validateEvidenceReference({ status: 'resolved', kind, namespace, id }).ok, false, `${kind} ${id}`);
   }
 });
+
+// Synthetic authority/store barriers exercise the public disclosure boundary.
+// These do not claim a mounted host issuer or a database-backed evidence adapter.
+for (const stage of ['getPosting', 'listByLogicalOperation', 'findByReference']) {
+  test(`revocation during ${stage} denies evidence and prevents any later read`, async () => {
+    let revoked = false;
+    const calls = [];
+    const base = store([record(scopeA), observation(scopeA)]);
+    const guardedStore = Object.fromEntries(['getPosting', 'listByLogicalOperation', 'findByReference'].map(method => [method, async (...args) => {
+      calls.push(method);
+      const result = await base[method](...args);
+      if (method === stage) revoked = true;
+      return result;
+    }]));
+    const runtime = { store: guardedStore, clock, financeAuthority: {
+      async authorizeCurrent(input) { return authority(revoked).authorizeCurrent(input); },
+    } };
+    const result = stage === 'findByReference'
+      ? await lookupByOperationalReference(request(scopeA, { reference: { status: 'resolved', kind: 'logical_operation', namespace: 'cost-intelligence', id: 'op-1' } }), runtime)
+      : await lookupPostingEvidence(request(scopeA, { eventId: 'evt-expense-1' }), runtime);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'FORBIDDEN_SCOPE');
+    assert.equal(Object.hasOwn(result, 'value'), false, 'denial must not carry retained data');
+    assert.deepEqual(calls, stage === 'getPosting' ? ['getPosting']
+      : stage === 'listByLogicalOperation' ? ['getPosting', 'listByLogicalOperation'] : ['findByReference']);
+  });
+}
+
+for (const outcome of ['absent', 'unavailable']) {
+  test(`late revocation also denies ${outcome} evidence lookups`, async () => {
+    let revoked = false;
+    const runtime = { clock, financeAuthority: {
+      async authorizeCurrent(input) { return authority(revoked).authorizeCurrent(input); },
+    }, store: { async getPosting() {
+      revoked = true;
+      return outcome === 'absent' ? { status: 'ok', value: null } : { status: 'unavailable' };
+    } } };
+    const result = await lookupPostingEvidence(request(scopeA, { eventId: 'evt-expense-1' }), runtime);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'FORBIDDEN_SCOPE');
+    assert.equal(Object.hasOwn(result, 'value'), false);
+  });
+}
+
+for (const change of ['unavailable', 'expired', 'foreign_scope', 'membership_revision']) {
+  test(`a ${change} final authority cannot disclose a previously readable posting`, async () => {
+    let readFinished = false;
+    const base = store([record(scopeA), observation(scopeA)]);
+    const runtime = { clock, store: { ...base, async listByLogicalOperation(...args) {
+      const result = await base.listByLogicalOperation(...args);
+      readFinished = true;
+      return result;
+    } }, financeAuthority: { async authorizeCurrent(input) {
+      if (readFinished && change === 'unavailable') return null;
+      const decision = await authority().authorizeCurrent(input);
+      if (readFinished && change === 'expired') return { ...decision, expiresAt: now };
+      if (readFinished && change === 'foreign_scope') return { ...decision, scope: scopeB };
+      if (readFinished && change === 'membership_revision') return { ...decision, principal: { ...decision.principal, membershipRevision: 'm2' } };
+      return decision;
+    } } };
+    const result = await lookupPostingEvidence(request(scopeA, { eventId: 'evt-expense-1' }), runtime);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, change === 'unavailable' ? 'SOURCE_UNAVAILABLE' : 'FORBIDDEN_SCOPE');
+    assert.equal(Object.hasOwn(result, 'value'), false);
+  });
+}
+
+test('caller mutation during authorization cannot substitute evidence scope or posting identity', async () => {
+  const submitted = request({ ...scopeA }, { eventId: 'evt-expense-1' });
+  const seen = [];
+  const base = store([record(scopeA), record(scopeB, { eventId: 'evt-b' })]);
+  const runtime = { clock, store: { ...base, async getPosting(scope, id) {
+    seen.push({ scope: { ...scope }, id });
+    return base.getPosting(scope, id);
+  } }, financeAuthority: { async authorizeCurrent(input) {
+    Object.assign(submitted.scope, scopeB);
+    submitted.eventId = 'evt-b';
+    return authority().authorizeCurrent(input);
+  } } };
+  const result = await lookupPostingEvidence(submitted, runtime);
+  assert.ok(result.ok);
+  assert.equal(result.value.posting.eventId, 'evt-expense-1');
+  assert.deepEqual(seen, [{ scope: scopeA, id: 'evt-expense-1' }]);
+});
+
+test('caller mutation during authorization cannot substitute a reverse lookup reference', async () => {
+  const submitted = request({ ...scopeA }, { reference: { status: 'resolved', kind: 'logical_operation', namespace: 'cost-intelligence', id: 'op-1' } });
+  const runtime = ports([record(scopeA), record(scopeA, { eventId: 'evt-other', logicalOperationId: 'op-other' })]);
+  runtime.financeAuthority = { async authorizeCurrent(input) {
+    submitted.reference.id = 'op-other';
+    return authority().authorizeCurrent(input);
+  } };
+  const result = await lookupByOperationalReference(submitted, runtime);
+  assert.ok(result.ok);
+  assert.deepEqual(result.value.matches.map(item => item.eventId), ['evt-expense-1']);
+});
+
+test('store-owned posting records cannot change while related evidence is read', async () => {
+  const row = record(scopeA);
+  const base = store([row, observation(scopeA)]);
+  const runtime = { ...ports([]), store: { ...base, async listByLogicalOperation(...args) {
+    row.eventId = 'evt-substituted';
+    row.reservationId = 'res-substituted';
+    return base.listByLogicalOperation(...args);
+  } } };
+  const result = await lookupPostingEvidence(request(scopeA, { eventId: 'evt-expense-1' }), runtime);
+  assert.ok(result.ok);
+  assert.equal(result.value.posting.eventId, 'evt-expense-1');
+  assert.equal(result.value.reservation.id, 'res-1');
+});

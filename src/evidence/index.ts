@@ -8,6 +8,7 @@ import {
   type ApiResult,
   type Clock,
   type FinanceAuthorizationPort,
+  type FinanceAuthorizationResult,
   type TrustedScope,
   type Validation,
 } from '../shared/contracts.js';
@@ -353,15 +354,40 @@ async function authorize(request: { requestId: string; scope: TrustedScope }, po
   });
 }
 
-function validate<T>(schema: typeof PostingEvidenceRequestSchema | typeof ReverseEvidenceRequestSchema, value: unknown, operation: string): Validation<T> {
+/** A membership/service revision change invalidates a multi-read lookup, even if access was restored. */
+function principalRevision(authorization: FinanceAuthorizationResult): string | null {
+  if (!authorization.ok || authorization.decision.status !== 'allowed' || !('principal' in authorization.decision)) return null;
+  const principal = authorization.decision.principal;
+  return JSON.stringify(principal.kind === 'user'
+    ? [principal.kind, principal.actorId, principal.membershipRevision]
+    : [principal.kind, principal.actorId, principal.serviceGrantRevision]);
+}
+
+async function reauthorize(request: { requestId: string; scope: TrustedScope }, ports: EvidenceRuntimePorts, revision: string | null) {
+  const current = await authorize(request, ports);
+  if (!current.ok) return current;
+  if (revision === null || principalRevision(current) !== revision) return {
+    ok: false as const,
+    error: errorEnvelope('evidence', 'authorizeFinanceOperation', 'FORBIDDEN_SCOPE', request.requestId, 'Current financial authorization changed during the evidence lookup.'),
+  };
+  return current;
+}
+
+function validate<T extends PostingEvidenceRequest | ReverseEvidenceRequest>(schema: typeof PostingEvidenceRequestSchema | typeof ReverseEvidenceRequestSchema, value: unknown, operation: string): Validation<T> {
   if (!Value.Check(schema, value)) {
     return { ok: false, error: errorEnvelope('evidence', operation, 'VALIDATION_ERROR', 'evidence-request', 'The evidence lookup request is invalid.') };
   }
-  return { ok: true, value: value as T };
+  // Detach caller-owned scope/identity fields before the first authority or store await.
+  const snapshot = Value.Clone(value) as T;
+  Object.freeze(snapshot.scope);
+  if ('reference' in snapshot) Object.freeze(snapshot.reference);
+  return { ok: true, value: Object.freeze(snapshot) };
 }
 
 async function guarded<T>(read: () => Promise<EvidenceStoreRead<T>>): Promise<EvidenceStoreRead<T>> {
-  try { return await read(); } catch { return { status: 'unavailable' }; }
+  // A store may retain its returned objects. Do not let a later await substitute
+  // already scope-checked ledger facts or output fields through those aliases.
+  try { return Value.Clone(await read()); } catch { return { status: 'unavailable' }; }
 }
 
 /**
@@ -376,6 +402,7 @@ export async function lookupPostingEvidence(value: unknown, ports: EvidenceRunti
   const request = validated.value;
   const authorization = await authorize(request, ports);
   if (!authorization.ok) return failure(authorization.error);
+  const revision = principalRevision(authorization);
 
   const notFound = (gaps: EvidenceGapCode[]): ApiResult<PostingEvidence> => ({
     ok: true,
@@ -383,6 +410,10 @@ export async function lookupPostingEvidence(value: unknown, ports: EvidenceRunti
       operationalReferences: [], relatedEventIds: { supersedes: null, reverses: null }, gaps, billingAuthority: false },
   });
   const posting = await guarded(() => ports.store.getPosting(request.scope, request.eventId));
+  // Also gate absent/unavailable results; stale access must not reveal existence
+  // or trigger a second protected storage operation.
+  const afterPosting = await reauthorize(request, ports, revision);
+  if (!afterPosting.ok) return failure(afterPosting.error);
   if (posting.status === 'unavailable') return failure(errorEnvelope('evidence', 'lookupPostingEvidence', 'SOURCE_UNAVAILABLE', request.requestId, 'Evidence source is temporarily unavailable.', true));
   const record = posting.value;
   if (record === null || !recordInScope(record, request.scope) || record.eventId !== request.eventId) {
@@ -398,6 +429,8 @@ export async function lookupPostingEvidence(value: unknown, ports: EvidenceRunti
     gaps.push('source_observations_unavailable');
   } else {
     const linked = await guarded(() => ports.store.listByLogicalOperation(request.scope, logicalOperationId, MAX_RESULTS));
+    const afterLinked = await reauthorize(request, ports, revision);
+    if (!afterLinked.ok) return failure(afterLinked.error);
     if (linked.status === 'unavailable' || !Array.isArray(linked.value?.records)) {
       gaps.push('source_observations_unavailable');
     } else {
@@ -453,10 +486,13 @@ export async function lookupByOperationalReference(value: unknown, ports: Eviden
   }
   const authorization = await authorize(request, ports);
   if (!authorization.ok) return failure(authorization.error);
+  const revision = principalRevision(authorization);
 
   const kind = reference.kind as ReverseLookupKind;
-  const wanted = { status: 'resolved', kind, namespace: reference.namespace, id: reference.id } as const;
+  const wanted = Object.freeze({ status: 'resolved', kind, namespace: reference.namespace, id: reference.id } as const);
   const found = await guarded(() => ports.store.findByReference(request.scope, wanted, MAX_RESULTS));
+  const afterRead = await reauthorize(request, ports, revision);
+  if (!afterRead.ok) return failure(afterRead.error);
   if (found.status === 'unavailable') return failure(errorEnvelope('evidence', 'lookupByOperationalReference', 'SOURCE_UNAVAILABLE', request.requestId, 'Evidence source is temporarily unavailable.', true));
 
   const gaps: EvidenceGapCode[] = ['reconciliation_lineage_not_linked', 'export_lineage_not_linked', 'reference_kinds_not_indexed'];

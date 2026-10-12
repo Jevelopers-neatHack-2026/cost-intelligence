@@ -14,6 +14,8 @@ Every public output is an explicit allowlist projection of the store row (no obj
 
 Both lookups authorize with the existing `ledger.readSnapshot` grant (no new permission) and read through an injected `EvidenceLinkStorePort` that must filter by scope. Returned rows are re-verified against the requested scope. An absent posting and a posting in another tenant/project/environment/billing mode are indistinguishable (`not_found`).
 
+The validated request is copied and frozen before any asynchronous authorization or storage work. Store results are copied before another await can change their scope-checked identities or allowlisted fields. The current grant is checked at entry, after the posting read before any related-observation read, and after the last read before disclosure. Absent and unavailable read results go through the same renewed authorization. A denied, expired, unavailable or scope-mismatched decision returns only its safe error envelope, with no retained evidence. A changed membership or service-grant revision also refuses the lookup; the caller can start a new request under the new revision. These checks use the configured host authority on every call and do not establish a real issuer integration or an export disclosure fence.
+
 - `lookupPostingEvidence`: posting to source observations (same logical operation), reservation, rate/rule versions and typed operational refs.
 - `lookupByOperationalReference`: reverse lookup by a resolved, validated, indexed kind. Matches are links only; an empty result is declared as not proof of zero usage.
 
