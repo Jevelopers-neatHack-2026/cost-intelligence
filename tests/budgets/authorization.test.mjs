@@ -861,15 +861,42 @@ test('R1-002 final supporting evidence is persisted and emitted expiry includes 
     assert.equal(row.authority_evidence.host.evidenceRef,'final-support');assert.equal(row.authority_evidence.source.expiresAt,'2026-10-12T04:00:02Z');assert.equal(row.authority_evidence.finance.operation,'budgets.authorize');
   }finally{await pool.end();}
 });
-test('R1-002 proof expiry at COMMIT acknowledgement returns unavailable, retains one hold and requires fresh current revalidation',async()=>{
-  const pool=reservationPool();const fixture=await fixturePromise;const scope=makeScope('r1-commit-expiry');let now=Date.parse('2026-10-12T04:00:00Z');const clock={now:()=>new Date(now)};
+test('R1-002 expiry at COMMIT acknowledgement retains one hold and cannot renew expired financial authority',async()=>{
+  const pool=reservationPool();const fixture=await fixturePromise;const scope=makeScope('r1-commit-expiry');
+  const initialTime=Date.parse('2026-10-12T04:00:00Z'),financialExpiry=new Date(initialTime+1).toISOString();
+  let now=initialTime;const clock={now:()=>new Date(now)};
   try{
     await setBudgetLimit(pool,scope,'2');const ordinary=makePorts(pool,scope,{clock});const req=reservationRequest(scope,fixture);
     const commitPool={connect:async()=>{const c=await pool.connect();return {query:async(text,values)=>{const r=await c.query(text,values);if(text==='COMMIT')now+=10;return r;},release:()=>c.release()};}};
     const ports=publicPorts(commitPool,scope,{clock,reservationAuthority:{verifyCurrent:async q=>{const d=await ordinary.reservationAuthority.verifyCurrent(q);d.expiresAt=new Date(now+1).toISOString();return d;}}});
     const result=await api.authorize(req,ports);assertNoCurrentAuthority(result,'post-commit expiry');assert.equal(result.value.status,'unavailable');assert.equal(await countEvents(pool,scope),1,'acknowledged hold is retained, never erased on proof TTL');
-    const recovery=publicPorts(pool,scope,{clock});const replay=await api.authorize(req,recovery);assert.equal(replay.value.reservationId,(await pool.query('SELECT reservation_id FROM cost_intelligence.budget_reservation_events WHERE tenant_id=$1',[scope.tenantId])).rows[0].reservation_id);assert.equal(replay.value.historicalReplay,true);assert.equal(replay.value.finance,undefined);assert.equal(await countEvents(pool,scope),1);
-    assert.equal((await api.revalidateAuthorization(currentQuery(scope,req,replay.value.reservationId),recovery)).value.status,'authorized');
+    assert.equal(now,initialTime+10,'COMMIT acknowledgement crosses the original one-millisecond authority lifetime');
+    const durableReservation=()=>pool.query(`SELECT reservation_id,event_sequence,event_type,financial_expires_at::text,
+      authority_evidence->>'expiresAt' AS authority_expires_at,held_amount::text,consumed_amount::text,released_amount::text,content_hash
+      FROM cost_intelligence.budget_reservation_events
+      WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 ORDER BY event_sequence`,
+    [scope.tenantId,scope.projectId,scope.environment,scope.billingMode]);
+    const committed=await durableReservation();assert.equal(committed.rows.length,1);const stored=committed.rows[0];
+    assert.equal(stored.event_sequence,1);assert.equal(stored.event_type,'authorized');
+    assert.equal(new Date(stored.financial_expires_at).toISOString(),financialExpiry,'the committed financial deadline is the original proof minimum');
+    assert.equal(stored.authority_expires_at,financialExpiry,'immutable authority evidence records the same deadline');
+    assert.equal(stored.held_amount,req.estimate.knownSubtotal);assert.equal(stored.consumed_amount,'0');assert.equal(stored.released_amount,'0');
+
+    const recovery=publicPorts(pool,scope,{clock});const replay=await api.authorize(req,recovery);assert.equal(replay.ok,true);
+    assert.equal(replay.value.reservationId,stored.reservation_id);assert.equal(replay.value.status,'authorized');
+    assert.equal(replay.value.historicalReplay,true);assert.equal(replay.value.finance,undefined);assert.equal(await countEvents(pool,scope),1);
+    // Fresh host/source/Finance proofs cannot renew an already expired financial authorization.
+    const current=await api.revalidateAuthorization(currentQuery(scope,req,replay.value.reservationId),recovery);
+    assert.equal(current.ok,true);assertNoCurrentAuthority(current,'the persisted financial deadline has already expired');
+    assert.equal(current.value.status,'denied');assert.equal(current.value.revoked,true);
+    assert.equal(current.value.snapshot.state,'expired');assert.equal(current.value.snapshot.dispatchEligible,false);
+    assert.equal(current.value.snapshot.finance,undefined);assert.equal(current.value.snapshot.heldAmount,stored.held_amount);
+    assert.equal(current.value.snapshot.effectiveConsumedAmount,'0');assert.equal(current.value.snapshot.releasedAmount,'0');
+    const capacity=await readCapacity(scope,'USD','r1-expired-hold-retained',makePorts(pool,scope,{clock}));assert.equal(capacity.ok,true);
+    assert.equal(capacity.value.reservationCount,1);assert.equal(capacity.value.outstandingHolds,stored.held_amount);
+    assert.equal(capacity.value.usedCapacity,stored.held_amount);assert.equal(capacity.value.effectiveConsumedSpend,'0');
+    assert.deepEqual((await durableReservation()).rows,committed.rows,'replay and revalidation cannot extend the persisted deadline or mutate the retained hold');
+    assert.equal(await countEvents(pool,scope),1,'expired authority creates no second hold and erases no exposure');
   }finally{await pool.end();}
 });
 test('R1-003 Finance permission expiry or revocation across host verification refuses both phases without releasing exposure',async()=>{
