@@ -191,3 +191,121 @@ test('CI-05B.2 reconciliation resolutions are idempotent and reject a reused key
     await pool.end();
   }
 });
+
+test('CI-05B.4/defect-a a quiet partially-settled (unknown finality) hold is aged into the queue and its unused remainder is reclaimed', async () => {
+  requireDb();
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  try {
+    const scope = makeScope('recon-partialsettle-leak');
+    await setBudgetLimit(pool, scope, '5.00');
+    const authorized = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00' }), ports(pool, scope, { clock: clockAt(T0) }));
+    const id = authorized.value.reservationId;
+    const own = authorized.value.attemptBinding;
+    assert.equal((await markReservationDispatched(markDispatchedCommand(scope, id, 1, { attemptBinding: own }), ports(pool, scope, { clock: clockAt(T0) }))).ok, true);
+    // Settle 0.60 of a 1.00 hold with UNKNOWN usage completeness -> finality projects
+    // 'unknown' (the per-token provider default). 0.40 stays reserved; the hold then goes quiet.
+    const settled = await settleReservation(settleCommand(scope, id, 2, { cumulativeAmount: '0.600000', finality: 'partial', usageCompleteness: 'unknown', sequence: 1, attemptBinding: own }), ports(pool, scope, { clock: clockAt(T0) }));
+    assert.equal(settled.ok, true, settled.ok ? '' : settled.error.code);
+    assert.equal(settled.value.usageFinality, 'unknown', 'unknown completeness keeps the settlement non-final');
+    assert.equal(settled.value.state, 'partially_settled');
+
+    const before = await readCapacity(scope, 'USD', 'leak-before', ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(before.value.outstandingHolds, '0.4', 'the unused 0.40 is still reserved before recovery');
+
+    // The quiet partial settlement MUST be aged into the reconciliation queue (regression for the leak).
+    const scan = await runRecoveryScan(recoveryScanRequest(scope, { agingThresholdMs: 0 }), ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(scan.ok, true, scan.ok ? '' : scan.error.code);
+    assert.equal(scan.value.opened, 1, 'a quiet partially-settled hold is no longer invisible to recovery');
+    assert.equal(scan.value.entries[0].category, 'partially_settled_outstanding');
+    assert.equal(scan.value.entries[0].outstandingHold, '0.4');
+
+    // Resolving as a confirmed expense releases the unused remainder: capacity reclaimed, spend preserved.
+    const resolved = await resolveReconciliationException(resolveReconciliationRequest(scope, id, { disposition: 'confirmed_expense_settled', resolution: 'final per-key usage was 0.60; remainder reclaimed', nextAction: 'close' }), ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error.code);
+    assert.equal(resolved.value.status, 'resolved');
+    assert.equal(resolved.value.outstandingHold, '0', 'the unused remainder is no longer reserved');
+
+    const after = await readCapacity(scope, 'USD', 'leak-after', ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(after.value.outstandingHolds, '0', 'the remainder is reclaimed; nothing is reserved forever');
+    assert.equal(after.value.effectiveConsumedSpend, '0.6', 'the confirmed expense is preserved, not truncated or inflated');
+    assert.equal(after.value.availableCapacity, '4.4');
+  } finally {
+    await pool.end();
+  }
+});
+
+test('CI-05B.4/defect-c a verified-no-bill resolution itself releases the stuck hold and restores capacity (idempotent)', async () => {
+  requireDb();
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  try {
+    const scope = makeScope('recon-nobill-move');
+    await setBudgetLimit(pool, scope, '3.00');
+    const { id } = await dispatchedUnknown(pool, scope, reserve, '1.00');
+    await runRecoveryScan(recoveryScanRequest(scope, { agingThresholdMs: 0 }), ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    const before = await readCapacity(scope, 'USD', 'nobill-before', ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(before.value.availableCapacity, '2', 'the unknown hold still reserves capacity before resolution');
+    // No separate release/expiry: the resolution ITSELF moves the money.
+    const req = resolveReconciliationRequest(scope, id, { disposition: 'verified_no_bill_released', resolution: 'provider confirmed no charge', nextAction: 'close' });
+    const resolved = await resolveReconciliationException(req, ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error.code);
+    assert.equal(resolved.value.status, 'resolved');
+    assert.equal(resolved.value.reservationState, 'released', 'the resolution released the hold');
+    assert.equal(resolved.value.outstandingHold, '0');
+    const after = await readCapacity(scope, 'USD', 'nobill-after', ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(after.value.availableCapacity, '3', 'the verified no-bill resolution reclaimed the full hold');
+    assert.equal(after.value.effectiveConsumedSpend, '0', 'a no-bill outcome records no spend');
+    // Idempotent: the same resolution replays and never double-releases.
+    const replay = await resolveReconciliationException(req, ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(replay.value.status, 'replay');
+    const after2 = await readCapacity(scope, 'USD', 'nobill-after2', ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(after2.value.availableCapacity, '3', 'the replay does not re-release');
+  } finally {
+    await pool.end();
+  }
+});
+
+test('CI-05B.4/defect-c a confirmed-expense resolution settles, appends a linked ledger posting, and releases the remainder (idempotent)', async () => {
+  requireDb();
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  try {
+    const scope = makeScope('recon-expense-move');
+    await setBudgetLimit(pool, scope, '5.00');
+    const { id, own } = await dispatchedUnknown(pool, scope, reserve, '2.00');
+    await runRecoveryScan(recoveryScanRequest(scope, { agingThresholdMs: 0 }), ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    // The confirmed expense is settled first (1.50 final), leaving 0.50 unused.
+    await settleReservation(settleCommand(scope, id, 2, { cumulativeAmount: '1.500000', finality: 'final', sequence: 1, attemptBinding: own }), ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    const req = resolveReconciliationRequest(scope, id, { disposition: 'confirmed_expense_settled', resolution: 'provider confirmed 1.50', nextAction: 'post expense' });
+    const resolved = await resolveReconciliationException(req, ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(resolved.ok, true, resolved.ok ? '' : resolved.error.code);
+    assert.equal(resolved.value.status, 'resolved');
+    assert.equal(resolved.value.outstandingHold, '0', 'the unused remainder is released by the resolution');
+    // The resolution appended a linked budget-ledger posting, recorded in the exception evidence.
+    const resolvedRow = await pool.query(
+      `SELECT evidence FROM cost_intelligence.budget_reconciliation_exceptions WHERE reservation_id = $1 AND status = 'resolved'`,
+      [id],
+    );
+    assert.equal(resolvedRow.rows.length, 1);
+    const evidence = typeof resolvedRow.rows[0].evidence === 'string' ? JSON.parse(resolvedRow.rows[0].evidence) : resolvedRow.rows[0].evidence;
+    assert.ok(evidence.linkedPostingEventId, 'the resolution links a budget-ledger posting event id');
+    const posting = await pool.query(
+      `SELECT event_type FROM cost_intelligence.budget_reservation_events WHERE reservation_event_id = $1`,
+      [evidence.linkedPostingEventId],
+    );
+    assert.equal(posting.rows.length, 1, 'the linked posting exists in the append-only budget ledger');
+    assert.equal(posting.rows[0].event_type, 'released');
+    const after = await readCapacity(scope, 'USD', 'expense-move-cap', ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(after.value.effectiveConsumedSpend, '1.5', 'the confirmed expense is recorded in full');
+    assert.equal(after.value.outstandingHolds, '0', 'the unused remainder is reclaimed');
+    // Idempotent: the same resolution replays and never re-posts or re-releases.
+    const replay = await resolveReconciliationException(req, ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(replay.value.status, 'replay');
+    const after2 = await readCapacity(scope, 'USD', 'expense-move-cap2', ports(pool, scope, { clock: clockAt(T_AFTER) }));
+    assert.equal(after2.value.effectiveConsumedSpend, '1.5');
+    assert.equal(after2.value.outstandingHolds, '0');
+  } finally {
+    await pool.end();
+  }
+});

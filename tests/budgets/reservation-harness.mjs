@@ -173,12 +173,12 @@ export function markDispatchedCommand(scope, reservationId, expectedRevision, op
   };
 }
 
-export function settleCommand(scope, reservationId, expectedRevision, { cumulativeAmount, finality = 'partial', sequence = 1, currency = 'USD', ...rest } = {}) {
+export function settleCommand(scope, reservationId, expectedRevision, { cumulativeAmount, finality = 'partial', sequence = 1, currency = 'USD', usageCompleteness = 'complete', ...rest } = {}) {
   const base = lifecycleBase(scope, reservationId, expectedRevision, rest);
   return {
     ...base, action: 'settle',
     canonicalCommand: canonicalCommand('SettleRequest', scope, reservationId, expectedRevision, currency, { consumed: { amount: cumulativeAmount, currency, scale: fractionScale(cumulativeAmount) } }),
-    settlement: { measure: 'cumulative', finality, sequence, cumulativeAmount, currency, usageCompleteness: 'complete', sourceObservationRefs: [authorityRef()], allowObservedOverrun: true },
+    settlement: { measure: 'cumulative', finality, sequence, cumulativeAmount, currency, usageCompleteness, sourceObservationRefs: [authorityRef()], allowObservedOverrun: true },
   };
 }
 

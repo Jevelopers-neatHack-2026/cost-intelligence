@@ -264,3 +264,126 @@ test('CI-05B.4 the recovery scan is bounded: it never returns more than the requ
     await pool.end();
   }
 });
+
+test('CI-05B.3/defect-b a financially-expired hold cannot be dispatched (typed, hold preserved); a not-yet-expired dispatch still succeeds', async () => {
+  requireDb();
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  try {
+    const scope = makeScope('recovery-dispatch-expiry');
+    await setBudgetLimit(pool, scope, '5.00');
+    // Financial expiry = T0 + 60s. Dispatch is attempted AFTER it matures.
+    const expiredAuth = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00' }), ports(pool, scope, { clock: clockAt(T0), financialExpiryMs: 60_000 }));
+    const expId = expiredAuth.value.reservationId;
+    const expOwn = expiredAuth.value.attemptBinding;
+    const rejected = await markReservationDispatched(markDispatchedCommand(scope, expId, 1, { attemptBinding: expOwn }), ports(pool, scope, { clock: clockAt(T_AFTER_LEASE) }));
+    assert.equal(rejected.ok, false, 'a matured financial expiry blocks dispatch');
+    assert.equal(rejected.error.code, 'VALIDATION_ERROR');
+    assert.equal(rejected.error.retryable, false, 'a matured financial expiry is deterministic, not a transient outage');
+    assert.match(rejected.error.safe_message, /financial expiry/i);
+    // The hold is preserved: still held, not dispatched, still reserving capacity.
+    const stillHeld = await readReservationState(scope, expId, 'b-held', ports(pool, scope, { clock: clockAt(T_AFTER_LEASE) }));
+    assert.equal(stillHeld.value.state, 'held', 'a rejected dispatch leaves the hold held');
+    assert.equal(stillHeld.value.everDispatched, false);
+    assert.equal(stillHeld.value.outstandingHold, '1');
+
+    // A legitimate, not-yet-matured dispatch still works; the worker lease stays separate from financial expiry.
+    const freshAuth = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00' }), ports(pool, scope, { clock: clockAt(T0), financialExpiryMs: 60_000 }));
+    const freshId = freshAuth.value.reservationId;
+    const freshOwn = freshAuth.value.attemptBinding;
+    const ok = await markReservationDispatched(markDispatchedCommand(scope, freshId, 1, { attemptBinding: freshOwn }), ports(pool, scope, { clock: clockAt('2026-10-12T04:00:30.000Z') }));
+    assert.equal(ok.ok, true, ok.ok ? '' : ok.error.code);
+    assert.equal(ok.value.state, 'dispatched', 'a not-yet-expired hold still dispatches');
+  } finally {
+    await pool.end();
+  }
+});
+
+test('CI-05B/defect-d authorize replay reproduces the original decision, not the current state; callers use readReservationState', async () => {
+  requireDb();
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  try {
+    const scope = makeScope('recovery-replay');
+    await setBudgetLimit(pool, scope, '5.00');
+    const request = reservationRequest(scope, reserve, { amount: '1.00' });
+    const first = await authorizeReservation(request, ports(pool, scope));
+    assert.equal(first.value.status, 'authorized');
+    assert.equal(first.value.expiryEligibility, 'eligible_if_never_dispatched');
+    const id = first.value.reservationId;
+    const own = first.value.attemptBinding;
+    // Progress the reservation all the way to settled.
+    await markReservationDispatched(markDispatchedCommand(scope, id, 1, { attemptBinding: own }), ports(pool, scope));
+    await settleReservation(settleCommand(scope, id, 2, { cumulativeAmount: '1.000000', finality: 'final', sequence: 1, attemptBinding: own }), ports(pool, scope));
+    // The identical authorize replays. Its status is still the ORIGINAL 'authorized'
+    // (the AuthorizationDecision contract cannot encode settled), but the eligibility
+    // is downgraded so the replay never claims a progressed hold is freely expirable.
+    const replay = await authorizeReservation(request, ports(pool, scope));
+    assert.equal(replay.ok, true, replay.ok ? '' : replay.error.code);
+    assert.equal(replay.value.reservationId, id, 'the replay returns the single existing hold');
+    assert.equal(replay.value.status, 'authorized', 'replay reproduces the original first-event decision shape');
+    assert.equal(replay.value.expiryEligibility, 'not_expired', 'a progressed reservation is no longer freely expirable on replay');
+    // The live projected state is read via readReservationState, not the replay.
+    const live = await readReservationState(scope, id, 'd-live', ports(pool, scope));
+    assert.equal(live.value.state, 'settled', 'readReservationState projects the current lifecycle state');
+    assert.equal(live.value.everDispatched, true);
+  } finally {
+    await pool.end();
+  }
+});
+
+test('CI-05B/defect-e the expiry reason is persisted so financial_expiry and operator_revocation stay distinguishable', async () => {
+  requireDb();
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  try {
+    const scope = makeScope('recovery-expreason');
+    await setBudgetLimit(pool, scope, '5.00');
+    // Operator revocation of a never-dispatched hold.
+    const a = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00' }), ports(pool, scope));
+    const revoked = await expireReservation(expireCommand(scope, a.value.reservationId, 1, { reason: 'operator_revocation', attemptBinding: a.value.attemptBinding }), ports(pool, scope));
+    assert.equal(revoked.ok, true, revoked.ok ? '' : revoked.error.code);
+    // Matured financial expiry of another never-dispatched hold.
+    const b = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00' }), ports(pool, scope, { clock: clockAt(T0), financialExpiryMs: 60_000 }));
+    const expired = await expireReservation(expireCommand(scope, b.value.reservationId, 1, { reason: 'financial_expiry', attemptBinding: b.value.attemptBinding }), ports(pool, scope, { clock: clockAt(T_AFTER_LEASE) }));
+    assert.equal(expired.ok, true, expired.ok ? '' : expired.error.code);
+    const rows = await pool.query(
+      `SELECT reservation_id, expiry_reason FROM cost_intelligence.budget_reservation_events
+       WHERE event_type = 'expired' AND reservation_id = ANY($1::text[])`,
+      [[a.value.reservationId, b.value.reservationId]],
+    );
+    const byId = Object.fromEntries(rows.rows.map(r => [r.reservation_id, r.expiry_reason]));
+    assert.equal(byId[a.value.reservationId], 'operator_revocation', 'an operator revocation records its reason');
+    assert.equal(byId[b.value.reservationId], 'financial_expiry', 'a matured financial expiry records a distinct reason');
+  } finally {
+    await pool.end();
+  }
+});
+
+test('CI-05B/gap3 behavioral: two idempotency keys reusing one billable_attempt_id at event_sequence=1 yield exactly one hold', async () => {
+  requireDb();
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  try {
+    const scope = makeScope('recovery-gap3-behavioral');
+    await setBudgetLimit(pool, scope, '10.00');
+    const sharedBillable = `billable-seq1-${Math.random().toString(16).slice(2)}`;
+    // Two DIFFERENT idempotency keys, the SAME billable attempt id; both would be first events.
+    const first = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00', idempotencyKey: `k1-${sharedBillable}`, billableAttemptId: sharedBillable }), ports(pool, scope));
+    assert.equal(first.ok, true, first.ok ? '' : first.error.code);
+    assert.equal(first.value.status, 'authorized');
+    const second = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00', idempotencyKey: `k2-${sharedBillable}`, billableAttemptId: sharedBillable }), ports(pool, scope));
+    assert.equal(second.ok, false, 'the second authorization must not create a second hold');
+    assert.equal(second.error.code, 'IDEMPOTENCY_CONFLICT', 'it is a typed conflict, never swallowed into unavailable');
+    assert.equal(second.error.retryable, false, 'a billable-attempt conflict is deterministic, not a transient outage');
+    // At the DB: exactly one event_sequence=1 row bound to the shared billable attempt.
+    const rows = await pool.query(
+      `SELECT count(*)::int AS n FROM cost_intelligence.budget_reservation_events
+       WHERE billable_attempt_id = $1 AND event_sequence = 1`,
+      [sharedBillable],
+    );
+    assert.equal(rows.rows[0].n, 1, 'the partial unique index admits exactly one first-event hold per billable attempt');
+  } finally {
+    await pool.end();
+  }
+});

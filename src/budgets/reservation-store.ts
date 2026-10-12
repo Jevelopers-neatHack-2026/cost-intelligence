@@ -638,6 +638,15 @@ function policyRefMatches(canonicalRef: { id: string; revision: number; content_
  * ambiguous and the hold may have persisted: the caller must not dispatch and
  * must retry with the same idempotency key, which replays the hold if it
  * persisted (or reports a conflict for a different request).
+ *
+ * CI-05B (defect d): an idempotent REPLAY reproduces the original first-event
+ * authorization decision (its `status` is pinned by the AuthorizationDecision
+ * contract to authorized/partial/denied/unavailable and cannot encode later
+ * lifecycle states). It is therefore NOT a current-state read: a reservation that
+ * has since been dispatched, settled, released or expired still replays with its
+ * original `status`, though `expiryEligibility` is downgraded to `not_expired` so
+ * the replay never claims a progressed hold is still freely expirable. Callers
+ * that need the live projected state must call `readReservationState`.
  */
 export async function authorizeReservation(
   value: unknown,
@@ -686,7 +695,14 @@ export async function authorizeReservation(
         `SELECT reservation_id, event_type, event_sequence, currency, held_amount::text AS held_amount,
                 partial_allowed_amount::text AS partial_allowed_amount, estimate_completeness,
                 known_subtotal::text AS known_subtotal, bounded_maximum::text AS bounded_maximum, allow_partial,
-                attempt_binding, policy_version_id, policy_ref, rate_card_ref
+                attempt_binding, policy_version_id, policy_ref, rate_card_ref,
+                (SELECT bool_or(e2.event_type = 'dispatched') FROM cost_intelligence.budget_reservation_events e2
+                   WHERE e2.tenant_id = $1 AND e2.project_id = $2 AND e2.environment = $3 AND e2.billing_mode = $4
+                     AND e2.reservation_id = budget_reservation_events.reservation_id) AS proj_ever_dispatched,
+                (SELECT e3.event_type FROM cost_intelligence.budget_reservation_events e3
+                   WHERE e3.tenant_id = $1 AND e3.project_id = $2 AND e3.environment = $3 AND e3.billing_mode = $4
+                     AND e3.reservation_id = budget_reservation_events.reservation_id
+                   ORDER BY e3.event_sequence DESC LIMIT 1) AS proj_last_type
          FROM cost_intelligence.budget_reservation_events
          WHERE tenant_id = $1 AND project_id = $2 AND environment = $3 AND billing_mode = $4 AND idempotency_key = $5
          ORDER BY event_sequence ASC LIMIT 1`,
@@ -719,6 +735,21 @@ export async function authorizeReservation(
         const held = parseScaledDecimal(fromRow(row, 'held_amount') ?? '0');
         const partial = fromRow(row, 'partial_allowed_amount');
         const status: AuthorizationDecision['status'] = eventType === 'authorized' ? 'authorized' : 'partial';
+        // CI-05B (defect d): the replay reproduces the ORIGINAL first-event decision
+        // shape (its `status` is pinned by the AuthorizationDecision contract and
+        // cannot represent later lifecycle states), but the eligibility must not lie:
+        // a reservation that has since been dispatched/settled/released/expired is no
+        // longer `eligible_if_never_dispatched`. The replay SELECT above projects the
+        // CURRENT last event type / dispatch flag for this reservation, so no extra
+        // round-trip is needed; when that projection is unavailable the original
+        // eligibility is preserved. A replay is NOT a current-state read: callers that
+        // need the live state must use readReservationState.
+        const projLastType = fromRow(row, 'proj_last_type');
+        const projEverDispatched = row.proj_ever_dispatched === true;
+        const stillFreshlyHeld = projLastType === null
+          || ((projLastType === 'authorized' || projLastType === 'partially_authorized') && !projEverDispatched);
+        const expiryEligibilityOverride: AuthorizationDecision['expiryEligibility'] =
+          stillFreshlyHeld ? 'eligible_if_never_dispatched' : 'not_expired';
         gate.beginCommit();
         await client.query('COMMIT'); inTransaction = false;
         return {
@@ -729,6 +760,7 @@ export async function authorizeReservation(
             partialAllowed: partial === null ? null : parseScaledDecimal(partial),
             policyRef: storedPolicyRef!,
             rateCardRef: parseRef(row.rate_card_ref),
+            expiryEligibilityOverride,
           }),
         };
       }
@@ -842,6 +874,8 @@ function buildDecision(args: {
   requestId: string; request: ReservationRequest; currency: string; now: Date;
   status: AuthorizationDecision['status']; reservationId: string; held: bigint; available: bigint;
   partialAllowed: bigint | null; policyRef: VersionedReference; rateCardRef: VersionedReference | null;
+  /** CI-05B (defect d): on a replay, the eligibility is derived from the CURRENT projected state, not the original first-event status. */
+  expiryEligibilityOverride?: AuthorizationDecision['expiryEligibility'];
 }): AuthorizationDecision {
   const { request } = args;
   return {
@@ -850,7 +884,8 @@ function buildDecision(args: {
     currency: args.currency, estimateCompleteness: request.estimate.completeness, knownSubtotal: request.estimate.knownSubtotal,
     boundedConservativeMaximum: request.estimate.boundedConservativeMaximum ?? null,
     rateCardRef: args.rateCardRef, policyRef: args.policyRef,
-    expiryEligibility: args.status === 'authorized' || args.status === 'partial' ? 'eligible_if_never_dispatched' : 'not_expired',
+    expiryEligibility: args.expiryEligibilityOverride
+      ?? (args.status === 'authorized' || args.status === 'partial' ? 'eligible_if_never_dispatched' : 'not_expired'),
     attemptBinding: request.attemptBinding,
     partialAuthorization: args.status === 'partial' && args.partialAllowed !== null
       ? { allowedAmount: formatScaledDecimal(args.partialAllowed), allowedWorkUnits: null, unit: null, callerAcknowledgementRequired: true, replanBeforeDispatch: true }
@@ -974,6 +1009,8 @@ async function applyCommand(args: {
   ports: BudgetRuntimePorts; operation: string; authority: FinanceOperation;
   /** CI-05B: worker lease persisted at dispatch, kept strictly separate from the financial expiry. */
   workerLeaseId?: string | null; workerLeaseExpiresAt?: string | null;
+  /** CI-05B (defect e): the authoritative cause of an expiry event, persisted so financial_expiry and operator_revocation stay distinguishable. */
+  expiryReason?: 'financial_expiry' | 'operator_revocation' | null;
   compute(state: ReservationState): { eventType: string; consumed: bigint; released: bigint; usageFinality: 'unknown' | 'partial' | 'final'; settlementSequence: number | null } | { reject: ErrorEnvelope };
 }): Promise<ApiResult<ReservationCommandOutcome>> {
   const { ports, scope, requestId } = args;
@@ -1079,15 +1116,16 @@ async function applyCommand(args: {
            bounded_maximum, allow_partial, partial_allowed_amount, usage_finality, settlement_sequence, policy_version_id,
            rate_card_ref, policy_ref, idempotency_key, expected_revision, actor_reference, source_authority_ref,
            attempt_binding, logical_operation_id, billable_attempt_id, content_hash,
-           worker_lease_id, worker_lease_expires_at)
+           worker_lease_id, worker_lease_expires_at, expiry_reason)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,0,$10::numeric,$11::numeric,NULL,NULL,NULL,false,NULL,$12,$13,$14,
-           NULL,$15::jsonb,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22,$23,$24,$25::timestamptz)`,
+           NULL,$15::jsonb,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22,$23,$24,$25::timestamptz,$26)`,
         [eventId, scope.tenantId, scope.projectId, scope.environment, scope.billingMode, effectiveCurrency, args.reservationId, nextSequence,
           computed.eventType, formatScaledDecimal(computed.consumed), formatScaledDecimal(computed.released), computed.usageFinality,
           computed.settlementSequence, state.policyVersionId, JSON.stringify(args.sourceAuthorityRef), args.idempotencyKey,
           args.expectedRevision, args.actorReference, JSON.stringify(args.sourceAuthorityRef), JSON.stringify(args.attemptBinding),
           args.logicalOperationId, args.billableAttemptId, contentHash,
-          args.workerLeaseId ?? null, args.workerLeaseExpiresAt ?? null],
+          args.workerLeaseId ?? null, args.workerLeaseExpiresAt ?? null,
+          computed.eventType === 'expired' ? (args.expiryReason ?? null) : null],
       );
       const refreshed = await loadReservation(client, scope, args.reservationId);
       gate.beginCommit();
@@ -1110,6 +1148,10 @@ export async function markReservationDispatched(value: unknown, ports: BudgetRun
   const { Value } = requireValue();
   if (!Value.Check(markSchema(), value)) return failure(makeError('markDispatched', 'VALIDATION_ERROR', requestIdOf(value), 'The mark-dispatched command does not match the published schema.'));
   const request = value as MarkDispatchedCommand;
+  // CI-05B.3 fencing: the hold's FINANCIAL expiry is captured against the trusted
+  // clock so compute() can reject a financially-expired hold. This is independent
+  // of the worker lease TTL carried on the command below.
+  const dispatchNow = trustedNow(ports);
   return applyCommand({
     requestId: request.requestId, idempotencyKey: request.idempotencyKey, scope: request.scope as TrustedScope,
     reservationId: request.reservationId, expectedRevision: request.expectedRevision, currency: '',
@@ -1134,6 +1176,15 @@ export async function markReservationDispatched(value: unknown, ports: BudgetRun
       }
       if (!sameJson(state.originalBinding, request.attemptBinding)) {
         return { reject: makeError('markDispatched', 'VALIDATION_ERROR', request.requestId, 'The attempt binding does not match the reservation\'s original attempt.') };
+      }
+      // CI-05B.3: a hold whose FINANCIAL expiry (expires_at) has already matured
+      // must not be dispatched; it can only be expired and re-authorized. This is
+      // a deterministic, non-retryable rejection and the hold is preserved (no
+      // event is appended). The worker lease TTL is deliberately NOT consulted
+      // here: lease state never blocks or authorizes a financial dispatch.
+      if (state.expiresAt && dispatchNow && dispatchNow.getTime() >= state.expiresAt.getTime()) {
+        return { reject: makeError('markDispatched', 'VALIDATION_ERROR', request.requestId,
+          'The reservation\'s financial expiry has matured; a financially-expired hold cannot be dispatched. Expire and re-authorize. The hold is preserved.') };
       }
       return { eventType: 'dispatched', consumed: 0n, released: 0n, usageFinality: 'unknown', settlementSequence: null };
     },
@@ -1411,6 +1462,9 @@ export async function expireReservation(value: unknown, ports: BudgetRuntimePort
     attemptBinding: request.attemptBinding as unknown as Record<string, unknown>,
     logicalOperationId: request.attemptBinding.logicalOperationId, billableAttemptId: request.attemptBinding.billableAttemptId,
     kind: 'expire', ports, operation: 'expire', authority: 'budgets.release',
+    // CI-05B (defect e): persist WHICH authoritative cause produced this expiry so a
+    // matured financial expiry and an operator revocation remain distinguishable in the log.
+    expiryReason: request.reason,
     identity: { eventType: 'expired', consumed: 0n, released: null, usageFinality: null, settlementSequence: null },
     compute(state) {
       if (!sameJson(state.originalBinding, request.attemptBinding)) return attemptMismatch('expire', request.requestId);
@@ -1513,6 +1567,7 @@ export async function runRecoveryScan(value: unknown, ports: BudgetRuntimePorts)
         `WITH per_reservation AS (
            SELECT reservation_id, currency,
                   sum(held_amount)::text AS held, sum(released_amount)::text AS released, max(consumed_amount)::text AS consumed,
+                  (sum(held_amount) - sum(released_amount) - max(consumed_amount)) AS outstanding_numeric,
                   (array_agg(event_type ORDER BY event_sequence DESC))[1] AS last_type,
                   (array_agg(usage_finality ORDER BY event_sequence DESC))[1] AS last_finality,
                   bool_or(event_type = 'dispatched') AS ever_dispatched,
@@ -1526,6 +1581,11 @@ export async function runRecoveryScan(value: unknown, ports: BudgetRuntimePorts)
          SELECT *, (extract(epoch FROM (now() - last_recorded_at)) * 1000)::bigint AS age_ms FROM per_reservation
          WHERE last_type = 'dispatched'
             OR (last_type IN ('authorized', 'partially_authorized') AND expires_at IS NOT NULL AND expires_at <= $5)
+            -- CI-05B.4 (defect a): a hold settled with non-final finality (partial, or
+            -- the 'unknown' default used by per-token providers such as OpenRouter) that
+            -- still has an outstanding reserved remainder and then goes quiet must be
+            -- aged into the reconciliation queue, never left reserved forever.
+            OR (last_type = 'settled' AND last_finality <> 'final' AND outstanding_numeric > 0)
          ORDER BY last_recorded_at ASC NULLS FIRST
          LIMIT $6`,
         [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, now.toISOString(), request.maxReservations + 1],
@@ -1554,12 +1614,20 @@ export async function runRecoveryScan(value: unknown, ports: BudgetRuntimePorts)
         const outstanding = candidate.held - candidate.released - candidate.consumed;
         const floorOutstanding = outstanding > 0n ? outstanding : 0n;
         const leaseLapsed = candidate.workerLeaseExpiresAt !== null && now.getTime() >= candidate.workerLeaseExpiresAt.getTime();
-        const financiallyExpired = candidate.lastType !== 'dispatched';
-        const state: ReservationViewState = financiallyExpired ? 'held' : (leaseLapsed ? 'outcome_unknown' : 'dispatched');
-        const category = financiallyExpired ? 'never_dispatched_financial_expiry'
+        // Three independent aging shapes: a dispatched/in-flight hold, a
+        // never-dispatched hold whose financial expiry has matured, and a hold
+        // settled with non-final finality that still reserves an unused remainder.
+        const partiallySettled = candidate.lastType === 'settled';
+        const financiallyExpired = !partiallySettled && candidate.lastType !== 'dispatched';
+        const state: ReservationViewState = partiallySettled ? 'partially_settled'
+          : financiallyExpired ? 'held' : (leaseLapsed ? 'outcome_unknown' : 'dispatched');
+        const category = partiallySettled ? 'partially_settled_outstanding'
+          : financiallyExpired ? 'never_dispatched_financial_expiry'
           : leaseLapsed ? 'outcome_unknown_in_flight' : 'dispatched_unresolved';
-        const severity: 'review' | 'variance' | 'blocking' = leaseLapsed ? 'blocking' : 'review';
-        const nextAction = financiallyExpired
+        const severity: 'review' | 'variance' | 'blocking' = partiallySettled ? 'variance' : leaseLapsed ? 'blocking' : 'review';
+        const nextAction = partiallySettled
+          ? 'Import the delayed final per-key usage to settle the confirmed expense and release the unused remainder; the quiet partial settlement must not reserve capacity forever.'
+          : financiallyExpired
           ? 'Fence no-dispatch and expire the never-dispatched hold, or re-authorize; never release without fencing.'
           : 'Obtain the provider outcome; settle the confirmed expense or release only on verified no-bill. Do not release an unknown hold.';
         const evidence = {
@@ -1699,12 +1767,17 @@ export interface ReconciliationResolutionReceipt {
 }
 
 /**
- * CI-05B.4: record a reconciliation resolution (append-only) against an open
- * exception. The resolution links the owner's disposition and evidence; the
- * actual financial change (settle/release/expire) is performed through the
- * lifecycle commands, and the current hold+spend snapshot is captured here so
- * the queue reflects verified no-bill releases, confirmed expenses, and
- * recorded over-cap variances without ever truncating real spend.
+ * CI-05B.4 (defect c): record a reconciliation resolution (append-only) against
+ * an open exception AND move the money the disposition implies. A verified-no-bill
+ * resolution releases the still-outstanding hold (capacity restored, zero spend);
+ * a confirmed-expense resolution keeps the already-settled consumption and releases
+ * the unused remainder; both append an authoritative, append-only budget-ledger
+ * posting whose event id is linked into the resolution evidence. An over-cap
+ * variance and a held-for-reconciliation disposition record a disposition only —
+ * the real over-cap spend already lives in the settled consumption/overrun and is
+ * never truncated to the reserved amount. The whole resolution (disposition row and
+ * money-moving posting) is one atomic transaction and is idempotent/typed-conflict
+ * safe on the resolution idempotency key.
  */
 export async function resolveReconciliationException(value: unknown, ports: BudgetRuntimePorts): Promise<ApiResult<ReconciliationResolutionReceipt>> {
   const { Value } = requireValue();
@@ -1776,8 +1849,55 @@ export async function resolveReconciliationException(value: unknown, ports: Budg
         return { ok: true, value: { schemaVersion: '1.0.0', requestId, status: 'not_open', reservationId: request.reservationId, disposition: request.disposition, reservationState, outstandingHold: formatScaledDecimal(floorOutstanding) } };
       }
 
+      // CI-05B.4 (defect c): the resolution ACTUALLY MOVES MONEY; it is not a bare
+      // note. A verified-no-bill outcome releases the still-outstanding hold
+      // (capacity restored, no spend); a confirmed-expense outcome keeps the
+      // already-settled consumption and releases the unused remainder. Both append
+      // an authoritative, append-only budget-ledger posting whose event id is linked
+      // back into this resolution's evidence. Over-cap and held-for-reconciliation
+      // record a disposition only: the real over-cap spend already lives in the
+      // settled consumption/overrun and is never truncated to the reserved amount.
+      let linkedPostingEventId: string | null = null;
+      let resolvedOutstanding = floorOutstanding;
+      let resolvedReservationState = reservationState;
+      const movesMoney = request.disposition === 'verified_no_bill_released' || request.disposition === 'confirmed_expense_settled';
+      const releasable = state !== null && floorOutstanding > 0n && state.lastType !== 'released' && state.lastType !== 'expired';
+      if (movesMoney && state !== null && releasable) {
+        // Serialize the money move with concurrent lifecycle commands on this
+        // reservation's real currency partition (the '*' lock above only serializes
+        // reconciliation resolutions against one another).
+        if (!(await acquirePartitionLock(client, scope, state.currency, gate))) {
+          await rollback(client); inTransaction = false;
+          return failure(makeError('resolveReconciliation', 'BUDGET_UNAVAILABLE', requestId, 'The reservation partition is busy; retry the identical idempotent request.', true));
+        }
+        const postingId = globalThis.crypto.randomUUID();
+        const postingSequence = state.revision + 1;
+        const postingIdem = `recon-${request.disposition === 'verified_no_bill_released' ? 'release' : 'settle-remainder'}:${request.idempotencyKey}`;
+        const postingHash = await hashValue({ reservationId: request.reservationId, posting: postingId, disposition: request.disposition, idempotencyKey: request.idempotencyKey });
+        gate.checkpoint();
+        await client.query(
+          `INSERT INTO cost_intelligence.budget_reservation_events
+            (reservation_event_id, tenant_id, project_id, environment, billing_mode, currency, reservation_id, event_sequence,
+             event_type, held_amount, consumed_amount, released_amount, usage_finality, settlement_sequence, policy_version_id,
+             policy_ref, idempotency_key, expected_revision, actor_reference, source_authority_ref, attempt_binding,
+             logical_operation_id, billable_attempt_id, content_hash)
+           SELECT $1,$2,$3,$4,$5, e.currency, e.reservation_id, $6,
+             'released', 0, 0, $7::numeric, $8, NULL, e.policy_version_id, e.policy_ref, $9, $10, $11,
+             e.source_authority_ref, e.attempt_binding, e.logical_operation_id, e.billable_attempt_id, $12
+           FROM cost_intelligence.budget_reservation_events e
+           WHERE e.tenant_id = $2 AND e.project_id = $3 AND e.environment = $4 AND e.billing_mode = $5
+             AND e.reservation_id = $13 AND e.event_sequence = 1`,
+          [postingId, scope.tenantId, scope.projectId, scope.environment, scope.billingMode, postingSequence,
+            formatScaledDecimal(floorOutstanding), state.usageFinality, postingIdem, state.revision, request.actorReference, postingHash,
+            request.reservationId],
+        );
+        linkedPostingEventId = postingId;
+        resolvedOutstanding = 0n;
+        resolvedReservationState = 'released';
+      }
+
       const exceptionId = globalThis.crypto.randomUUID();
-      const evidence = { idempotencyKey: request.idempotencyKey, resolvedAt: now.toISOString(), evidenceRefs: request.evidenceRefs, disposition: request.disposition };
+      const evidence = { idempotencyKey: request.idempotencyKey, resolvedAt: now.toISOString(), evidenceRefs: request.evidenceRefs, disposition: request.disposition, linkedPostingEventId };
       const contentHash = await hashValue({ reservationId: request.reservationId, disposition: request.disposition, idempotencyKey: request.idempotencyKey });
       gate.checkpoint();
       await client.query(
@@ -1790,11 +1910,11 @@ export async function resolveReconciliationException(value: unknown, ports: Budg
           request.reservationId, `resolution:${request.disposition}`, request.disposition === 'held_for_reconciliation' ? 'review' : 'variance',
           request.ownerRole, request.nextAction, JSON.stringify(evidence),
           state ? formatScaledDecimal(state.held) : '0', state ? formatScaledDecimal(state.consumed) : '0',
-          formatScaledDecimal(floorOutstanding), reservationState, request.resolution, request.disposition, request.actorReference, contentHash],
+          formatScaledDecimal(resolvedOutstanding), resolvedReservationState, request.resolution, request.disposition, request.actorReference, contentHash],
       );
       gate.beginCommit();
       await client.query('COMMIT'); inTransaction = false;
-      return { ok: true, value: { schemaVersion: '1.0.0', requestId, status: 'resolved', reservationId: request.reservationId, disposition: request.disposition, reservationState, outstandingHold: formatScaledDecimal(floorOutstanding) } };
+      return { ok: true, value: { schemaVersion: '1.0.0', requestId, status: 'resolved', reservationId: request.reservationId, disposition: request.disposition, reservationState: resolvedReservationState, outstandingHold: formatScaledDecimal(resolvedOutstanding) } };
     } catch (error) {
       if (client && inTransaction) await rollback(client);
       if (isUniqueViolation(error)) {
