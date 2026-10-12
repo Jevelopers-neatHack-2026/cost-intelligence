@@ -185,7 +185,7 @@ test('CI05B expense capacity excludes cash/cash corrections and bounded reversal
   const expense=await post(expenseFixture(f.scope,{amount:'1'})),cash=expenseFixture(f.scope,{amount:'-5'});cash.eventType='cash_movement';await post(cash);
   const afterCash=await api.readCapacity(f.scope,'USD','cash-does-not-offset',f.ports.budgets?{...f.ports,...f.ports.budgets}:f.ports);
   assert.equal(afterCash.ok,true,JSON.stringify(afterCash));assert.equal(afterCash.value.effectiveConsumedSpend,'1');assert.equal(afterCash.value.outstandingHolds,'1');assert.equal(afterCash.value.usedCapacity,'2');
-  const correction=async(original,amount)=>{const next=structuredClone(original),id=randomUUID();Object.assign(next,{eventId:id,requestId:id,idempotencyKey:id,eventType:'correction',supersedesEventId:original.eventId});next.money={amount,currency:'USD',scale:amount.split('.')[1]?.length??0};next.sourceIdentity={...original.sourceIdentity,sourceEventId:id,revisionSequence:original.sourceIdentity.revisionSequence+1,sourceRevision:'fixture-2',contentHash:`sha256:${'e'.repeat(64)}`};const prior=await f.pool.query('SELECT event_hash FROM cost_intelligence.financial_ledger_events WHERE event_id=$1',[original.eventId]);next.sourceRefs=[{contract:'financial-ledger-event',schema_version:'1.0.0',id:original.eventId,revision:1,content_hash:prior.rows[0].event_hash}];return next;};
+  const correction=async(original,amount)=>{const next=structuredClone(original),id=randomUUID();Object.assign(next,{eventId:id,requestId:id,idempotencyKey:id,eventType:'correction',supersedesEventId:original.eventId});next.identities={...original.identities,sourceObservationId:randomUUID()};next.money={amount,currency:'USD',scale:amount.split('.')[1]?.length??0};next.sourceIdentity={...original.sourceIdentity,sourceEventId:id,revisionSequence:original.sourceIdentity.revisionSequence+1,sourceRevision:'fixture-2',contentHash:`sha256:${'e'.repeat(64)}`};const prior=await f.pool.query('SELECT event_hash FROM cost_intelligence.financial_ledger_events WHERE event_id=$1',[original.eventId]);next.sourceRefs=[{contract:'financial-ledger-event',schema_version:'1.0.0',id:original.eventId,revision:1,content_hash:prior.rows[0].event_hash}];return next;};
   await post(await correction(cash,'-7'));await post(await correction(expense,'0.8'));
   const corrected=await api.readCapacity(f.scope,'USD','correct-expense-axis',{...f.ports,...f.ports.budgets});assert.equal(corrected.value.effectiveConsumedSpend,'0.8');assert.equal(corrected.value.usedCapacity,'1.8');
  }finally{await f.pool.end();}
@@ -330,4 +330,39 @@ test('CI05B genuine process death before COMMIT and after unobserved COMMIT reco
    assert.deepEqual(counts.rows[0],{ledger:1,events:3,postings:1,observations:1,receipts:1});
   }finally{if(child&&child.exitCode===null&&child.signalCode===null){const exit=new Promise(resolve=>child.once('exit',resolve));child.kill('SIGKILL');await exit;}await rm(directory,{recursive:true,force:true});await f.pool.end();}
  }
+});
+
+
+test('CI05B interrupted committed discovery run preserves expense, exposes changed-finality conflict, and finishes through a new current-cursor run',{timeout:20000},async()=>{
+ const f=await fixture('interrupted-discovery',{native:true});let unblock,call;
+ try{
+  const first=await f.source.nativeCost('0.6'),second=await f.source.nativeCost('0.8');
+  let phase=0,commitWithheld=false,signal;const checkpoint=new Promise(resolve=>{signal=resolve;}),withheld=new Promise(resolve=>{unblock=resolve;});
+  const collector={...f.source.backend,findAttemptEvidence:async()=>({reportedCostRefs:phase<2?[first,second]:[second],finalityRef:phase===0?null:finality})};
+  let finality=null;
+  const database={connect:async()=>{const client=await f.ports.database.connect();return {release:()=>client.release(),query:async(text,values)=>{
+   const result=await client.query(text,values);
+   if(text.trim().toUpperCase()==='COMMIT'&&!commitWithheld){
+    const durable=await f.pool.query('SELECT count(*)::int AS n FROM cost_intelligence.budget_reported_observations WHERE tenant_id=$1 AND project_id=$2 AND source_observation_id=$3',[f.scope.tenantId,f.scope.projectId,f.source.records.get(second.id).record.payload.observationId]);
+    if(durable.rows[0].n===1){commitWithheld=true;signal();await withheld;}
+   }
+   return result;
+  }};}};
+  const ports={...f.ports,budgets:{...f.ports.budgets,database,sourceCollector:collector,authorityWaitMs:2000}};
+  const request={schemaVersion:'2.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope:f.scope,currency:'USD',jobReference:'interrupted-current-evidence',expectedCursorRevision:0,pageSize:1,ownerReference:'synthetic-finance-investigator',actionReference:'collect-independent-current-source'};
+  call=reconciliation.startReconciliation(request,ports);
+  let timer;await Promise.race([checkpoint,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('actual committed discovery checkpoint was not reached')),7000);})]).finally(()=>clearTimeout(timer));
+  const pending=await call;call=null;assert.equal(pending.ok,false);assert.equal(pending.error.code,'RECONCILIATION_PENDING');assert.equal(commitWithheld,true);
+  const durable=await f.pool.query(`SELECT sum(e.amount)::text AS amount,count(*)::int AS heads FROM cost_intelligence.financial_ledger_events e JOIN cost_intelligence.financial_source_revision_heads h ON h.current_event_id=e.event_id WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.financial_effect`,[f.scope.tenantId,f.scope.projectId]);assert.equal(durable.rows[0].amount,'0.8');assert.equal(durable.rows[0].heads,1);
+  unblock();await new Promise(resolve=>setTimeout(resolve,20));
+  const afterTimeout=await api.getReservationSnapshot({schemaVersion:'2.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId},f.ports);assert.equal(afterTimeout.ok,true);assert.equal(afterTimeout.value.consumedAmount,'0.8');assert.equal(afterTimeout.value.outstandingHold,'0.2');assert.equal(afterTimeout.value.releasedAmount,'0');
+  finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_billed',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:second,fenceReference:null});phase=1;
+  const changedDiscovery=await reconciliation.startReconciliation(request,ports);assert.equal(changedDiscovery.ok,true);assert.equal(changedDiscovery.value.status,'needs_review');assert.equal(changedDiscovery.value.unresolvedCount,1);assert.equal(changedDiscovery.value.actions[0].errorCode,'IDEMPOTENCY_CONFLICT');
+  const conservative=await api.getReservationSnapshot({schemaVersion:'2.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId},f.ports);assert.equal(conservative.value.consumedAmount,'0.8');assert.equal(conservative.value.outstandingHold,'0.2');assert.equal(conservative.value.releasedAmount,'0');
+  phase=2;const newRun={...request,requestId:randomUUID(),idempotencyKey:randomUUID(),expectedCursorRevision:changedDiscovery.value.cursorRevision,actionReference:'retry-current-finality-after-needs-review'};
+  const complete=await reconciliation.startReconciliation(newRun,ports);assert.equal(complete.ok,true);assert.equal(complete.value.status,'complete');assert.equal(complete.value.unresolvedCount,0);assert.equal(complete.value.dispatchEligible,false);
+  const repeated=await reconciliation.startReconciliation(newRun,ports);assert.equal(repeated.ok,true);assert.equal(repeated.value.replay,true);
+  const final=await api.getReservationSnapshot({schemaVersion:'2.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId},f.ports);assert.equal(final.value.consumedAmount,'0.8');assert.equal(final.value.releasedAmount,'0.2');assert.equal(final.value.outstandingHold,'0');
+  const heads=await f.pool.query(`SELECT sum(e.amount)::text AS amount,count(*)::int AS n FROM cost_intelligence.financial_ledger_events e JOIN cost_intelligence.financial_source_revision_heads h ON h.current_event_id=e.event_id WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.financial_effect`,[f.scope.tenantId,f.scope.projectId]);assert.equal(heads.rows[0].amount,'0.8');assert.equal(heads.rows[0].n,1);
+ }finally{unblock?.();if(call)await call.catch(()=>{});await f.pool.end();}
 });
