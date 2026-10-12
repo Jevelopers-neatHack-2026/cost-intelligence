@@ -1,33 +1,21 @@
 /** Node 22 structured reporter. Private names, assertions and stdout are omitted. */
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
 
 const failureCodes = new Set(['ERR_ASSERTION', '42P01', '42703', '42883', '42501', '23505', '23514', '57014', '55P03', 'P0001']);
 const positiveInteger = value => Number.isSafeInteger(value) && value > 0 ? value : null;
-const escapePattern = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function boundedFailure(data) {
-  const location = typeof data.file === 'string'
-    ? new RegExp(`(?:${[data.file, pathToFileURL(data.file).href].map(escapePattern).join('|')}):(\\d+):(\\d+)`)
-    : null;
-  let failureLine = null;
-  let failureColumn = null;
   let code = 'bounded_other';
   let error = data.details?.error;
-  // Node wraps the assertion in a test failure. Inspect a bounded cause chain,
-  // retaining only allowlisted codes and numeric positions in this source file.
+  // Node wraps the assertion in a test failure. Inspect only a bounded cause
+  // chain for allowlisted codes; message and stack text cannot supply locations.
   for (let depth = 0; depth < 4 && error && typeof error === 'object'; depth++, error = error.cause) {
     if (failureCodes.has(error.code)) code = error.code;
-    const match = location && typeof error.stack === 'string' ? error.stack.slice(0, 16_384).match(location) : null;
-    if (match) {
-      failureLine = positiveInteger(Number(match[1]));
-      failureColumn = positiveInteger(Number(match[2]));
-    }
   }
   return {
     titleHash: typeof data.name === 'string' ? createHash('sha256').update(data.name).digest('hex') : null,
     registrationLine: positiveInteger(data.line), registrationColumn: positiveInteger(data.column),
-    failureLine, failureColumn, code,
+    code,
   };
 }
 

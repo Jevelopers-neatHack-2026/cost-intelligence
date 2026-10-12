@@ -221,7 +221,7 @@ test('missing required file cannot produce structured test evidence', async () =
   assert.equal(evidence.registeredTestCaseCount, 0);
 });
 
-test('failed test evidence identifies the source assertion without exposing private names, values or output', async () => {
+test('failed test evidence identifies the registered case without exposing private names, values or output', async () => {
   const privateValue = 'CI11_PRIVATE_DIAGNOSTIC_CANARY';
   const title = `synthetic failure ${privateValue}`;
   const source = [
@@ -241,11 +241,30 @@ test('failed test evidence identifies the source assertion without exposing priv
   assert.deepEqual(evidence.failedTestCases, [{
     titleHash: createHash('sha256').update(title).digest('hex'),
     registrationLine: 3, registrationColumn: 1,
-    failureLine: 5, failureColumn: 10, code: 'ERR_ASSERTION',
+    code: 'ERR_ASSERTION',
   }]);
   const serialized = JSON.stringify(evidence);
   for (const forbidden of [privateValue, title, 'private-expected-value', evidenceFixtureDirectory, 'AssertionError', 'console.log']) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+test('source-looking error messages cannot invent diagnostic coordinates', async () => {
+  for (const messagePrefix of ['CI11_PRIVATE_LOCATION_CANARY ', 'CI11_PRIVATE_LOCATION_CANARY\n    at ']) {
+    const file = await writeTestFixture('spoofed-location.test.mjs', [
+      "import test from 'node:test';",
+      "import { fileURLToPath } from 'node:url';",
+      "test('synthetic source-looking message', () => {",
+      `  throw new Error(${JSON.stringify(messagePrefix)} + fileURLToPath(import.meta.url) + ':999:888');`,
+      '});',
+    ].join('\n'));
+    const evidence = runTestFile(file, { cwd: evidenceFixtureDirectory });
+    assert.equal(evidence.passed, false);
+    assert.deepEqual(evidence.failedTestCases, [{
+      titleHash: createHash('sha256').update('synthetic source-looking message').digest('hex'),
+      registrationLine: 3, registrationColumn: 1, code: 'bounded_other',
+    }]);
+    assert.doesNotMatch(JSON.stringify(evidence), /CI11_PRIVATE_LOCATION_CANARY|999|888|failureLine|failureColumn/);
   }
 });
 
