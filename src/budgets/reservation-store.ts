@@ -377,7 +377,7 @@ async function verifyPricing(ports:BudgetRuntimePorts,request:ReservationRequest
   const amount=verified.profile.pricingUnit==='fixed_per_attempt'?verified.profile.fixedAttemptAmount:
     verified.maximum?.record.payload&&typeof verified.maximum.record.payload==='object'&&'authorizedMaximum' in verified.maximum.record.payload?
       String(verified.maximum.record.payload.authorizedMaximum):null;
-  if(amount===null)return {amount:null,proofs:[verified.source]};
+  if(amount===null)return {amount:null,proofs:[verified.source],pricingUnit:verified.profile.pricingUnit};
   if(verified.profile.pricingUnit==='fixed_per_attempt'&&request.estimate.completeness==='complete'
     &&!sameAmount(amount,request.estimate.knownSubtotal))return null;
   if(verified.profile.pricingUnit!=='fixed_per_attempt'&&(!verified.maximum
@@ -386,10 +386,10 @@ async function verifyPricing(ports:BudgetRuntimePorts,request:ReservationRequest
     ||(verified.maximum.record.payload as {currency:string}).currency!==request.estimate.currency))return null;
   if(parseScaledDecimal(amount)<parseScaledDecimal(request.estimate.knownSubtotal)
     ||!sameAmount(amount,request.canonicalRequest.requested.amount))return null;
-  return {amount:parseScaledDecimal(amount),proofs:[verified.source,...(verified.maximum?[verified.maximum]:[])]};
+  return {amount:parseScaledDecimal(amount),proofs:[verified.source,...(verified.maximum?[verified.maximum]:[])],pricingUnit:verified.profile.pricingUnit};
 }
-function maximumMatches(request:ReservationRequest,source:BudgetEvidenceDecision):boolean{
-  return request.estimate.completeness==='complete'||!!source.maximum&&sameJson(source.maximum.policyRef,request.estimate.maximumPolicyRef)
+function maximumMatches(request:ReservationRequest,source:BudgetEvidenceDecision,required=request.estimate.completeness!=='complete'):boolean{
+  return !required||!!source.maximum&&sameJson(source.maximum.policyRef,request.estimate.maximumPolicyRef)
     &&source.maximum.currency===request.estimate.currency&&sameAmount(source.maximum.authorizedCap,request.estimate.boundedConservativeMaximum??'0')
     &&sameAmount(source.maximum.authorizedCap,request.canonicalRequest.requested.amount)
     &&parseScaledDecimal(source.maximum.authorizedCap)>=parseScaledDecimal(request.estimate.knownSubtotal);
@@ -780,13 +780,14 @@ function sameAmount(left: string, right: string): boolean {
 }
 
 /** Contradictory financial fields between the canonical request and the estimate. */
-function financialBindingError(request: ReservationRequest,approvedAmount?:bigint): string | null {
+function financialBindingError(request: ReservationRequest,approvedAmount?:bigint,pricingUnit?:string): string | null {
   const canonical = request.canonicalRequest;
   const requested = canonical.requested;
   if (request.estimate.currency !== canonical.currency || requested.currency !== canonical.currency) {
     return 'The estimate and requested amount currency must match the reservation request currency.';
   }
   if(approvedAmount!==undefined){
+    if(pricingUnit==='fixed_per_attempt'&&request.estimate.completeness==='complete'&&request.estimate.maximumPolicyRef!==undefined)return 'A fixed-price complete estimate cannot supply a separate maximum policy reference.';
     if(parseScaledDecimal(requested.amount)!==approvedAmount||parseScaledDecimal(request.estimate.knownSubtotal)>approvedAmount)
       return 'The exact requested hold must equal the independently approved fixed price or attempt maximum.';
     return null;
@@ -864,6 +865,15 @@ export async function authorizeReservation(
       if (!host) return failure(makeError('authorize', 'FORBIDDEN_SCOPE', requestId, 'The current host target grant or lease is unavailable or revoked.'));
       proofs.push(host,source);
       if(!currentProofBound(ports,proofs,request))return failure(makeError('authorize','FORBIDDEN_SCOPE',requestId,'The admission proof chain is no longer current.'));
+      const preflightPricing=await gate.wait(verifyPricing(ports,request));gate.checkpoint();
+      // A genuine fixed-price source can establish a contradictory request before any DB work.
+      // An invalid pricing reference is still compared with a persisted key before rejecting a conflicting retry.
+      if(preflightPricing?.amount!==null&&preflightPricing){
+        const contradiction=financialBindingError(request,preflightPricing.amount,preflightPricing.pricingUnit);
+        if(contradiction)return failure(makeError('authorize','VALIDATION_ERROR',requestId,contradiction));
+        proofs.push(...preflightPricing.proofs);
+      }
+      if(!currentProofBound(ports,proofs,request))return unavailable();
 
       client = await ports.database.connect();
       gate.checkpoint();
@@ -957,10 +967,14 @@ export async function authorizeReservation(
       if(!pricing)return failure(makeError('authorize','FORBIDDEN_SCOPE',requestId,'A current authenticated pricing profile and per-attempt maximum policy are required.'));
       proofs.push(...pricing.proofs);
       const approvedMaximum=pricing.amount;
-      const bindingError=approvedMaximum===null?null:financialBindingError(request,approvedMaximum);
+      const bindingError=approvedMaximum===null?null:financialBindingError(request,approvedMaximum,pricing.pricingUnit);
       if(bindingError)return failure(makeError('authorize','VALIDATION_ERROR',requestId,bindingError));
 
       const need = approvedMaximum;
+      if(need!==null&&!maximumMatches(request,source,pricing.pricingUnit!=='fixed_per_attempt')){
+        await rollback(client);inTransaction=false;
+        return {ok:true,value:buildDecision({requestId,request,currency,now,status:'denied',reservationId:'none',held:0n,available:capacity.available,partialAllowed:null,policyRef:decisionReference(capacity.policy),rateCardRef:request.estimate.rateCardRef})};
+      }
       if (capacity.unresolvedExposure) { await rollback(client);inTransaction=false;return unavailable(); }
       if (need === null) {
         // Unknown / unbounded pricing cannot auto-authorize.
@@ -994,7 +1008,7 @@ export async function authorizeReservation(
       const finalHost=await gate.wait(verifyReservationHost(ports.reservationAuthority,{scope,billableAttemptId:request.attemptBinding.billableAttemptId,binding:request.authorityBinding,sourceAuthorityRef:request.sourceAuthorityRef,phase:'admission'},ports.clock));gate.checkpoint();
       const finalSource=await gate.wait(verifySource(ports,request as unknown as Record<string,unknown>,'authorize',request.sourceAuthorityRef));gate.checkpoint();
       const finalPricing=await gate.wait(verifyPricing(ports,request));gate.checkpoint();
-      if(!finalHost||!finalSource||!finalPricing||finalPricing.amount!==approvedMaximum)return failure(makeError('authorize','FORBIDDEN_SCOPE',requestId,'Current host or source authority changed during admission.'));
+      if(!finalHost||!finalSource||!finalPricing||finalPricing.amount!==approvedMaximum||!maximumMatches(request,finalSource,finalPricing.pricingUnit!=='fixed_per_attempt'))return failure(makeError('authorize','FORBIDDEN_SCOPE',requestId,'Current host or source authority changed during admission.'));
       proofs.push(finalHost,finalSource,...finalPricing.proofs);
       const finalScope=await refreshScopeProof(scope,requestId,ports,'authorize','budgets.authorize',gate,proofs);if(!finalScope.ok)return finalScope;
       const admissionBound=currentProofBound(ports,proofs,request);if(!admissionBound)return failure(makeError('authorize','FORBIDDEN_SCOPE',requestId,'Admission authority expired before the financial effect.'));
@@ -1021,7 +1035,7 @@ export async function authorizeReservation(
           request.estimate.rateCardRef === null ? null : JSON.stringify(request.estimate.rateCardRef),
           JSON.stringify(policyRef), request.idempotencyKey, scope.actorId,
           JSON.stringify(request.sourceAuthorityRef),
-          JSON.stringify(request.attemptBinding), request.attemptBinding.logicalOperationId, request.attemptBinding.billableAttemptId, contentHash, JSON.stringify(normalizedBudgetRequest(request as unknown as Record<string, unknown>)), JSON.stringify(request.authorityBinding), request.canonicalRequest.expires_at, formatScaledDecimal(need), JSON.stringify(authorityEvidence)],
+          JSON.stringify(request.attemptBinding), request.attemptBinding.logicalOperationId, request.attemptBinding.billableAttemptId, contentHash, JSON.stringify(normalizedBudgetRequest(request as unknown as Record<string, unknown>)), JSON.stringify(request.authorityBinding), admissionBound.expiresAt, formatScaledDecimal(need), JSON.stringify(authorityEvidence)],
       );
       const beforeCommit=await refreshScopeProof(scope,requestId,ports,'authorize','budgets.authorize',gate,proofs);if(!beforeCommit.ok)return beforeCommit;
       if(!currentProofBound(ports,proofs,request)){await rollback(client);inTransaction=false;return unavailable();}
@@ -1031,7 +1045,7 @@ export async function authorizeReservation(
         binding:request.authorityBinding,sourceAuthorityRef:request.sourceAuthorityRef,phase:'admission'},ports.clock));gate.checkpoint();
       const acknowledgedSource=await gate.wait(verifySource(ports,request as unknown as Record<string,unknown>,'authorize',request.sourceAuthorityRef));gate.checkpoint();
       const acknowledgedPricing=await gate.wait(verifyPricing(ports,request));gate.checkpoint();
-      if(!acknowledgedHost||!acknowledgedSource||!acknowledgedPricing||acknowledgedPricing.amount!==approvedMaximum)return unavailable();
+      if(!acknowledgedHost||!acknowledgedSource||!acknowledgedPricing||acknowledgedPricing.amount!==approvedMaximum||!maximumMatches(request,acknowledgedSource,acknowledgedPricing.pricingUnit!=='fixed_per_attempt'))return unavailable();
       proofs.push(acknowledgedHost,acknowledgedSource,...acknowledgedPricing.proofs);
       const acknowledgedScope=await refreshScopeProof(scope,requestId,ports,'authorize','budgets.authorize',gate,proofs);if(!acknowledgedScope.ok)return unavailable();
       const returnedBound=currentProofBound(ports,proofs,request);if(!returnedBound)return unavailable();
@@ -1134,6 +1148,7 @@ async function loadReservation(client: BudgetTransactionPort, scope: TrustedScop
             (array_agg(attempt_binding ORDER BY event_sequence ASC))[1] AS original_binding,
             (array_agg(authorization_request ORDER BY event_sequence ASC))[1] AS authorization_request,
             (array_agg(financial_expires_at::text ORDER BY event_sequence ASC))[1] AS financial_expires_at,
+            (array_agg(authority_evidence->>'expiresAt' ORDER BY event_sequence ASC))[1] AS authority_expires_at,
             bool_or(event_type = 'partial_acknowledged') AS acknowledged,
             (array_agg(command_evidence ORDER BY event_sequence DESC) FILTER (WHERE event_type='partial_acknowledged'))[1] AS acknowledgement_evidence,
             (array_agg(command_evidence ORDER BY event_sequence DESC) FILTER (WHERE event_type='dispatched'))[1] AS dispatch_evidence
@@ -1170,8 +1185,13 @@ async function loadReservation(client: BudgetTransactionPort, scope: TrustedScop
     originalBinding: row.original_binding ?? null,
     settlementSourceRef:sourcePosting.rows[0]?.source_reference??null,
     latestReportedUsage:reported.rows[0]?.usage_event as BudgetReportedUsage??null,
-    authorizationRequest: row.authorization_request as ReservationRequest ?? null, financialExpiresAt: fromRow(row, 'financial_expires_at'), acknowledged: !!acknowledgement, acknowledgementEvidence: acknowledgement?.command_request ?? null, dispatchEvidence: row.dispatch_evidence ?? null,
+    authorizationRequest: row.authorization_request as ReservationRequest ?? null, financialExpiresAt: earliestFinancialExpiry(fromRow(row,'financial_expires_at'),fromRow(row,'authority_expires_at')), acknowledged: !!acknowledgement, acknowledgementEvidence: acknowledgement?.command_request ?? null, dispatchEvidence: row.dispatch_evidence ?? null,
   };
+}
+
+function earliestFinancialExpiry(...values:(string|null)[]):string|null{
+  const present=values.filter((value):value is string=>value!==null);if(!present.length)return null;
+  const times=present.map(value=>Date.parse(value));return times.every(Number.isFinite)?new Date(Math.min(...times)).toISOString():'1970-01-01T00:00:00.000Z';
 }
 
 function stateFor(lastType: string, usageFinality: 'unknown' | 'partial' | 'final'): ReservationLifecycleState {
@@ -1526,7 +1546,7 @@ async function verifiedSettlement(value:unknown,ports:BudgetRuntimePorts,correct
     validateCurrent:verify,
     async appendFinancial(state,client,revision,retainProof){
       if(!accepted)return failure(makeError('settle','SOURCE_UNAVAILABLE',request.requestId,'Verified original reported cost is required.'));
-      const posted=await postAuthenticatedSettlement(client,ports,request,state,revision,accepted,correction?'budgets.recordExpenseAdjustment':'budgets.settle',retainProof);
+      const posted=await postAuthenticatedSettlement(client,ports,request,state,revision,accepted,finality,correction?'budgets.recordExpenseAdjustment':'budgets.settle',retainProof);
       if(!posted.ok)return posted;
       // Refresh original source/finality after the ledger append's asynchronous authorization and DB work.
       const refreshed=await verify(state);if(!refreshed.ok)return refreshed;
@@ -1574,7 +1594,7 @@ async function persistBudgetSource(client:BudgetTransactionPort,source:Authentic
   return id;
 }
 async function postAuthenticatedSettlement(client:BudgetTransactionPort,ports:BudgetRuntimePorts,request:SettleReservationCommand|VerifiedSettlementRequest|VerifiedExpenseCorrectionRequest,
-  state:ReservationState,revision:number,accepted:ResolvedBudgetReportedCost,authority:'budgets.settle'|'budgets.recordExpenseAdjustment',retainProof:(proof:TimedBudgetProof)=>void):Promise<ApiResult<unknown>>{
+  state:ReservationState,revision:number,accepted:ResolvedBudgetReportedCost,verifiedFinality:'partial'|'final',authority:'budgets.settle'|'budgets.recordExpenseAdjustment',retainProof:(proof:TimedBudgetProof)=>void):Promise<ApiResult<unknown>>{
   const scope=request.scope as TrustedScope,usage=accepted.usage;
   const observationId=await persistBudgetSource(client,accepted.source);
   const previousObservation=await client.query(`SELECT reservation_id,usage_event,provider_evidence,ledger_event_id
@@ -1622,7 +1642,7 @@ async function postAuthenticatedSettlement(client:BudgetTransactionPort,ports:Bu
     scope,eventId,correlationId:usage.correlation_id,producer:{module:usage.producer.module,sourceRevision:usage.producer.source_revision,buildRevision:usage.producer.build_revision},
     occurredAt:usage.occurred_at,observedAt:usage.observed_at,evidenceMode:accepted.source.record.evidenceMode,
     verificationStatus:'verified',eventType:predecessor?'correction':'consumption',classification:prior?.classification??'supplier_expense',
-    valuation:'provider_reported_unsettled',settlementStatus:'unpaid',reconciliationStatus:'unmatched',reservationLifecycle:null,
+    valuation:'provider_reported_unsettled',settlementStatus:'unpaid',reconciliationStatus:'unmatched',reservationLifecycle:verifiedFinality==='final'?'settled':'partially_settled',
     identities:{logicalOperationId:request.attemptBinding.logicalOperationId,sourceObservationId:usage.source_observation_id,reservationId:prior?.identities.reservationId??null},
     postingMapping:prior?.postingMapping??{schemaVersion:'1.0.0',sourceLineId:request.attemptBinding.billableAttemptId,
       transportAttemptId:known(request.attemptBinding.transportAttemptId),providerAttemptId:known(request.attemptBinding.providerAttemptId),
@@ -1632,7 +1652,7 @@ async function postAuthenticatedSettlement(client:BudgetTransactionPort,ports:Bu
       revisionSubjectId:prior?.sourceIdentity.revisionSubjectId??request.attemptBinding.billableAttemptId,
       sourceRevision:`collector:${accepted.source.record.id}:${accepted.source.record.revision}`,
       revisionSequence:predecessor?Number(predecessor.source_revision_sequence)+1:1,contentHash:accepted.source.recordHash},
-    usage:{completeness:usage.completeness,missingFields:[...usage.missing_fields],units:(usage.usage_units??[]).map(unit=>({
+    usage:{completeness:usage.completeness,missingFields:usage.missing_fields.map(field=>field==='usage_units'?'usage':field),units:(usage.usage_units??[]).map(unit=>({
       name:unit.name,quantity:unit.quantity,scale:unit.scale,relation:unit.relation,...(unit.included_in!==undefined?{includedIn:unit.included_in}:{})}))},
     money:{amount,currency:'USD',scale:amount.split('.')[1]?.length??0},sourceRefs:[accepted.source.reference,usage.valuation.basis==='provider_reported_unsettled'?usage.valuation.provider_evidence_ref:accepted.source.reference],
     dimensions:{provider:usage.provider,model:usage.model},pricing:null,fxEvidence:null,financialEffect:true,
@@ -2192,7 +2212,7 @@ async function snapshotFrom(client: BudgetTransactionPort, request: ReservationS
   if (!original?.sourceAuthorityRef || !original.authorityBinding) return null;
   const first = await client.query(`SELECT reservation_event_id, content_hash, authorized_cap::text AS cap FROM cost_intelligence.budget_reservation_events WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND reservation_id=$5 AND event_sequence=1`, [request.scope.tenantId,request.scope.projectId,request.scope.environment,request.scope.billingMode,request.reservationId]);
   const row=first.rows[0]; if (!row) return null;
-  const expired = Date.parse(original.canonicalRequest.expires_at) <= now.getTime();
+  const expired = Date.parse(state.financialExpiresAt??original.canonicalRequest.expires_at) <= now.getTime();
   const lifecycle = stateFor(state.lastType,state.usageFinality);
   const eligible = !expired && Date.parse(original.authorityBinding.leaseExpiresAt)>now.getTime() && (lifecycle==='held' || lifecycle==='dispatched') && (state.firstType!=='partially_authorized' || state.acknowledged);
   const c=original.canonicalRequest;
@@ -2208,7 +2228,7 @@ async function snapshotFrom(client: BudgetTransactionPort, request: ReservationS
     idempotency_key:original.idempotencyKey,authority_ref:original.sourceAuthorityRef,settlement_ref:null };
   const snapshot={schemaVersion:'1.0.0',requestId:request.requestId,asOf:now.toISOString(),reservation:canonical,
     state:expired && !state.everDispatched && lifecycle==='held'?'expired':lifecycle, heldAmount:formatScaledDecimal(state.held),effectiveConsumedAmount:formatScaledDecimal(state.consumed),releasedAmount:formatScaledDecimal(state.released),latestCumulativeSettlement:formatScaledDecimal(state.consumed),overrunAmount:formatScaledDecimal(state.consumed>state.held?state.consumed-state.held:0n),usageFinality:state.usageFinality,expectedRevision:state.revision,attemptBinding:original.attemptBinding,
-    dispatchEligible:eligible, ...(eligible ? {finance:financeEnvelope(original,request.reservationId,state.held-state.released-state.consumed>0n?state.held-state.released-state.consumed:0n,parseScaledDecimal(fromRow(row,'cap')??'0'),`ci05a:${asString(row.reservation_event_id)}`,asString(row.content_hash))}: {})};
+    dispatchEligible:eligible, ...(eligible ? {finance:financeEnvelope(original,request.reservationId,state.held-state.released-state.consumed>0n?state.held-state.released-state.consumed:0n,parseScaledDecimal(fromRow(row,'cap')??'0'),`ci05a:${asString(row.reservation_event_id)}`,asString(row.content_hash),state.financialExpiresAt??undefined)}: {})};
   const validated=validateReservationSnapshotBoundary(snapshot);return validated.ok?validated.value:null;
 }
 /** Finance USD18 read preserves financial facts without synthesizing a legacy canonical envelope. */
@@ -2294,7 +2314,7 @@ export async function revalidateReservation(value: unknown, ports: BudgetRuntime
       gate.checkpoint();if(host)proofs.push(host);else allowed=false;
       const source=await gate.wait(verifySource(ports,original as unknown as Record<string,unknown>,'authorize',original.sourceAuthorityRef));
       gate.checkpoint();if(source){proofs.push(source);}else allowed=false;
-      const pricing=await gate.wait(verifyPricing(ports,original));gate.checkpoint();if(pricing?.amount!==null&&pricing)proofs.push(...pricing.proofs);else allowed=false;
+      const pricing=await gate.wait(verifyPricing(ports,original));gate.checkpoint();if(pricing?.amount!==null&&pricing){proofs.push(...pricing.proofs);if(!source||!maximumMatches(original,source,pricing.pricingUnit!=='fixed_per_attempt'))allowed=false;}else allowed=false;
       if(state.firstType==='partially_authorized'){
         const ack=state.acknowledgementEvidence as PartialAcknowledgementRequest|null;
         const plan=ack?await gate.wait(verifySource(ports,ack as unknown as Record<string,unknown>,'acknowledgePartial',ack.sourceAuthorityRef)):null;
@@ -2321,6 +2341,7 @@ async function validateDispatchEvidence(state:ReservationState,request:MarkDispa
   const original=state.authorizationRequest;const now=trustedNow(ports);
   const refuse=()=>failure(makeError('markDispatched','FORBIDDEN_SCOPE',request.requestId,'Current dispatch target, source, expiry, lease or revised plan evidence is missing.'));
   if(!original?.authorityBinding||!original.sourceAuthorityRef||!now||Date.parse(original.canonicalRequest.expires_at)<=now.getTime()
+    ||state.financialExpiresAt!==null&&Date.parse(state.financialExpiresAt)<=now.getTime()
     ||request.workerLeaseId!==original.authorityBinding.leaseRef||request.workerLeaseExpiresAt!==original.authorityBinding.leaseExpiresAt)return refuse();
   if(!ports.reservationAuthority||!ports.budgetEvidence)return failure(makeError('markDispatched','BUDGET_UNAVAILABLE',request.requestId,'Current host and source verification is not configured.',true));
   const host=await verifyReservationHost(ports.reservationAuthority,{scope:request.scope,billableAttemptId:original.attemptBinding.billableAttemptId,
@@ -2329,7 +2350,7 @@ async function validateDispatchEvidence(state:ReservationState,request:MarkDispa
   const source=await verifySource(ports,request as unknown as Record<string,unknown>,'markDispatched',request.sourceAuthorityRef);
   const estimate=await verifySource(ports,original as unknown as Record<string,unknown>,'authorize',original.sourceAuthorityRef);
   const pricing=await verifyPricing(ports,original);
-  if(!host||!source||!estimate||!pricing||pricing.amount===null)return refuse();
+  if(!host||!source||!estimate||!pricing||pricing.amount===null||!maximumMatches(original,estimate,pricing.pricingUnit!=='fixed_per_attempt'))return refuse();
   const proofs:TimedBudgetProof[]=[host,source,estimate,...pricing.proofs];
   if(state.firstType==='partially_authorized'){
     const ack=state.acknowledgementEvidence as PartialAcknowledgementRequest|null;

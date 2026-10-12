@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import {diagnosticBudgetClient} from './static-diagnostics.mjs';
+import {syntheticCapabilityRows} from './synthetic-capability.mjs';
 import { budgetDigest, canonicalBudgetJson } from '../../dist/index.js';
 import { databaseConfigFromEnvironment, runtimeDatabaseConfigFromEnvironment } from '../../scripts/test-db-lifecycle.mjs';
 
@@ -42,6 +43,8 @@ function registerSyntheticProfile(request,options={}){
   return publish('pricing_profile',{schemaVersion:'ci-budget-pricing-1.0.0',currency:request.estimate.currency,economicRequestDigest:digest,
     pricingUnit,fixedAttemptAmount:pricingUnit==='fixed_per_attempt'?request.estimate.knownSubtotal:null,maximumPolicyRef:maximum});
 }
+/** Explicit fixture-owner issuance after all financial request fields are fixed. */
+export function refreshSyntheticPricing(request,options={}){request.pricingProfileRef=registerSyntheticProfile(request,options);return request;}
 function syntheticSourceBackend(scope,clock){return {
   loadCurrent:async reference=>{
     const stored=SYNTHETIC_PROFILES.get(reference.id);if(!stored)return null;
@@ -293,7 +296,12 @@ export const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /** Scripted ports whose database hands out the given client (optionally late or never). */
 export function scriptedPorts(scope, connect, options = {}) {
-  return makePorts({ connect }, scope, options);
+  return makePorts({ connect:async()=>{
+    const client=await connect();return {release:()=>client.release(),query:async(sql,values)=>{
+      const result=await client.query(sql,values),metadata=syntheticCapabilityRows(sql);
+      return metadata===null?result:{rows:structuredClone(metadata),rowCount:metadata.length};
+    }};
+  } }, scope, options);
 }
 
 /** The policy row, aggregate row and event rows a typical scripted authorization partition returns. */

@@ -1,14 +1,20 @@
-import {diagnosticTest,diagnosticBudgetApi} from './static-diagnostics.mjs';
+import {diagnosticTest,diagnosticBudgetApi,diagnosticBudgetOperation} from './static-diagnostics.mjs';
 const test=diagnosticTest('settlement-integrity.test.mjs');
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {spawn} from 'node:child_process';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {Value} from '@sinclair/typebox/value';
 import pg from 'pg';
-import {databaseConfigFromEnvironment} from '../../scripts/test-db-lifecycle.mjs';
+import {databaseConfigFromEnvironment,runtimeDatabaseConfigFromEnvironment} from '../../scripts/test-db-lifecycle.mjs';
 import * as rawApi from '../../dist/budgets/index.js';
 const api=diagnosticBudgetApi(rawApi);
 import * as reconciliation from '../../dist/reconciliation/index.js';
-import {appendLedgerEvent} from '../../dist/ledger/store.js';
+import {appendLedgerEvent as rawAppendLedgerEvent} from '../../dist/ledger/store.js';
+const appendLedgerEvent=diagnosticBudgetOperation(rawAppendLedgerEvent);
 import {loadReserveFixture,setBudgetLimit,reservationPool,makeScope,makePorts,reservationRequest,markDispatchedCommand,settleCommand,releaseCommand,FIXED_TIME} from './reservation-harness.mjs';
 import {signedSourceHarness} from './signed-source-harness.mjs';
 
@@ -89,6 +95,9 @@ test('CI05B ordinary decrease conflicts; separately granted authenticated source
 });
 test('CI05B expiry conserves exposure; acknowledging holds keeps latest queue open, and late authentic cost survives revoked execution authority',async()=>{
  const f=await fixture('settlement-expiry-current-queue');try{
+  const persistedExpiry=await f.pool.query('SELECT financial_expires_at FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$1 AND event_sequence=1',[f.reservationId]);
+  assert.equal(new Date(persistedExpiry.rows[0].financial_expires_at).toISOString(),f.grant.finance.expires_at);
+  assert.ok(Date.parse(f.grant.finance.expires_at)<Date.parse(f.request.canonicalRequest.expires_at),'the persisted financial grant retains the shorter proof lifetime');
   f.advance(61000);
   const expiry={schemaVersion:'1.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope:f.scope,reservationId:f.reservationId,expectedRevision:2,
    actorReference:f.scope.actorId,sourceAuthorityRef:f.request.sourceAuthorityRef,attemptBinding:f.request.attemptBinding,reasonReference:'synthetic-expiry-sweep'};
@@ -285,4 +294,40 @@ test('CI05B public partial acknowledgement persists SHA text, replays one receip
   const rows=await f.pool.query(`SELECT count(*)::int AS n,min(content_hash)::text AS digest FROM cost_intelligence.budget_reservation_acknowledgements WHERE reservation_id=$1`,[f.reservationId]);assert.equal(rows.rows[0].n,1);assert.match(rows.rows[0].digest,/^sha256:[a-f0-9]{64}$/);
   const capacity=await api.readCapacity(f.scope,'USD','partial-conservation',{...f.ports,...f.ports.budgets});assert.equal(capacity.value.outstandingHolds,'1');assert.equal(capacity.value.usedCapacity,'1');
  }finally{await f.pool.end();}
+});
+
+
+test('CI05B genuine process death before COMMIT and after unobserved COMMIT recovers exactly one public settlement and unused release',{timeout:30000},async()=>{
+ for(const mode of ['before_commit','after_commit']){
+  const f=await fixture(`process-kill-${mode}`,{native:true}),directory=await mkdtemp(join(tmpdir(),'ci05b-synthetic-crash-'));let child;
+  try{
+   const cost=await f.source.nativeCost('0.8'),finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_billed',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:cost,fenceReference:null});
+   const command=native(settleCommand(f.scope,f.reservationId,2,{cumulativeAmount:'0.8',finality:'final',attemptBinding:f.request.attemptBinding}));
+   command.sourceAuthorityRef=cost;command.settlement.sourceObservationRefs=[cost];command.settlement.finalityEvidenceRef=finality;command.settlement.usageCompleteness='unknown';
+   assert.equal(Value.Check(api.VerifiedSettlementRequestSchema,command),true);
+   const input=join(directory,'synthetic-financial-records.json');await writeFile(input,JSON.stringify({scope:f.scope,now:f.ports.clock.now().toISOString(),command,publicKey:f.source.key,records:[...f.source.records]}),{mode:0o600});
+   const config=runtimeDatabaseConfigFromEnvironment(),env={CI_TEST_DB_RUNTIME_HOST:config.host,CI_TEST_DB_RUNTIME_PORT:String(config.port),CI_TEST_DB_RUNTIME_USER:config.user,CI_TEST_DB_RUNTIME_PASSWORD:config.password,CI_TEST_DB_RUNTIME_NAME:config.database};
+   child=spawn(process.execPath,[fileURLToPath(new URL('./settlement-crash-worker.mjs',import.meta.url)),input,mode],{stdio:['ignore','ignore','ignore','ipc'],env});
+   const exited=new Promise(resolve=>child.once('exit',(code,signal)=>resolve({code,signal})));
+   let timer;const checkpoint=await new Promise((resolve,reject)=>{
+    timer=setTimeout(()=>reject(new Error('synthetic settlement checkpoint did not arrive')),7000);
+    child.on('message',message=>{if(message?.kind==='checkpoint')resolve(message.stage);else if(message?.kind==='finished')reject(new Error('settlement returned before the required process checkpoint'));});
+    child.once('error',()=>reject(new Error('synthetic settlement process could not start')));
+    child.once('exit',()=>reject(new Error('synthetic settlement process ended before the checkpoint')));
+   }).finally(()=>clearTimeout(timer));
+   assert.equal(checkpoint,mode);
+   const ledgerBefore=await f.pool.query('SELECT count(*)::int AS n FROM cost_intelligence.financial_ledger_events WHERE tenant_id=$1 AND project_id=$2 AND financial_effect',[f.scope.tenantId,f.scope.projectId]);
+   const holdsBefore=await f.pool.query('SELECT count(*)::int AS n,sum(released_amount)::text AS released FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$1',[f.reservationId]);
+   assert.equal(ledgerBefore.rows[0].n,mode==='after_commit'?1:0);assert.equal(holdsBefore.rows[0].n,mode==='after_commit'?3:2);assert.equal(holdsBefore.rows[0].released,mode==='after_commit'?'0.2':'0');
+   assert.equal(child.kill('SIGKILL'),true);const death=await exited;assert.equal(death.signal,'SIGKILL');child=null;
+   const recovered=await api.settle(command,f.ports);assert.equal(recovered.ok,true);assert.equal(recovered.value.status,mode==='after_commit'?'replay':'applied');
+   assert.equal(recovered.value.consumedAmount,'0.8');assert.equal(recovered.value.releasedAmount,'0.2');assert.equal(recovered.value.outstandingHold,'0');
+   const counts=await f.pool.query(`SELECT (SELECT count(*) FROM cost_intelligence.financial_ledger_events WHERE tenant_id=$1 AND project_id=$2 AND financial_effect)::int AS ledger,
+    (SELECT count(*) FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$3)::int AS events,
+    (SELECT count(*) FROM cost_intelligence.budget_settlement_postings WHERE reservation_id=$3)::int AS postings,
+    (SELECT count(*) FROM cost_intelligence.budget_reported_observations WHERE reservation_id=$3)::int AS observations,
+    (SELECT count(*) FROM cost_intelligence.budget_command_receipts WHERE reservation_id=$3 AND idempotency_key=$4)::int AS receipts`,[f.scope.tenantId,f.scope.projectId,f.reservationId,command.idempotencyKey]);
+   assert.deepEqual(counts.rows[0],{ledger:1,events:3,postings:1,observations:1,receipts:1});
+  }finally{if(child&&child.exitCode===null&&child.signalCode===null){const exit=new Promise(resolve=>child.once('exit',resolve));child.kill('SIGKILL');await exit;}await rm(directory,{recursive:true,force:true});await f.pool.end();}
+ }
 });

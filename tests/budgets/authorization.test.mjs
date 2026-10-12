@@ -4,14 +4,14 @@ import './settlement-integrity.test.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import {diagnosticTest,diagnosticBudgetOperation} from './static-diagnostics.mjs';
+import {diagnosticTest,diagnosticBudgetOperation,diagnosticBudgetApi} from './static-diagnostics.mjs';
 const test=diagnosticTest('authorization.test.mjs');
 import {
   authorizeReservation as rawAuthorizeReservation, changeBudgetPolicy as rawChangeBudgetPolicy, readCapacity, markReservationDispatched, normalizedBudgetRequest,
 } from '../../dist/index.js';
 import {
   loadReserveFixture, setBudgetLimit, reservationPool, makePorts, makeScope, policyChange, reservationRequest,
-  scriptedClient, scriptedPorts, partitionRows, delay,
+  scriptedClient, scriptedPorts, partitionRows, delay, refreshSyntheticPricing,
 } from './reservation-harness.mjs';
 
 const authorizeReservation=diagnosticBudgetOperation(rawAuthorizeReservation),changeBudgetPolicy=diagnosticBudgetOperation(rawChangeBudgetPolicy);
@@ -560,7 +560,7 @@ function persistingClient(policy) {
 test('CI-05A.1 a complete estimate with an optional bounded maximum persists it and replays the identical request', async () => {
   const scope = makeScope('optional-maximum');
   const request = await scriptedRequest(scope, { amount: '1' });
-  request.estimate.boundedConservativeMaximum = '1.000';
+  request.estimate.boundedConservativeMaximum = '1.000';refreshSyntheticPricing(request);
   const { script, inserts } = persistingClient(POLICY);
   const ports = scriptedPorts(scope, async () => script.client);
   const initial = await authorizeReservation(request, ports);
@@ -586,7 +586,7 @@ test('CI-05A.3 a maximum policy reference on a complete estimate, or a maximum b
   const scope = makeScope('optional-maximum-reject');
   const withRef = await scriptedRequest(scope, { amount: '1' });
   withRef.estimate.boundedConservativeMaximum = '1';
-  withRef.estimate.maximumPolicyRef = POLICY;
+  withRef.estimate.maximumPolicyRef = POLICY;refreshSyntheticPricing(withRef);
   const below = await scriptedRequest(scope, { amount: '1' });
   below.estimate.boundedConservativeMaximum = '0.5';
   for (const [label, request] of Object.entries({ withRef, below })) {
@@ -606,7 +606,7 @@ test('CI-05A.1 PostgreSQL: the exact same request with an optional bounded maxim
     const scope = makeScope('db-optional-maximum');
     await setLimit(pool, scope, '5.00');
     const request = reservationRequest(scope, reserve, { amount: '1' });
-    request.estimate.boundedConservativeMaximum = '1';
+    request.estimate.boundedConservativeMaximum = '1';refreshSyntheticPricing(request);
     const first = await authorizeReservation(request, makePorts(pool, scope));
     assert.equal(first.ok && first.value.status, 'authorized', first.ok ? '' : first.error.code);
     const replay = await authorizeReservation(request, makePorts(pool, scope));
@@ -674,7 +674,7 @@ test('CI-05A.4 a COMMIT acknowledged only after the deadline leaves one hold tha
 });
 
 // CI05A public Finance-local mapping; host/source grants here are explicitly synthetic offline fixtures.
-const api = await import('../../dist/index.js');
+const api=diagnosticBudgetApi(await import('../../dist/index.js'));
 function publicPorts(pool, scope, options={}) {
   const low=makePorts(pool,scope,options);
   return {...low,storage:{isAvailable:async()=>true},providerSource:{isAvailable:async()=>true},budgets:{database:low.database,authorityWaitMs:low.authorityWaitMs,reservationAuthority:low.reservationAuthority,budgetEvidence:low.budgetEvidence,sourceCollector:low.sourceCollector,reportedCostContractMode:low.reportedCostContractMode}};
@@ -774,8 +774,15 @@ test('effective ledger costs and reservation holds conserve spend, sum distinct 
       const posted=await api.appendLedgerEvent(budgetLedgerEvent(scope,{amount,billableAttemptId:req.attemptBinding.billableAttemptId,logicalOperationId:req.attemptBinding.logicalOperationId}),ports);assert.equal(posted.ok,true,posted.ok?'':posted.error.safe_message);assert.equal(posted.value.status,'accepted');
     }
     let cap=await readCapacity(scope,'USD','joined',ports);assert.equal(cap.value.effectiveConsumedSpend,'0.5');assert.equal(cap.value.outstandingHolds,'0.5');assert.equal(cap.value.usedCapacity,'1');
-    const helpers=await import('./reservation-harness.mjs');const settlement=helpers.settleCommand(scope,grant.value.reservationId,1,{cumulativeAmount:'0.4',finality:'partial',attemptBinding:req.attemptBinding});assert.equal((await api.settleReservation(settlement,ports)).ok,true);
-    cap=await readCapacity(scope,'USD','joined-settled',ports);assert.equal(cap.value.usedCapacity,'1');assert.equal(cap.value.effectiveConsumedSpend,'0.5','two distinct source cost rows sum before comparison to cumulative reservation consumption');
+    const helpers=await import('./reservation-harness.mjs');const settlement=helpers.settleCommand(scope,grant.value.reservationId,1,{cumulativeAmount:'0.4',finality:'partial',attemptBinding:req.attemptBinding});
+    const unsupported=await api.settleReservation(settlement,ports);assert.equal(unsupported.ok,false,'an unverified reference must not post claimed cost or change the hold');
+    cap=await readCapacity(scope,'USD','joined-unverified',ports);assert.equal(cap.value.usedCapacity,'1');assert.equal(cap.value.effectiveConsumedSpend,'0.5');assert.equal(cap.value.outstandingHolds,'0.5');
+    const {signedSourceHarness}=await import('./signed-source-harness.mjs'),collector=await signedSourceHarness(scope,req.authorityBinding,req.attemptBinding,ports.clock);
+    const sourceAuthorityRef=await collector.nativeCost('0.4'),original=ports.sourceCollector;
+    const financialPorts={...ports,reportedCostContractMode:'finance_collector_v1',sourceCollector:{loadCurrent:async ref=>(await collector.backend.loadCurrent(ref))??original.loadCurrent(ref),loadCurrentIssuerKey:async id=>(await collector.backend.loadCurrentIssuerKey(id))??original.loadCurrentIssuerKey(id)}};
+    const {canonicalCommand,...nativeSettlement}=settlement;Object.assign(nativeSettlement,{schemaVersion:'2.0.0',sourceAuthorityRef});Object.assign(nativeSettlement.settlement,{sourceObservationRefs:[sourceAuthorityRef],usageCompleteness:'unknown'});
+    const posted=await api.settleReservation(nativeSettlement,financialPorts);assert.equal(posted.ok,true,posted.ok?'':posted.error.code);assert.equal(posted.value.consumedAmount,'0.4');
+    cap=await readCapacity(scope,'USD','joined-settled',financialPorts);assert.equal(cap.value.usedCapacity,'1');assert.equal(cap.value.effectiveConsumedSpend,'0.9','two distinct existing economic cost rows and a new attributable provider expense all remain recognized');assert.equal(cap.value.outstandingHolds,'0.1');
     const other=await api.appendLedgerEvent(budgetLedgerEvent(scope,{amount:'0.7'}),ports);assert.equal(other.value.status,'accepted');
     cap=await readCapacity(scope,'USD','unlinked',ports);assert.equal(cap.value.usedCapacity,'1.7');
     const denied=await api.authorize(reservationRequest(scope,fixture,{amount:'0.4'}),publicPorts(pool,scope));assert.equal(denied.value.status,'denied');
@@ -905,7 +912,7 @@ test('accepted unpriced public intake blocks uncovered capacity without inventin
       const foreignPorts=publicPorts(pool,foreign);const {limitAmount,...setup}=policyChange(foreign,{limitAmount:'1',expectedPolicyRevision:0});
       const policy=await api.changeBudget({...setup,newLimit:limitAmount,expectedLedgerRevision:0},foreignPorts);assert.equal(policy.ok,true,policy.ok?'':policy.error.code);assert.equal(policy.value.status,'applied');
       const foreignRequest=reservationRequest(foreign,fixture,{policyRef:policy.value.decisionReference,logicalOperationId:observation.usageEvent.logical_operation_id,billableAttemptId:observation.usageEvent.billable_attempt_id});
-      foreignRequest.attemptBinding.providerAttemptId=observation.usageEvent.provider_attempt_id;foreignRequest.attemptBinding.transportAttemptId=observation.usageEvent.transport_attempt_id;
+      foreignRequest.attemptBinding.providerAttemptId=observation.usageEvent.provider_attempt_id;foreignRequest.attemptBinding.transportAttemptId=observation.usageEvent.transport_attempt_id;refreshSyntheticPricing(foreignRequest);
       const foreignGrant=await api.authorize(foreignRequest,foreignPorts);assert.equal(foreignGrant.ok,true,foreignGrant.ok?'':foreignGrant.error.code);assert.equal(foreignGrant.value.status,'authorized');
       assert.equal((await api.authorize(reservationRequest(scope,fixture),ports)).value.status,'unavailable','a foreign scoped hold cannot cover this accepted attempt');
     }
@@ -916,7 +923,7 @@ test('unpriced intake matches an existing economic hold once; priced intake char
   const pool=reservationPool();const scope=makeScope('covered-intake');const fixture=await fixturePromise;
   try{
     await setBudgetLimit(pool,scope,'1');await setBudgetLimit(pool,scope,'1','EUR');const ports=publicPorts(pool,scope);
-    const req=reservationRequest(scope,fixture,{amount:'0.75'});req.attemptBinding.providerAttemptId=randomUUID();req.attemptBinding.transportAttemptId=randomUUID();
+    const req=reservationRequest(scope,fixture,{amount:'0.75'});req.attemptBinding.providerAttemptId=randomUUID();req.attemptBinding.transportAttemptId=randomUUID();refreshSyntheticPricing(req);
     const grant=await api.authorize(req,ports);assert.equal(grant.value.status,'authorized');
     const observation=await intakeObservation(scope,{binding:req.attemptBinding});assert.equal((await api.ingestUsage(observation,ports)).value.outboxStatus,'awaiting_evidence');
     assert.equal((await api.ingestUsage(observation,ports)).value.status,'duplicate');
