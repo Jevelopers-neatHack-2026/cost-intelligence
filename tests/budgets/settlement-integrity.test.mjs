@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import * as api from '../../dist/budgets/index.js';
+import {appendLedgerEvent} from '../../dist/ledger/store.js';
 import {loadReserveFixture,setBudgetLimit,reservationPool,makeScope,makePorts,reservationRequest,markDispatchedCommand,settleCommand,releaseCommand,FIXED_TIME} from './reservation-harness.mjs';
 import {signedSourceHarness} from './signed-source-harness.mjs';
 
@@ -114,4 +115,58 @@ test('CI05B a complete per-token 0.01 estimate holds the authenticated 0.10 maxi
   const unknown=await api.authorize(unissued,ports);assert.equal(unknown.ok,true,JSON.stringify(unknown));assert.equal(unknown.value.status,'denied');assert.equal(unknown.value.heldAmount,'0');
   const capacity=await api.readCapacity(scope,'USD','per-token-conservation',low);assert.equal(capacity.value.usedCapacity,'0.1');assert.equal(capacity.value.outstandingHolds,'0.1');
  }finally{await pool.end();}
+});
+
+function expenseFixture(scope,{amount='0.3',billableAttemptId=randomUUID(),logicalOperationId=randomUUID()}={}){
+  const id=randomUUID();const unknown=amount===null;
+  return {schemaVersion:'1.0.0',requestId:id,idempotencyKey:id,scope,eventId:id,correlationId:randomUUID(),producer:{module:'ci05a.synthetic.test',sourceRevision:'a'.repeat(40),buildRevision:'fixture-1'},occurredAt:'2026-10-12T03:00:00Z',observedAt:'2026-10-12T03:00:01Z',evidenceMode:'mocked',verificationStatus:'verified',eventType:'expense',classification:'direct_cost',valuation:unknown?'unknown':'provider_confirmed',settlementStatus:'unpaid',reconciliationStatus:'unmatched',reservationLifecycle:null,identities:{logicalOperationId,sourceObservationId:randomUUID(),reservationId:null},postingMapping:{schemaVersion:'1.0.0',sourceLineId:id,transportAttemptId:{status:'not_applicable'},providerAttemptId:{status:'not_applicable'},providerRequestId:{status:'not_applicable'},billableAttemptId:{status:'known',id:billableAttemptId}},sourceIdentity:{source:'ci05a-synthetic',sourceEventId:id,sourceObjectId:id,revisionSubjectId:id,sourceRevision:'fixture-1',revisionSequence:0,contentHash:`sha256:${'d'.repeat(64)}`},usage:{completeness:unknown?'unknown':'complete',missingFields:unknown?['amount']:[],units:unknown?[]:[{name:'tokens',quantity:'1',scale:0,relation:'standalone'}]},money:{amount,currency:'USD',scale:typeof amount==='string'?(amount.split('.')[1]?.length??0):0},sourceRefs:[],dimensions:{},pricing:null,fxEvidence:null,financialEffect:true,reservationAuthorizationEventId:null,supersedesEventId:null,reversesEventId:null};
+}
+
+test('CI05B expense capacity excludes cash/cash corrections and bounded reversal ancestry without dropping real expense corrections',async()=>{
+ const f=await fixture('expense-axis');try{
+  const post=async record=>{const result=await appendLedgerEvent(record,f.ports);assert.equal(result.ok,true,JSON.stringify(result));assert.equal(result.value.status,'accepted');return record;};
+  const expense=await post(expenseFixture(f.scope,{amount:'1'})),cash=expenseFixture(f.scope,{amount:'-5'});cash.eventType='cash_movement';await post(cash);
+  const afterCash=await api.readCapacity(f.scope,'USD','cash-does-not-offset',f.ports.budgets?{...f.ports,...f.ports.budgets}:f.ports);
+  assert.equal(afterCash.ok,true,JSON.stringify(afterCash));assert.equal(afterCash.value.effectiveConsumedSpend,'1');assert.equal(afterCash.value.outstandingHolds,'1');assert.equal(afterCash.value.usedCapacity,'2');
+  const correction=(original,amount)=>{const next=structuredClone(original),id=randomUUID();Object.assign(next,{eventId:id,requestId:id,idempotencyKey:id,eventType:'correction',supersedesEventId:original.eventId});next.money={amount,currency:'USD',scale:amount.split('.')[1]?.length??0};next.sourceIdentity={...original.sourceIdentity,sourceEventId:id,revisionSequence:original.sourceIdentity.revisionSequence+1,sourceRevision:'fixture-2',contentHash:`sha256:${'e'.repeat(64)}`};return next;};
+  await post(correction(cash,'-7'));await post(correction(expense,'0.8'));
+  const corrected=await api.readCapacity(f.scope,'USD','correct-expense-axis',{...f.ports,...f.ports.budgets});assert.equal(corrected.value.effectiveConsumedSpend,'0.8');assert.equal(corrected.value.usedCapacity,'1.8');
+ }finally{await f.pool.end();}
+});
+test('CI05B privacy-quarantined scoped financial history refuses admission replay/capacity/no-bill release and preserves the hold',async()=>{
+ const f=await fixture('quarantine-hold');try{
+  const expense=expenseFixture(f.scope,{amount:'0.5',billableAttemptId:f.request.attemptBinding.billableAttemptId,logicalOperationId:f.request.attemptBinding.logicalOperationId});
+  const posted=await appendLedgerEvent(expense,f.ports);assert.equal(posted.ok,true,JSON.stringify(posted));
+  const quarantine=async(project,hash)=>f.pool.query(`INSERT INTO cost_intelligence.financial_privacy_quarantine(record_kind,record_hash,tenant_id,project_id,environment,billing_mode,reason_code) VALUES('ledger_event',$1,$2,$3,$4,$5,'legacy_sensitive_event_data')`,[hash,f.scope.tenantId,project,f.scope.environment,f.scope.billingMode]);
+  await quarantine(randomUUID(),`sha256:${'1'.repeat(64)}`);
+  assert.equal((await api.readCapacity(f.scope,'USD','foreign-quarantine-control',{...f.ports,...f.ports.budgets})).ok,true);
+  const row=await f.pool.query('SELECT event_hash FROM cost_intelligence.financial_ledger_events WHERE event_id=$1',[expense.eventId]);await quarantine(f.scope.projectId,row.rows[0].event_hash);
+  assert.equal((await api.readCapacity(f.scope,'USD','quarantined-capacity',{...f.ports,...f.ports.budgets})).ok,false);
+  assert.equal((await api.authorize(f.request,f.ports)).ok,false);
+  const finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_no_bill',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:null,fenceReference:null});
+  const release=native(releaseCommand(f.scope,f.reservationId,2,{amount:'1',proof:'final_usage_known',attemptBinding:f.request.attemptBinding}));release.release.finalityEvidenceRef=finality;
+  assert.equal((await api.release(release,f.ports)).ok,false);
+  const held=await f.pool.query('SELECT sum(held_amount)::text AS held,sum(released_amount)::text AS released,count(*)::int AS events FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$1',[f.reservationId]);assert.equal(held.rows[0].held,'1');assert.equal(held.rows[0].released,'0');assert.equal(held.rows[0].events,2);
+ }finally{await f.pool.end();}
+});
+test('CI05B authenticated no-bill release is terminal against stale unverified timeout, with late authenticated expense still recognized',async()=>{
+ const f=await fixture('no-bill-terminal');try{
+  const finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_no_bill',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:null,fenceReference:null});
+  const release=native(releaseCommand(f.scope,f.reservationId,2,{amount:'1',proof:'final_usage_known',attemptBinding:f.request.attemptBinding}));release.release.finalityEvidenceRef=finality;
+  const released=await api.release(release,f.ports);assert.equal(released.ok,true,JSON.stringify(released));assert.equal(released.value.usageFinality,'final');assert.equal(released.value.releasedAmount,'1');assert.equal(released.value.outstandingHold,'0');
+  const unknown={schemaVersion:'1.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope:f.scope,reservationId:f.reservationId,expectedRevision:3,actorReference:f.scope.actorId,sourceAuthorityRef:f.dispatch.sourceAuthorityRef,attemptBinding:f.request.attemptBinding,outcome:'timeout',httpStatus:524,dispatchIntentRef:f.dispatch.dispatchIntentRef};
+  assert.equal((await api.retainUnknownOutcome(unknown,f.ports)).ok,false);
+  const events=await f.pool.query('SELECT count(*)::int AS n FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$1',[f.reservationId]);assert.equal(events.rows[0].n,3);
+  const late=await api.settle(native(await settlement(f,3,'0.4','final')),f.ports);assert.equal(late.ok,true,JSON.stringify(late));assert.equal(late.value.consumedAmount,'0.4');assert.equal(late.value.releasedAmount,'1');assert.equal(late.value.outstandingHold,'0');
+ }finally{await f.pool.end();}
+});
+test('CI05B signed private provider extras are absent from every runtime-readable source/proof receipt after settlement',async()=>{
+ const f=await fixture('source-financial-projection');try{
+  const canary='private-fixture-canary-'+randomUUID(),cost=await f.source.cost('0.25',{sourceExtra:{prompt:canary,image:canary,bearer:canary},payloadExtra:{prompt:canary}});
+  const command=native(settleCommand(f.scope,f.reservationId,2,{cumulativeAmount:'0.25',finality:'partial',attemptBinding:f.request.attemptBinding}));command.sourceAuthorityRef=cost;command.settlement.sourceObservationRefs=[cost];
+  const settled=await api.settle(command,f.ports);assert.equal(settled.ok,true,JSON.stringify(settled));
+  for(const table of ['budget_source_observations','budget_command_receipts','budget_reported_observations','budget_reconciliation_exceptions']){
+    const rows=await f.pool.query(`SELECT to_jsonb(t)::text AS body FROM cost_intelligence.${table} t WHERE tenant_id=$1 AND project_id=$2`,[f.scope.tenantId,f.scope.projectId]);assert.equal(rows.rows.some(row=>row.body.includes(canary)),false);
+  }
+ }finally{await f.pool.end();}
 });

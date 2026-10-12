@@ -10,7 +10,7 @@ ALTER TABLE cost_intelligence.usage_intake_attempts ADD CONSTRAINT usage_intake_
 CREATE TABLE cost_intelligence.budget_source_observations (observation_id text PRIMARY KEY, tenant_id text NOT NULL, project_id text NOT NULL, environment text NOT NULL, billing_mode text NOT NULL,
  record_id text NOT NULL, record_revision integer NOT NULL CHECK(record_revision>=1), record_hash char(71) NOT NULL,
  predecessor_hash char(71), source_bytes_hash char(71) NOT NULL, source_reference jsonb NOT NULL,
- collector_record jsonb NOT NULL, current_evidence jsonb NOT NULL, authentication_evidence jsonb NOT NULL, original_source_bytes text NOT NULL,
+ collector_record jsonb NOT NULL, current_evidence jsonb NOT NULL, authentication_evidence jsonb NOT NULL, financial_source_facts jsonb NOT NULL,
  recorded_at timestamptz NOT NULL DEFAULT now(),
  UNIQUE(tenant_id,project_id,environment,billing_mode,record_id,record_revision));
 ALTER TABLE cost_intelligence.budget_source_observations OWNER TO ci_finance_owner;
@@ -196,7 +196,9 @@ BEGIN
  OR NEW.provider_evidence->>'content_hash' IS DISTINCT FROM NEW.provider_evidence_hash::text
  OR NOT EXISTS(SELECT 1 FROM cost_intelligence.budget_source_observations s
    WHERE s.observation_id=NEW.collector_observation_id AND s.tenant_id=NEW.tenant_id AND s.project_id=NEW.project_id AND s.environment=NEW.environment AND s.billing_mode=NEW.billing_mode
-     AND s.collector_record->'payload'->'usageEvent'=NEW.usage_event AND s.collector_record->'payload'->'providerEvidence'=NEW.provider_evidence)
+     AND s.collector_record->'payload'->>'usageEventHash'=NEW.observation_digest::text
+     AND s.collector_record->'payload'->>'providerEvidenceHash'=NEW.provider_evidence_hash::text
+     AND s.collector_record->'payload'->>'sourceObservationId'=NEW.source_observation_id)
  OR NOT EXISTS(SELECT 1 FROM cost_intelligence.financial_ledger_events e WHERE e.event_id=NEW.ledger_event_id
    AND e.tenant_id=NEW.tenant_id AND e.project_id=NEW.project_id AND e.environment=NEW.environment AND e.billing_mode=NEW.billing_mode
    AND e.billable_attempt_id=NEW.usage_event->>'billable_attempt_id' AND e.currency='USD'

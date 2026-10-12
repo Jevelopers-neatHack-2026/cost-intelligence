@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {randomUUID} from 'node:crypto';
 import {providerReportedCostEvidenceContentHash} from '@jevelopers/shared-contracts-reported-development/usage-reported-unsettled';
-import {resolveReportedCost,exactSourceDecimal,parseFinancialSourceJson,budgetDigest,budgetSourceBytesHash,budgetCollectorSigningBytes,resolvePricingProfile,pricingEconomicRequestDigest} from '../../dist/budgets/index.js';
+import {resolveReportedCost,budgetSourcePersistence,exactSourceDecimal,parseFinancialSourceJson,budgetDigest,budgetSourceBytesHash,budgetCollectorSigningBytes,resolvePricingProfile,pricingEconomicRequestDigest} from '../../dist/budgets/index.js';
 
 async function signedFixture(){
  const fixture=JSON.parse(await readFile(new URL('../../node_modules/@jevelopers/shared-contracts-reported-development/fixtures/UsageEvent.2_0_0.json',import.meta.url),'utf8'));
@@ -81,4 +81,17 @@ test('complete per-token subtotal remains subordinate to authenticated per-attem
  const value=await resolvePricingProfile(f.backend,f.clock,profile,request);assert.ok(value);assert.equal(value.maximum.record.payload.authorizedMaximum,'0.10');
  const invalid=await f.publish('pricing_profile',{...value.profile,maximumPolicyRef:null});assert.equal((await resolvePricingProfile(f.backend,f.clock,invalid,request)).maximum,null);
  assert.equal(await resolvePricingProfile(f.backend,f.clock,profile,{...request,estimate:{completeness:'complete',knownSubtotal:'0.02'}}),null);
+});
+
+test('signed whole provider body and arbitrary collector extras never enter runtime-readable financial provenance',async()=>{
+ const f=await signedFixture(),canary='private-fixture-canary-'+randomUUID();
+ const original=JSON.stringify({usage:{cost:'0.25'},prompt:canary,images:[canary],credentials:{bearer:canary}});
+ const payload=await f.payload('0.25',original);payload.privateMetadata={prompt:canary};
+ const query=await f.publish('reported_cost',payload,original),accepted=await resolveReportedCost(f.backend,f.clock,query);
+ assert.ok(accepted);const persisted=await budgetSourcePersistence(accepted.source);
+ assert.equal(JSON.stringify(persisted).includes(canary),false);
+ assert.equal(persisted.collectorRecord.sourceBytesSha256,await budgetSourceBytesHash(original));
+ assert.equal(persisted.collectorRecord.originalPayloadHash,await budgetDigest(payload));
+ assert.equal(persisted.financialFacts.reportedCost.money.amount,'0.25');
+ assert.equal('sourceBytes' in persisted,false);assert.equal('original_source_bytes' in persisted,false);
 });

@@ -10,6 +10,7 @@ const Hash = Type.String({ pattern: '^sha256:[a-f0-9]{64}$' });
 const Instant = Type.String({ format: 'date-time' });
 const Attempt = Type.Object({ logicalOperationId: Ref, providerAttemptId: Ref, billableAttemptId: Ref,
   transportAttemptId: Ref, providerRequestId: Type.Union([Ref, Type.Null()]) }, { additionalProperties: false });
+export const BUDGET_SOURCE_MAX_BYTES=1048576;
 export const BudgetCollectorRecordSchema = Type.Object({
   version: Type.Literal(BUDGET_SOURCE_VERSION), issuerKeyId: Ref, id: Ref,
   revision: Type.Integer({ minimum: 1 }), predecessorHash: Type.Union([Hash, Type.Null()]),
@@ -109,6 +110,7 @@ export function createAuthenticatedBudgetSourceResolver(backend: BudgetCollector
       const envelope=structuredClone(await backend.loadCurrent(query.reference));
       if(!envelope||!Value.Check(BudgetCollectorRecordSchema,envelope.record)||!Value.Check(BudgetCollectorCurrentSchema,envelope.current))return null;
       if(typeof envelope.sourceBytes!=='string'||typeof envelope.recordSignature!=='string'||typeof envelope.currentSignature!=='string')return null;
+      if(new TextEncoder().encode(envelope.sourceBytes).byteLength>BUDGET_SOURCE_MAX_BYTES)return null;
       const {record,current}=envelope;
       const recordKey=structuredClone(await backend.loadCurrentIssuerKey(record.issuerKeyId));
       const currentIssuer=structuredClone(await backend.loadCurrentIssuerKey(current.issuerKeyId));
@@ -152,4 +154,34 @@ export function createAuthenticatedBudgetSourceResolver(backend: BudgetCollector
           currentSignature:latest.currentSignature,recordIssuerKey:finalRecordKey,initialCurrentIssuerKey:currentIssuer,currentIssuerKey:finalCurrentKey}});
     }catch{return null;}
   }};
+}
+
+/** Runtime-readable provenance is a financial projection, never a copy of the authenticated provider body.
+ * Original bytes and the signed original record stay behind the independently mounted owner collector. */
+export async function budgetSourcePersistence(source:AuthenticatedBudgetSource):Promise<{
+  collectorRecord:Record<string,unknown>;financialFacts:Record<string,unknown>;
+}> {
+  const record=source.record;
+  let facts:Record<string,unknown>;
+  if(record.kind==='reported_cost'){
+    const payload=record.payload as {usageEvent?:Record<string,unknown>;providerEvidence?:Record<string,unknown>;amountSemantics?:unknown};
+    const evidence=payload.providerEvidence;
+    if(!payload.usageEvent||!evidence)throw new Error('Unsupported financial provenance.');
+    facts={usageEventHash:await budgetDigest(payload.usageEvent),providerEvidenceHash:evidence.content_hash,
+      sourceObservationId:payload.usageEvent.source_observation_id,amountSemantics:payload.amountSemantics,
+      reportedCost:evidence.reported_cost};
+  }else if(record.kind==='execution_finality'){
+    const payload=record.payload as Record<string,unknown>;
+    facts={schemaVersion:payload.schemaVersion,state:payload.state,dispatchIntentRef:payload.dispatchIntentRef,
+      cumulativeCostRef:payload.cumulativeCostRef,fenceReference:payload.fenceReference};
+  }else if(record.kind==='pricing_profile'||record.kind==='maximum_policy'){
+    // Only typed financial policy fields are retained, never an arbitrary signed payload.
+    const payload=record.payload as Record<string,unknown>;
+    const names=record.kind==='pricing_profile'?['schemaVersion','pricingUnit','currency','economicRequestDigest','fixedAttemptAmount','maximumPolicyRef']:
+      ['schemaVersion','currency','policyRef','authorizedMaximum','economicRequestDigest'];
+    facts=Object.fromEntries(names.filter(name=>payload[name]!==undefined).map(name=>[name,payload[name]]));
+  }else throw new Error('Aggregate provider bodies cannot enter attempt financial provenance.');
+  // This object is deliberately labelled a projection: its content is not the original signed record.
+  const {payload,...metadata}=record;
+  return {collectorRecord:{...metadata,payload:facts,projectionVersion:'ci-budget-financial-provenance-1.0.0',originalPayloadHash:await budgetDigest(payload)},financialFacts:facts};
 }

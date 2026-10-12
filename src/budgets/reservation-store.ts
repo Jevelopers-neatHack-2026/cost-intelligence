@@ -1,9 +1,9 @@
 import { Value } from '@sinclair/typebox/value';
 import { budgetDigest, normalizedBudgetRequest, verifyBudgetSource, verifyReservationHost, CurrentReservationRequestSchema, PartialAcknowledgementRequestSchema, type BudgetEvidenceDecision, type ReservationAuthorityDecision, type BudgetEvidencePort, type BudgetReservationAuthorityPort, type BudgetReference, type CurrentReservationRequest, type PartialAcknowledgementRequest } from './authority.js';
 import { Type, type Static } from '@sinclair/typebox';
-import { type BudgetCollectorBackend, createAuthenticatedBudgetSourceResolver, type AuthenticatedBudgetSource } from './evidence.js';
+import { type BudgetCollectorBackend, createAuthenticatedBudgetSourceResolver, budgetSourcePersistence, type AuthenticatedBudgetSource } from './evidence.js';
 import { resolveReportedCost, resolvePricingProfile, resolveExecutionFinality, BudgetExecutionFinalitySchema, type AuthenticatedReportedCost } from './reported-cost.js';
-import { appendBudgetLedgerEventInTransaction,requireBudgetSettlementCapability,type LedgerAppendRequest } from '../ledger/store.js';
+import { appendBudgetLedgerEventInTransaction,requireBudgetSettlementCapability,budgetExpenseSql,budgetExpenseAxisSql,budgetCurrentLedgerHeadSql,type LedgerAppendRequest } from '../ledger/store.js';
 import {compareReportedUnsettledUsageIdentity} from '@jevelopers/shared-contracts-reported-development/usage-reported-unsettled';
 import type {UsageEvent_2_0_0} from '@jevelopers/shared-contracts-reported-development';
 import {
@@ -331,6 +331,18 @@ async function authorizeScope(scope:TrustedScope,requestId:string,ports:BudgetRu
   return result.ok?null:result.error;
 }
 /** Retain every proof consulted during a request: a later refresh cannot silently extend an expired chain. */
+async function persistedBudgetProofs(proofs:readonly TimedBudgetProof[]):Promise<readonly unknown[]>{
+  return Promise.all(proofs.map(async proof=>{
+    if('record' in proof&&'sourceBytes' in proof){
+      const source=proof as AuthenticatedBudgetSource;
+      const safe=await budgetSourcePersistence(source);
+      return {reference:source.reference,recordHash:source.recordHash,sourceBytesHash:source.record.sourceBytesSha256,
+        financialRecord:safe.collectorRecord,current:source.current,authentication:source.authentication,
+        verifiedAt:source.verifiedAt,expiresAt:source.expiresAt};
+    }
+    return proof;
+  }));
+}
 function currentProofBound(ports:BudgetRuntimePorts,proofs:readonly TimedBudgetProof[],request?:ReservationRequest):{now:Date;expiresAt:string}|null{
   const now=trustedNow(ports);if(!now||proofs.length===0)return null;
   const expiries:number[]=[];
@@ -414,6 +426,11 @@ async function acquirePartitionLock(
     return false;
   }
   gate.checkpoint();
+  const restricted=await client.query(`SELECT 1 FROM cost_intelligence.financial_privacy_quarantine
+    WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 LIMIT 1`,
+    [scope.tenantId,scope.projectId,scope.environment,scope.billingMode]);
+  gate.checkpoint();
+  if(restricted.rows.length)throw new Error('Financial history is restricted pending financial review.');
   return true;
 }
 
@@ -463,8 +480,8 @@ async function projectCapacity(
     `WITH effective_spend AS (
        SELECT e.* FROM cost_intelligence.financial_ledger_events e
        WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.environment=$3 AND e.billing_mode=$4 AND e.currency=$5
-         AND e.financial_effect AND e.classification IN ('direct_cost','supplier_expense','operating_expense','payable_labor')
-         AND NOT EXISTS (SELECT 1 FROM cost_intelligence.financial_ledger_events n WHERE n.supersedes_event_id=e.event_id)
+         AND ${budgetExpenseSql('e')}
+         AND ${budgetCurrentLedgerHeadSql('e')}
      ), attempt_spend AS (
        SELECT billable_attempt_id, greatest(coalesce(sum(amount),0),0) AS amount, bool_or(amount IS NULL) AS unknown
        FROM effective_spend WHERE billable_attempt_id IS NOT NULL GROUP BY billable_attempt_id
@@ -501,7 +518,14 @@ async function projectCapacity(
        (coalesce(sum(effective_consumed),0)+greatest((SELECT amount FROM unmatched),0))::text AS consumed,
        coalesce(sum(outstanding),0)::text AS outstanding_holds,
        (coalesce(sum(effective_consumed+outstanding),0)+greatest((SELECT amount FROM unmatched),0))::text AS used,
-       (coalesce(bool_or(unknown),false) OR (SELECT unknown FROM unmatched)) AS unresolved_exposure,
+       (coalesce(bool_or(unknown),false) OR (SELECT unknown FROM unmatched) OR EXISTS (
+         SELECT 1 FROM cost_intelligence.financial_ledger_events e WHERE e.tenant_id=$1 AND e.project_id=$2
+         AND e.environment=$3 AND e.billing_mode=$4 AND e.currency=$5 AND e.financial_effect
+         AND e.classification IN ('direct_cost','supplier_expense','operating_expense','payable_labor')
+         AND ${budgetCurrentLedgerHeadSql('e')}
+         AND coalesce(${budgetExpenseAxisSql('e')},'unresolved') NOT IN
+           ('consumption','charge','expense','fee','tax','refund','credit','discount','reimbursement','cash_movement','revenue')
+       )) AS unresolved_exposure,
        (SELECT count(*) FROM cost_intelligence.financial_ledger_events WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4)::int AS ledger_revision
      FROM joined`,
     [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, currency],
@@ -537,8 +561,8 @@ async function projectCapacity(
              coalesce((SELECT greatest(sum(e.amount),0) FROM cost_intelligence.financial_ledger_events e
                WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.environment=$3 AND e.billing_mode=$4
                  AND e.billable_attempt_id=a.billable_attempt_id AND e.currency=r.currency
-                 AND e.financial_effect AND e.classification IN ('direct_cost','supplier_expense','operating_expense','payable_labor')
-                 AND NOT EXISTS (SELECT 1 FROM cost_intelligence.financial_ledger_events n WHERE n.supersedes_event_id=e.event_id)),0))
+                 AND ${budgetExpenseSql('e')}
+                 AND ${budgetCurrentLedgerHeadSql('e')}),0))
              AND sum(r.held_amount)-sum(r.released_amount) >=
                coalesce((i.event_facts #>> '{valuation,money,amount}')::numeric,0)
          )
@@ -1130,7 +1154,7 @@ async function loadReservation(client: BudgetTransactionPort, scope: TrustedScop
     held: parseScaledDecimal(fromRow(row, 'held') ?? '0'), consumed: observationRevision>Number(row.settlement_revision)?parseScaledDecimal(fromRow(observation!, 'consumed_amount')??'0'):parseScaledDecimal(fromRow(row, 'consumed') ?? '0'),
     released: parseScaledDecimal(fromRow(row, 'released') ?? '0')+parseScaledDecimal(observation?fromRow(observation,'lifecycle_released')??'0':'0'), revision: Math.max(Number(row.revision),ackRevision,observationRevision),
     lastType: lifecycleNewest?asString(observation!.event_type):ackRevision>Number(row.revision)?'partial_acknowledged':asString(row.last_type),
-    usageFinality: observationRevision>Number(row.settlement_revision)?observation?.usage_finality as 'unknown'|'partial'|'final':finalityRaw === 'partial' || finalityRaw === 'final' ? finalityRaw : 'unknown',
+    usageFinality: observationRevision>Number(row.revision)?observation?.usage_finality as 'unknown'|'partial'|'final':finalityRaw === 'partial' || finalityRaw === 'final' ? finalityRaw : 'unknown',
     everDispatched: row.ever_dispatched === true,
     firstType: fromRow(row, 'first_type') ?? '',
     originalBinding: row.original_binding ?? null,
@@ -1327,9 +1351,9 @@ async function applyCommand(args: {
           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::numeric,$13::numeric,$14,$15,$16::jsonb,$17::jsonb,$18::jsonb,$19::jsonb,$20)`,
           [eventId,scope.tenantId,scope.projectId,scope.environment,scope.billingMode,effectiveCurrency,args.reservationId,nextSequence,args.expectedRevision,
             args.idempotencyKey,computed.eventType,formatScaledDecimal(computed.consumed),formatScaledDecimal(computed.released),computed.usageFinality,
-            args.actorReference,JSON.stringify(args.sourceAuthorityRef),JSON.stringify(args.attemptBinding),JSON.stringify(normalizedBudgetRequest(args.command!)),JSON.stringify(proofs),contentHash]);
+            args.actorReference,JSON.stringify(args.sourceAuthorityRef),JSON.stringify(args.attemptBinding),JSON.stringify(normalizedBudgetRequest(args.command!)),JSON.stringify(await persistedBudgetProofs(proofs)),contentHash]);
       }else if(args.kind==='acknowledge_partial'){
-        await client.query(`INSERT INTO cost_intelligence.budget_reservation_acknowledgements (acknowledgement_id,tenant_id,project_id,environment,billing_mode,currency,reservation_id,event_sequence,expected_revision,idempotency_key,actor_reference,source_authority_ref,attempt_binding,command_request,content_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15)`,[eventId,scope.tenantId,scope.projectId,scope.environment,scope.billingMode,effectiveCurrency,args.reservationId,nextSequence,args.expectedRevision,args.idempotencyKey,args.actorReference,JSON.stringify(args.sourceAuthorityRef),JSON.stringify(args.attemptBinding),JSON.stringify(normalizedBudgetRequest(args.command!)),contentHash]);
+        await client.query(`INSERT INTO cost_intelligence.budget_reservation_acknowledgements (acknowledgement_id,tenant_id,project_id,environment,billing_mode,currency,reservation_id,event_sequence,expected_revision,idempotency_key,actor_reference,source_authority_ref,attempt_binding,command_request,content_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15::jsonb)`,[eventId,scope.tenantId,scope.projectId,scope.environment,scope.billingMode,effectiveCurrency,args.reservationId,nextSequence,args.expectedRevision,args.idempotencyKey,args.actorReference,JSON.stringify(args.sourceAuthorityRef),JSON.stringify(args.attemptBinding),JSON.stringify(normalizedBudgetRequest(args.command!)),contentHash]);
       } else {
       await client.query(
         `INSERT INTO cost_intelligence.budget_reservation_events
@@ -1348,17 +1372,18 @@ async function applyCommand(args: {
       );
       }
       const refreshed = await loadReservation(client, scope, args.reservationId);
+      if(args.validateCurrent){const source=await gate.wait(args.validateCurrent(state));gate.checkpoint();if(!source.ok)return source;proofs.push(...source.value);}
+      const beforeCommit=await refreshScopeProof(scope,requestId,ports,args.operation,args.authority,gate,proofs);if(!beforeCommit.ok)return beforeCommit;
+      if(!currentProofBound(ports,proofs,lifetimeRequest))return unavailable();
       if(args.command&&refreshed){
-        const receipt=outcomeFrom(requestId,'applied',args.reservationId,refreshed);
+        const receipt=outcomeFrom(requestId,'applied',args.reservationId,refreshed),safeProofs=await persistedBudgetProofs(proofs);
         await client.query(`INSERT INTO cost_intelligence.budget_command_receipts
           (receipt_id,tenant_id,project_id,environment,billing_mode,idempotency_key,reservation_id,command_request,command_receipt,command_evidence,content_hash)
           VALUES($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9::jsonb,$10::jsonb,$11)`,
           [crypto.randomUUID(),scope.tenantId,scope.projectId,scope.environment,scope.billingMode,args.idempotencyKey,args.reservationId,
-            JSON.stringify(normalizedBudgetRequest(args.command)),JSON.stringify(receipt),JSON.stringify(proofs),await budgetDigest({command:normalizedBudgetRequest(args.command),receipt,proofs})]);
+            JSON.stringify(normalizedBudgetRequest(args.command)),JSON.stringify(receipt),JSON.stringify(safeProofs),await budgetDigest({command:normalizedBudgetRequest(args.command),receipt,proofs:safeProofs})]);
       }
-      if(args.validateCurrent){const source=await gate.wait(args.validateCurrent(state));gate.checkpoint();if(!source.ok)return source;proofs.push(...source.value);}
-      const beforeCommit=await refreshScopeProof(scope,requestId,ports,args.operation,args.authority,gate,proofs);if(!beforeCommit.ok)return beforeCommit;
-      if(!currentProofBound(ports,proofs,lifetimeRequest))return unavailable();
+      gate.checkpoint();if(!currentProofBound(ports,proofs,lifetimeRequest))return unavailable();
       gate.beginCommit();
       await client.query('COMMIT'); inTransaction = false;
       if(args.validateCurrent){const source=await gate.wait(args.validateCurrent(state));gate.checkpoint();if(!source.ok)return unavailable();proofs.push(...source.value);}
@@ -1522,20 +1547,20 @@ async function verifiedSettlement(value:unknown,ports:BudgetRuntimePorts,correct
 }
 
 async function persistBudgetSource(client:BudgetTransactionPort,source:AuthenticatedBudgetSource):Promise<string>{
-  const scope=source.record.scope;
-  const prior=await client.query(`SELECT observation_id,record_hash,original_source_bytes,collector_record FROM cost_intelligence.budget_source_observations
+  const scope=source.record.scope,safe=await budgetSourcePersistence(source);
+  const prior=await client.query(`SELECT observation_id,record_hash,financial_source_facts,collector_record FROM cost_intelligence.budget_source_observations
     WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND record_id=$5 AND record_revision=$6`,
     [scope.tenantId,scope.projectId,scope.environment,scope.billingMode,source.record.id,source.record.revision]);
   if(prior.rows[0]){
-    if(prior.rows[0].record_hash!==source.recordHash||prior.rows[0].original_source_bytes!==source.sourceBytes||!sameJson(prior.rows[0].collector_record,source.record))throw new Error('Conflicting source revision');
+    if(prior.rows[0].record_hash!==source.recordHash||!sameJson(prior.rows[0].financial_source_facts,safe.financialFacts)||!sameJson(prior.rows[0].collector_record,safe.collectorRecord))throw new Error('Conflicting source revision');
     return asString(prior.rows[0].observation_id);
   }
   const id=crypto.randomUUID();
   await client.query(`INSERT INTO cost_intelligence.budget_source_observations
-    (observation_id,tenant_id,project_id,environment,billing_mode,record_id,record_revision,record_hash,predecessor_hash,source_bytes_hash,source_reference,collector_record,current_evidence,authentication_evidence,original_source_bytes)
-    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14::jsonb,$15)`,
+    (observation_id,tenant_id,project_id,environment,billing_mode,record_id,record_revision,record_hash,predecessor_hash,source_bytes_hash,source_reference,collector_record,current_evidence,authentication_evidence,financial_source_facts)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12::jsonb,$13::jsonb,$14::jsonb,$15::jsonb)`,
     [id,scope.tenantId,scope.projectId,scope.environment,scope.billingMode,source.record.id,source.record.revision,source.recordHash,source.record.predecessorHash,
-      source.record.sourceBytesSha256,JSON.stringify(source.reference),JSON.stringify(source.record),JSON.stringify(source.current),JSON.stringify(source.authentication),source.sourceBytes]);
+      source.record.sourceBytesSha256,JSON.stringify(source.reference),JSON.stringify(safe.collectorRecord),JSON.stringify(source.current),JSON.stringify(source.authentication),JSON.stringify(safe.financialFacts)]);
   return id;
 }
 async function postAuthenticatedSettlement(client:BudgetTransactionPort,ports:BudgetRuntimePorts,request:SettleReservationCommand|VerifiedSettlementRequest|VerifiedExpenseCorrectionRequest,
@@ -1689,6 +1714,8 @@ export async function releaseReservation(value: unknown, ports: BudgetRuntimePor
           JOIN cost_intelligence.financial_source_revision_heads h ON h.current_event_id=e.event_id
           WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.environment=$3 AND e.billing_mode=$4 AND e.billable_attempt_id=$5
             AND e.financial_effect AND e.classification IN ('direct_cost','supplier_expense','operating_expense','payable_labor')
+            AND coalesce(${budgetExpenseAxisSql('e')},'unresolved') NOT IN ('cash_movement','revenue')
+            AND ${budgetCurrentLedgerHeadSql('e')}
             AND (e.amount IS NULL OR e.amount<>0) LIMIT 1`,
           [request.scope.tenantId,request.scope.projectId,request.scope.environment,request.scope.billingMode,request.attemptBinding.billableAttemptId]);
         if(expense.rows.length)return failure(makeError('release','VALIDATION_ERROR',request.requestId,'No-bill finality cannot replace a known or unresolved expense; record genuine zero/correction evidence first.'));
@@ -1721,7 +1748,8 @@ export async function releaseReservation(value: unknown, ports: BudgetRuntimePor
         &&(state.lastType !== 'settled' || state.usageFinality !== 'final')) {
         return preserved('Final-usage release is refused: the reservation has no final settlement.');
       }
-      return { eventType: 'released', consumed: 0n, released: releaseAmount, usageFinality: state.usageFinality, settlementSequence: null };
+      return { eventType: 'released', consumed: 0n, released: releaseAmount, usageFinality: proof?.record.payload&&Value.Check(BudgetExecutionFinalitySchema,proof.record.payload)
+        && ['final_no_bill','fenced_not_dispatched'].includes(proof.record.payload.state)?'final':state.usageFinality, settlementSequence: null };
     },
   });
 }
@@ -2070,6 +2098,7 @@ export async function readCapacity(
       await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
       await bindFinancialDatabaseScope(client, scope);
       await bindDeadline(client, gate);
+      if(!(await acquirePartitionLock(client,scope,currency,gate)))return unavailable();
       const capacity = await projectCapacity(client, scope, currency);
       gate.beginCommit();
       await client.query('COMMIT'); inTransaction = false;
