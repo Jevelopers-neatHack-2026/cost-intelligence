@@ -66,3 +66,4 @@ export { startReconciliation, getReconciliation, ReconciliationRequestSchema, Re
 export type { ReconciliationRequest, ReconciliationRun, ReconciliationResult } from './reconciliation/index.js';
 export { exportSummary, validateExportRequestBoundary, projectSafeFinancialSummary, safeCsvCell, serializeSafeFinancialSummaryCsv, ExportRequestSchema, ExportManifestSchema } from './integrations/index.js';
 export type { ExportRequest, ExportManifest, SafeFinancialMetricRow, SafeFinancialSummaryProjection } from './integrations/index.js';
+export * from './evidence/index.js';
