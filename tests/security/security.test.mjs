@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import { createHash, randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
+import { createHash, randomUUID,generateKeyPairSync,sign } from 'node:crypto';
+import { readFile,mkdir,writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import test from 'node:test';
+import registerTest from 'node:test';
 import pg from 'pg';
 import {
   FINANCE_OPERATION_POLICY,
@@ -12,6 +12,9 @@ import {
   authorizeFinanceOperation,
   acknowledgePartial,
   budgetDigest,
+  budgetCollectorSigningBytes,
+  budgetSourceBytesHash,
+  pricingEconomicRequestDigest,
   changeBudget,
   estimate,
   estimateV2,
@@ -22,6 +25,7 @@ import {
   ingestUsage,
   markDispatched,
   querySummary,
+  readCapacity,
   rebuildLedgerProjection,
   recordExpenseAdjustment,
   registerFxRateV2,
@@ -37,6 +41,16 @@ import { runtimeDatabaseConfigFromEnvironment } from '../../scripts/test-db-life
 
 const { Pool } = pg;
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
+const staticSecurityCases=[];
+const staticSecurityCase=name=>name.startsWith('operation policy')?'operation-policy':name.startsWith('authorization freshness')?'freshness':
+ name.startsWith('all exposed APIs')?'public-routes':name.startsWith('usage intake')?'usage-grants':name.startsWith('PostgreSQL ledger')?'ledger-isolation':name.startsWith('CI-05A PostgreSQL')?'budget-isolation':'known-fixture-case';
+function test(name,...args){const body=args.pop();return registerTest(name,...args,async context=>{
+ const record={case:staticSecurityCase(name),status:'running'};staticSecurityCases.push(record);
+ try{await body(context);record.status='passed';}catch(error){record.status='failed';record.code=['ERR_ASSERTION','42501','42P01','23505','23514'].includes(error?.code)?error.code:'bounded_other';
+  for(const key of ['actual','expected'])if(typeof error?.[key]==='boolean'||Number.isSafeInteger(error?.[key])&&Math.abs(error[key])<=100000)record[key]=error[key];
+  const location=String(error?.stack??'').match(/security\.test\.mjs:(\d+):(\d+)/);if(location)record.fixtureLocation={file:'tests/security/security.test.mjs',line:Number(location[1]),column:Number(location[2])};throw error;
+ }finally{await mkdir(join(root,'artifacts','test-manifests'),{recursive:true});await writeFile(join(root,'artifacts','test-manifests','ci05b-security-static-diagnostics.json'),JSON.stringify({version:'1.0.0',cases:staticSecurityCases})+'\n');}
+});}
 const syntheticAuthorityPath = join(root, 'fixtures/security/authority-cases.json');
 const pricingFixturePath = join(root, 'fixtures/pricing/ci03-synthetic-acceptance.json');
 const sharedFixtureRoot = join(root, 'node_modules/@jevelopers/shared-contracts/fixtures');
@@ -89,12 +103,28 @@ function runtimePorts(options = {}) {
 function versionedRef(contract, id) {
   return { contract, schema_version: '1.0.0', id, revision: 1, content_hash: `sha256:${'a'.repeat(64)}` };
 }
+const securityPricingKeys=generateKeyPairSync('ed25519'),securityPricingRecords=new Map();
+const securityPricingKey={publicKeySpkiBase64:securityPricingKeys.publicKey.export({type:'spki',format:'der'}).toString('base64'),
+ revoked:false,allowedKinds:['pricing_profile'],validFrom:'2026-10-11T00:00:00Z',validUntil:'2026-10-12T00:00:00Z'};
+async function registerSyntheticPricing(request,clock){
+ const payload={schemaVersion:'ci-budget-pricing-1.0.0',currency:'USD',economicRequestDigest:await pricingEconomicRequestDigest(request),pricingUnit:'fixed_per_attempt',fixedAttemptAmount:request.estimate.knownSubtotal,maximumPolicyRef:null};
+ const sourceBytes=JSON.stringify({financial_pricing_policy:payload});const binding=request.authorityBinding;
+ const record={version:'ci-budget-source-1.0.0',issuerKeyId:'ci09-synthetic-pricing-owner',id:randomUUID(),revision:1,predecessorHash:null,scope:request.scope,authorityBinding:binding,
+  evidenceMode:'mocked',provider:binding.provider,model:binding.model,operation:binding.operation,targetBindingSha256:binding.targetBindingSha256,attempt:request.attemptBinding,
+  kind:'pricing_profile',sourceFormat:'finance_pricing_policy_v1',sourceBytesSha256:await budgetSourceBytesHash(sourceBytes),observedAt:clock.now().toISOString(),payload};
+ const hash=await budgetDigest(record),{actorId,...financialScope}=request.scope;
+ const current={version:record.version,issuerKeyId:record.issuerKeyId,recordId:record.id,revision:1,recordHash:hash,scopeHash:await budgetDigest(financialScope),verifiedAt:clock.now().toISOString(),expiresAt:new Date(clock.now().getTime()+60000).toISOString(),revoked:false};
+ const signature=(kind,value)=>sign(null,budgetCollectorSigningBytes(kind,value),securityPricingKeys.privateKey).toString('base64');
+ securityPricingRecords.set(record.id,{record,current,sourceBytes,recordSignature:signature('record',record),currentSignature:signature('current',current)});
+ request.pricingProfileRef={contract:'ci-budget-source',schema_version:'1.0.0',id:record.id,revision:1,content_hash:hash};return request;
+}
 
 // These are independent, explicitly synthetic offline issuers, not production grants.
 function syntheticBudgetIssuers(expectedScope, clock) {
   const inScope = query => JSON.stringify(query.scope) === JSON.stringify(expectedScope);
   const times = () => ({ verifiedAt: clock.now().toISOString(), expiresAt: new Date(clock.now().getTime()+60000).toISOString() });
   return {
+    sourceCollector:{loadCurrent:async ref=>structuredClone(securityPricingRecords.get(ref.id)??null),loadCurrentIssuerKey:async id=>id==='ci09-synthetic-pricing-owner'?structuredClone(securityPricingKey):null},
     budgetEvidence: { verifyCurrent: async query => inScope(query) ? {
       status: 'verified', queryDigest: await budgetDigest(query), ...times(),
     } : null },
@@ -510,7 +540,7 @@ test('all exposed APIs request their operation grant before domain access', asyn
     expectedRevision: 1, actorReference: 'ci09-actor-reference', sourceAuthorityRef: fixtureRef, attemptBinding,
   };
   const settleRequest = {
-    ...lifecycleBase, action: 'settle', canonicalCommand: { ...settleCanonical, tenant_id: scope.tenantId, project_id: scope.projectId },
+    ...lifecycleBase, action: 'settle', canonicalCommand: { ...settleCanonical, tenant_id: scope.tenantId, project_id: scope.projectId,consumed:{amount:'0.2',currency:'USD',scale:1} },
     settlement: {
       measure: 'cumulative', finality: 'partial', sequence: 1, cumulativeAmount: '0.2', currency: 'USD',
       usageCompleteness: 'complete', sourceObservationRefs: [fixtureRef], allowObservedOverrun: true,
@@ -607,6 +637,7 @@ test('all exposed APIs request their operation grant before domain access', asyn
   let routePorts=[];
   let routeDenied=false;
   for (const [operation, invoke] of routes) {
+    const diagnostic=staticSecurityCases.find(entry=>entry.case==='public-routes');if(diagnostic&&Object.hasOwn(FINANCE_OPERATION_POLICY,operation)){diagnostic.operation=operation;diagnostic.deniedGrant=false;}
     currentCalls = [];
     routePorts=[];routeDenied=false;
     const result = await invoke();
@@ -618,6 +649,7 @@ test('all exposed APIs request their operation grant before domain access', asyn
       assert.ok(result.error.safe_message.length <= 240);
     }
     currentCalls=[];routePorts=[];routeDenied=true;
+    if(diagnostic)diagnostic.deniedGrant=true;
     const denied=await invoke();assert.equal(denied.ok,false,`${operation} denied grant refuses`);
     assert.equal(denied.error.code,'FORBIDDEN_SCOPE',`${operation} denies before domain access`);
     assert.ok(currentCalls.length>0&&currentCalls.every(call=>call.operation===operation&&call.permission===FINANCE_OPERATION_POLICY[operation].permission));
@@ -844,10 +876,10 @@ test('CI-05A PostgreSQL budget reservations recheck grants and isolate tenants',
       return allowedDecision(request, { principalKind: 'service' });
     } },
   });
-  function reservationRequestFor(targetScope, policyRef) {
+  async function reservationRequestFor(targetScope, policyRef) {
     const idem = `ci05a-sec-${randomUUID()}`;
     const logicalOperationId=randomUUID(),billableAttemptId=randomUUID(),budgetScopeId=randomUUID();
-    return {
+    const request={
       schemaVersion: '1.0.0', requestId: randomUUID(), idempotencyKey: idem, scope: targetScope,
       canonicalRequest: {
         ...structuredClone(reserve), tenant_id: targetScope.tenantId, project_id: targetScope.projectId,
@@ -862,7 +894,7 @@ test('CI-05A PostgreSQL budget reservations recheck grants and isolate tenants',
       allowPartialAuthorization: false,
       attemptBinding: { logicalOperationId, transportAttemptId: 't', providerRequestId: null, providerAttemptId: 'p', billableAttemptId },
       authorityBinding:syntheticBudgetBinding(budgetScopeId),sourceAuthorityRef:versionedRef('cost-intelligence.authority',randomUUID()),
-    };
+    };return registerSyntheticPricing(request,clock);
   }
   function policyFor(targetScope) {
     return {
@@ -878,20 +910,29 @@ test('CI-05A PostgreSQL budget reservations recheck grants and isolate tenants',
     const missingSource={...portsFor(tenantA),database:noDatabase};delete missingSource.budgetEvidence;
     const missingPolicy=await changeBudgetPolicy(policyFor(tenantA),missingSource);assert.equal(missingPolicy.ok,false);assert.equal(missingPolicy.error.code,'BUDGET_UNAVAILABLE');
     const missingHost={...portsFor(tenantA),database:noDatabase};delete missingHost.reservationAuthority;
-    assert.equal((await authorizeReservation(reservationRequestFor(tenantA),missingHost)).value.status,'unavailable');
+    assert.equal((await authorizeReservation(await reservationRequestFor(tenantA),missingHost)).value.status,'unavailable');
     const untrusted={...portsFor(tenantA),database:noDatabase,budgetEvidence:{verifyCurrent:async()=>null}};
-    const refused=await authorizeReservation(reservationRequestFor(tenantA),untrusted);assert.equal(refused.ok,false);assert.equal(refused.error.code,'FORBIDDEN_SCOPE');
+    const refused=await authorizeReservation(await reservationRequestFor(tenantA),untrusted);assert.equal(refused.ok,false);assert.equal(refused.error.code,'FORBIDDEN_SCOPE');
     assert.equal(prematureConnects,0,'missing or untrusted issuer evidence never opens persistence');
     const policy = await changeBudgetPolicy(policyFor(tenantA), portsFor(tenantA));
     assert.equal(policy.ok, true, policy.ok ? '' : policy.error.code);
     const policyRef = policy.value.policyRef;
-    const authorizedRequest = reservationRequestFor(tenantA, policyRef);
+    const authorizedRequest = await reservationRequestFor(tenantA, policyRef);
     const authorized = await authorizeReservation(authorizedRequest, portsFor(tenantA));
     assert.equal(authorized.ok, true, authorized.ok ? '' : authorized.error.code);
     assert.equal(authorized.value.status, 'authorized');
 
+    // Real signed synthetic records cannot override an independently revoked issuer or a broken signature.
+    const revokedPricing=await reservationRequestFor(tenantA,policyRef),revokedKeyPorts=portsFor(tenantA);
+    revokedKeyPorts.sourceCollector={...revokedKeyPorts.sourceCollector,loadCurrentIssuerKey:async id=>id==='ci09-synthetic-pricing-owner'?{...securityPricingKey,revoked:true}:null};
+    const revokedPricingResult=await authorizeReservation(revokedPricing,revokedKeyPorts);assert.equal(revokedPricingResult.ok,false);assert.equal(revokedPricingResult.error.code,'FORBIDDEN_SCOPE');
+    const alteredPricing=await reservationRequestFor(tenantA,policyRef),storedPricing=securityPricingRecords.get(alteredPricing.pricingProfileRef.id);
+    storedPricing.recordSignature=Buffer.alloc(64).toString('base64');
+    const alteredPricingResult=await authorizeReservation(alteredPricing,portsFor(tenantA));assert.equal(alteredPricingResult.ok,false);assert.equal(alteredPricingResult.error.code,'FORBIDDEN_SCOPE');
+    const commitments=await readCapacity(tenantA,'USD','ci09-pricing-refusal-conservation',portsFor(tenantA));assert.equal(commitments.ok,true);assert.equal(commitments.value.outstandingHolds,'0.25');assert.equal(commitments.value.usedCapacity,'0.25');
+
     // A stale/foreign canonical policy reference and a conflicting replay of a used key are typed failures.
-    const stalePolicy = await authorizeReservation(reservationRequestFor(tenantA), portsFor(tenantA));
+    const stalePolicy = await authorizeReservation(await reservationRequestFor(tenantA), portsFor(tenantA));
     assert.equal(stalePolicy.ok, false);
     if (!stalePolicy.ok) assert.equal(stalePolicy.error.code, 'VALIDATION_ERROR');
     const conflicting = structuredClone(authorizedRequest);
@@ -911,13 +952,13 @@ test('CI-05A PostgreSQL budget reservations recheck grants and isolate tenants',
     await assert.rejects(pool.query('TRUNCATE cost_intelligence.budget_reservation_events'), error => error.code === '42501');
 
     // A foreign-tenant scope is denied by the current authority before any hold.
-    const foreign = await authorizeReservation(reservationRequestFor(tenantB), portsFor(tenantA));
+    const foreign = await authorizeReservation(await reservationRequestFor(tenantB), portsFor(tenantA));
     assert.equal(foreign.ok, false);
     if (!foreign.ok) assert.equal(foreign.error.code, 'FORBIDDEN_SCOPE');
 
     // Revocation blocks a subsequent identical authorization.
     active = false;
-    const revoked = await authorizeReservation(reservationRequestFor(tenantA, policyRef), portsFor(tenantA));
+    const revoked = await authorizeReservation(await reservationRequestFor(tenantA, policyRef), portsFor(tenantA));
     assert.equal(revoked.ok, false);
     if (!revoked.ok) assert.equal(revoked.error.code, 'FORBIDDEN_SCOPE');
   } finally {
