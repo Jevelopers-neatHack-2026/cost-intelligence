@@ -260,7 +260,7 @@ test('CI-05A.2/.3 PostgreSQL: a dispatched hold keeps its capacity until final s
     assert.equal(dispatched.ok, true, dispatched.ok ? '' : dispatched.error.code);
 
     for (const proof of ['never_dispatched_fenced', 'final_usage_known']) {
-      const refused = await releaseReservation(releaseCommand(scope, reservationId, 2, { amount: '1.000000', proof , attemptBinding: ATTEMPT }), makePorts(pool, scope));
+      const refused = await releaseReservation(releaseCommand(scope, reservationId, 2, { amount: '1.000000', proof , attemptBinding: authorized.value.attemptBinding }), makePorts(pool, scope));
       assert.equal(refused.ok, false, proof);
       assert.equal(refused.error.code, 'BUDGET_UNAVAILABLE', proof);
     }
@@ -270,9 +270,9 @@ test('CI-05A.2/.3 PostgreSQL: a dispatched hold keeps its capacity until final s
     assert.equal(second.value.status, 'denied', 'no second worker is authorized against unresolved exposure');
 
     // A later final settlement still succeeds because the reservation was never released.
-    const final = await settleReservation(settleCommand(scope, reservationId, 2, { cumulativeAmount: '0.600000', finality: 'final', sequence: 1 , attemptBinding: ATTEMPT }), makePorts(pool, scope));
+    const final = await settleReservation(settleCommand(scope, reservationId, 2, { cumulativeAmount: '0.600000', finality: 'final', sequence: 1 , attemptBinding: authorized.value.attemptBinding }), makePorts(pool, scope));
     assert.equal(final.ok, true, final.ok ? '' : final.error.code);
-    const released = await releaseReservation(releaseCommand(scope, reservationId, 3, { amount: '0.400000', proof: 'final_usage_known' , attemptBinding: ATTEMPT }), makePorts(pool, scope));
+    const released = await releaseReservation(releaseCommand(scope, reservationId, 3, { amount: '0.400000', proof: 'final_usage_known' , attemptBinding: authorized.value.attemptBinding }), makePorts(pool, scope));
     assert.equal(released.ok, true, released.ok ? '' : released.error.code);
 
     // Partial authorization: the hold is created but dispatch stays unavailable and the hold is preserved.
