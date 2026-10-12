@@ -218,7 +218,8 @@ export async function resolveBudgetReportedCost(backend:BudgetCollectorBackend,c
     const source=await createAuthenticatedBudgetSourceResolver(backend,clock).resolveCurrent(query);
     if(!source||!Value.Check(FinanceReportedCostPayloadSchema,source.record.payload))return null;
     const payload=source.record.payload,attempt=query.attempt,scope=query.scope;
-    if(sourceCost(source)!==exactSourceDecimal(payload.money.amount)||payload.money.scale<(payload.money.amount.split('.')[1]?.length??0)
+    const originalAmount=sourceCost(source),reportedAmount=exactSourceDecimal(payload.money.amount);
+    if(originalAmount===null||reportedAmount===null||originalAmount!==reportedAmount||payload.money.scale<(payload.money.amount.split('.')[1]?.length??0)
       ||Date.parse(payload.observedAt)>Date.parse(source.verifiedAt)||Date.parse(payload.occurredAt)>Date.parse(payload.observedAt)
       ||payload.usage.units.some(unit=>unit.quantity!==null&&unit.scale<(unit.quantity.split('.')[1]?.length??0))
       ||(payload.usage.completeness==='complete'&&(payload.usage.missingFields.length!==0||payload.usage.units.some(unit=>unit.quantity===null))))return null;

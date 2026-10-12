@@ -133,3 +133,18 @@ test('Finance-native financial projection retains source commitment while exclud
  const safe=await budgetSourcePersistence(resolved.source);assert.equal(JSON.stringify(safe).includes(canary),false);
  assert.equal(safe.collectorRecord.sourceBytesSha256,await budgetSourceBytesHash(body));assert.equal(safe.financialFacts.reportedCost.money.amount,'0.4');
 });
+test('Finance-native signed missing, out-of-range and contradictory invalid costs never compare as two valid equal amounts',async()=>{
+ const f=await signedFixture({native:true,production:true});
+ const cases=[
+  ['10000000000000000000000','{}'],
+  ['10000000000000000000000','{"usage":{"cost":10000000000000000000000}}'],
+  ['10000000000000000000000','{"usage":{"cost":20000000000000000000000}}'],
+  ['10000000000000000000000','{"usage":{"cost":null}}'],
+  ['0','{"usage":{"cost":10000000000000000000000}}'],
+  ['10000000000000000000000','{"usage":{"cost":0}}'],
+ ];
+ const accepted=[];for(const [amount,body] of cases){const query=await f.publish('reported_cost',nativeFinancialPayload(f,amount),body);accepted.push((await resolveBudgetReportedCost(f.backend,f.clock,query,'finance_collector_v1'))!==null);}
+ assert.deepEqual(accepted,cases.map(()=>false));
+ const zero=await f.publish('reported_cost',nativeFinancialPayload(f,'0'),'{"usage":{"cost":0}}');assert.ok(await resolveBudgetReportedCost(f.backend,f.clock,zero,'finance_collector_v1'));
+ const exact=await f.publish('reported_cost',nativeFinancialPayload(f,'1.000000000000000001'),'{"usage":{"cost":1.000000000000000001}}');assert.ok(await resolveBudgetReportedCost(f.backend,f.clock,exact,'finance_collector_v1'));
+});
