@@ -1,0 +1,2780 @@
+[
+  {
+    "id": "lineage-source-sequence-fractional-signed",
+    "kind": "lineage",
+    "recordCanonicalBytes": "{\"signature\":{\"algorithm\":\"Ed25519\",\"value\":\"ArFkUBfsmqfD2gBkMvQl4aOqBfdmrABSW8_mZKjBgM04Pw9CKA40332ohCNglRXfdu7IlfWLvdVfroOuAeItBg\"},\"unsigned\":{\"currentHead\":{\"eventHash\":\"sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9\",\"eventId\":\"isolated-pg-head\",\"revisionSequence\":0.5},\"expiresAt\":\"2026-10-13T00:00:00.000Z\",\"format\":\"ci-finance-partition-source-lineage-1.0.0\",\"id\":\"isolated-lineage\",\"issuedAt\":\"2026-10-12T01:00:00.000Z\",\"issuerConfigurationReference\":{\"contentHash\":\"sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9\",\"id\":\"isolated-owner-config\",\"revision\":1},\"issuerEntitlementReference\":{\"contentHash\":\"sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841\",\"id\":\"isolated-entitlement\",\"revision\":1},\"issuerId\":\"isolated-finance-issuer\",\"issuerKeyReference\":{\"keyId\":\"isolated-key\",\"publicKeyContentHash\":\"sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16\",\"registryReference\":{\"contentHash\":\"sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde\",\"id\":\"isolated-registry\",\"revision\":1},\"revision\":1},\"issuerRegistryReference\":{\"contentHash\":\"sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde\",\"id\":\"isolated-registry\",\"revision\":1},\"ledgerBackendReference\":{\"contentHash\":\"sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad\",\"id\":\"isolated-pg-backend\",\"revision\":1},\"maintainerAccountRef\":\"isolated-maintainer-account\",\"maintainerSessionRef\":\"isolated-maintainer-session\",\"notBefore\":\"2026-10-12T00:00:00.000Z\",\"partition\":{\"billingMode\":\"simulated\",\"environment\":\"test\",\"projectId\":\"isolated-fixture-project\",\"tenantId\":\"isolated-fixture-tenant\"},\"policyReference\":{\"contentHash\":\"sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6\",\"id\":\"isolated-policy\",\"revision\":1},\"revision\":1,\"revocationRevision\":0,\"rootEvent\":{\"eventHash\":\"sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a\",\"eventId\":\"isolated-pg-root\"},\"scope\":{\"actorId\":\"isolated-fixture-actor\",\"billingMode\":\"simulated\",\"environment\":\"test\",\"projectId\":\"isolated-fixture-project\",\"tenantId\":\"isolated-fixture-tenant\"},\"sourceCustodyReferences\":{\"account\":{\"contentHash\":\"sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980\",\"id\":\"isolated-custody-account\",\"revision\":1},\"event\":{\"contentHash\":\"sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b\",\"id\":\"isolated-custody-event\",\"revision\":1},\"issuer\":{\"contentHash\":\"sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e\",\"id\":\"isolated-custody-issuer\",\"revision\":1},\"policy\":{\"contentHash\":\"sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f\",\"id\":\"isolated-custody-policy\",\"revision\":1},\"session\":{\"contentHash\":\"sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7\",\"id\":\"isolated-custody-session\",\"revision\":1}},\"sourceIdentity\":{\"revisionSubjectId\":\"isolated-source-subject\",\"sourceName\":\"isolated-fixture-source\",\"sourceObjectId\":\"isolated-source-object\"},\"sourceProjectRef\":\"isolated-source-project\",\"sourceTenantId\":\"isolated-source-tenant\",\"state\":\"active\"}}",
+    "store": {
+      "provenance": "ISOLATED STORED DESIGN VECTORS; NO LIVE ISSUER OR PG CAPTURE",
+      "registry": {
+        "id": "isolated-registry",
+        "revision": 1,
+        "state": "active",
+        "verifierId": "isolated-verifier",
+        "keys": [
+          {
+            "id": "isolated-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAiDY9pcrocgAPM5e-RJgKxqBDWm__4nyO2_iBctKNako",
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-kind-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEA8OSZN8cehtDCufz-6Vf7yQYpvkJDp6qL5Qt10CJAtyw",
+            "publicKeyContentHash": "sha256:be8e096437c5e0a4c2f117fd6769ed7e4046994cf4382334ae136536e66effed",
+            "allowedRecordKinds": [
+              "ci-finance-partition-source-lineage-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-action-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEALywHHIeGFlcNKjiiEbgn3kyk5tgr9-6YaLUd2AZ5B1U",
+            "publicKeyContentHash": "sha256:dab72fb30b70545822dfa46955b5754c3d95e775043b3dbe07c7b402f1b7bc53",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "registerSourceLineage"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-scope-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAJQ-By9ZwMQWoaSQ0VF7t-_7QCHU3WcVvuI8Tg9xuzCE",
+            "publicKeyContentHash": "sha256:110af5d22a17e6cc360190ddd5f72ae4bdef9930d8627aca816511e19b3f6194",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "foreign",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-entitlement-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAg3d6aUjhOrJPPcDzjkErox-V2fpeDJtY0lQddYSWPhE",
+            "publicKeyContentHash": "sha256:60a04e9ec5a187d88d7f226da7cf0dbd0b20f669d0910d2e3bc85be4b68cd27c",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-other-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:5b2aea0fa81f0541e14590061d03ae72a6abde7e01215f8096d55e0284b31b37"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          }
+        ],
+        "entitlements": [
+          {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "accountRef": "isolated-maintainer-account",
+            "sessionRef": "isolated-maintainer-session",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "sourceTenantId": "isolated-source-tenant",
+            "sourceProjectRef": "isolated-source-project",
+            "policyReference": {
+              "id": "isolated-policy",
+              "revision": 1,
+              "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+            },
+            "issuerConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            },
+            "ledgerBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-other-entitlement",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "accountRef": "isolated-other-account",
+            "sessionRef": "isolated-maintainer-session",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "sourceTenantId": "isolated-source-tenant",
+            "sourceProjectRef": "isolated-source-project",
+            "policyReference": {
+              "id": "isolated-policy",
+              "revision": 1,
+              "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+            },
+            "issuerConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            },
+            "ledgerBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          }
+        ]
+      },
+      "registryReference": {
+        "id": "isolated-registry",
+        "revision": 1,
+        "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+      },
+      "key": {
+        "id": "isolated-key",
+        "revision": 1,
+        "state": "active",
+        "issuerId": "isolated-finance-issuer",
+        "registryId": "isolated-registry",
+        "registryRevision": 1,
+        "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAiDY9pcrocgAPM5e-RJgKxqBDWm__4nyO2_iBctKNako",
+        "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16",
+        "allowedRecordKinds": [
+          "ci-finance-ledger-partition-binding-1.0.0",
+          "ci-finance-partition-source-lineage-1.0.0",
+          "ci-finance-maintainer-action-1.0.0"
+        ],
+        "allowedActions": [
+          "bindPartition",
+          "registerSourceLineage",
+          "provisionMapping",
+          "reviseMapping",
+          "revokeMapping"
+        ],
+        "allowedScopes": [
+          {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          }
+        ],
+        "entitlementReferences": [
+          {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          }
+        ],
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "entitlement": {
+        "id": "isolated-entitlement",
+        "revision": 1,
+        "state": "active",
+        "issuerId": "isolated-finance-issuer",
+        "registryId": "isolated-registry",
+        "registryRevision": 1,
+        "accountRef": "isolated-maintainer-account",
+        "sessionRef": "isolated-maintainer-session",
+        "allowedRecordKinds": [
+          "ci-finance-ledger-partition-binding-1.0.0",
+          "ci-finance-partition-source-lineage-1.0.0",
+          "ci-finance-maintainer-action-1.0.0"
+        ],
+        "allowedActions": [
+          "bindPartition",
+          "registerSourceLineage",
+          "provisionMapping",
+          "reviseMapping",
+          "revokeMapping"
+        ],
+        "allowedScopes": [
+          {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          }
+        ],
+        "sourceTenantId": "isolated-source-tenant",
+        "sourceProjectRef": "isolated-source-project",
+        "policyReference": {
+          "id": "isolated-policy",
+          "revision": 1,
+          "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+        },
+        "issuerConfigurationReference": {
+          "id": "isolated-owner-config",
+          "revision": 1,
+          "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+        },
+        "ledgerBackendReference": {
+          "id": "isolated-pg-backend",
+          "revision": 1,
+          "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+        },
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "entitlementReference": {
+        "id": "isolated-entitlement",
+        "revision": 1,
+        "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+      },
+      "principal": {
+        "id": "isolated-principal-session",
+        "revision": 1,
+        "state": "active",
+        "accountRef": "isolated-maintainer-account",
+        "sessionRef": "isolated-maintainer-session",
+        "scope": {
+          "tenantId": "isolated-fixture-tenant",
+          "projectId": "isolated-fixture-project",
+          "actorId": "isolated-fixture-actor",
+          "environment": "test",
+          "billingMode": "simulated"
+        },
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "policyReference": {
+        "id": "isolated-policy",
+        "revision": 1,
+        "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+      },
+      "policyArtifactUtf8": "ISOLATED FINANCE POLICY ARTIFACT BYTES v1\n",
+      "backendReference": {
+        "id": "isolated-pg-backend",
+        "revision": 1,
+        "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+      },
+      "configurationReference": {
+        "id": "isolated-owner-config",
+        "revision": 1,
+        "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+      },
+      "binding": {
+        "unsigned": {
+          "format": "ci-finance-ledger-partition-binding-1.0.0",
+          "id": "isolated-binding",
+          "revision": 1,
+          "state": "active",
+          "issuerId": "isolated-finance-issuer",
+          "issuerRegistryReference": {
+            "id": "isolated-registry",
+            "revision": 1,
+            "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "issuerEntitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "maintainerAccountRef": "isolated-maintainer-account",
+          "maintainerSessionRef": "isolated-maintainer-session",
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "partition": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "ledgerBackendReference": {
+            "id": "isolated-pg-backend",
+            "revision": 1,
+            "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+          },
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerConfigurationReference": {
+            "id": "isolated-owner-config",
+            "revision": 1,
+            "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+          },
+          "sourceCustodyReferences": {
+            "session": {
+              "id": "isolated-custody-session",
+              "revision": 1,
+              "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+            },
+            "account": {
+              "id": "isolated-custody-account",
+              "revision": 1,
+              "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+            },
+            "event": {
+              "id": "isolated-custody-event",
+              "revision": 1,
+              "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+            },
+            "issuer": {
+              "id": "isolated-custody-issuer",
+              "revision": 1,
+              "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+            },
+            "policy": {
+              "id": "isolated-custody-policy",
+              "revision": 1,
+              "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+            }
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z",
+          "revocationRevision": 0,
+          "sourceLineageReferences": [
+            {
+              "id": "isolated-lineage",
+              "revision": 1,
+              "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+            }
+          ]
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "5lpS0tDY610cvrvpuGXNRZJn9GvdMVfZPSXfGFborMh6Kx_XYS1bnWbeKdi-Pp9PfJa6lk-VipblCDYPLGVUCA"
+        }
+      },
+      "lineage": {
+        "unsigned": {
+          "format": "ci-finance-partition-source-lineage-1.0.0",
+          "id": "isolated-lineage",
+          "revision": 1,
+          "state": "active",
+          "issuerId": "isolated-finance-issuer",
+          "issuerRegistryReference": {
+            "id": "isolated-registry",
+            "revision": 1,
+            "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "issuerEntitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "maintainerAccountRef": "isolated-maintainer-account",
+          "maintainerSessionRef": "isolated-maintainer-session",
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "partition": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "ledgerBackendReference": {
+            "id": "isolated-pg-backend",
+            "revision": 1,
+            "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+          },
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerConfigurationReference": {
+            "id": "isolated-owner-config",
+            "revision": 1,
+            "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+          },
+          "sourceCustodyReferences": {
+            "session": {
+              "id": "isolated-custody-session",
+              "revision": 1,
+              "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+            },
+            "account": {
+              "id": "isolated-custody-account",
+              "revision": 1,
+              "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+            },
+            "event": {
+              "id": "isolated-custody-event",
+              "revision": 1,
+              "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+            },
+            "issuer": {
+              "id": "isolated-custody-issuer",
+              "revision": 1,
+              "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+            },
+            "policy": {
+              "id": "isolated-custody-policy",
+              "revision": 1,
+              "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+            }
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z",
+          "revocationRevision": 0,
+          "sourceIdentity": {
+            "sourceName": "isolated-fixture-source",
+            "sourceObjectId": "isolated-source-object",
+            "revisionSubjectId": "isolated-source-subject"
+          },
+          "rootEvent": {
+            "eventId": "isolated-pg-root",
+            "eventHash": "sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a"
+          },
+          "currentHead": {
+            "eventId": "isolated-pg-head",
+            "eventHash": "sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9",
+            "revisionSequence": 2
+          }
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "e5KvHoZYYf5Xo0XCSV48H0sFk9JvLMBcalT_jbDCVgRHr8sN3RDhXuIw5WH0ffSpV4c_bZByaaqkzGUMDsPbDw"
+        }
+      },
+      "action": {
+        "unsigned": {
+          "format": "ci-finance-maintainer-action-1.0.0",
+          "id": "isolated-maintainer-action",
+          "revision": 1,
+          "action": "provisionMapping",
+          "target": {
+            "kind": "finance_scope_mapping",
+            "mappingId": "isolated-mapping",
+            "hostConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            }
+          },
+          "audience": {
+            "verifierId": "isolated-verifier",
+            "financeBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "issuerRegistryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            }
+          },
+          "operator": {
+            "accountRef": "isolated-maintainer-account",
+            "sessionRef": "isolated-maintainer-session"
+          },
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "expectedPrior": {
+            "state": "absent",
+            "revision": null,
+            "contentHash": null,
+            "custodyEpoch": 1
+          },
+          "change": {
+            "mapping": {
+              "id": "isolated-mapping",
+              "revision": 1,
+              "state": "active",
+              "sourceIssuer": "getticketstub.com",
+              "sourceAudience": "isolated-source-audience",
+              "sourceTenantId": "isolated-source-tenant",
+              "sourceProjectRef": "isolated-source-project",
+              "scope": {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              },
+              "ledgerPartition": {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "environment": "test",
+                "billingMode": "simulated"
+              },
+              "policyReference": {
+                "id": "isolated-policy",
+                "revision": 1,
+                "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+              },
+              "issuerConfigurationReference": {
+                "id": "isolated-owner-config",
+                "revision": 1,
+                "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+              },
+              "financeBindingReference": {
+                "id": "isolated-binding",
+                "revision": 1,
+                "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+              },
+              "sourceCustodyReferences": {
+                "session": {
+                  "id": "isolated-custody-session",
+                  "revision": 1,
+                  "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+                },
+                "account": {
+                  "id": "isolated-custody-account",
+                  "revision": 1,
+                  "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+                },
+                "event": {
+                  "id": "isolated-custody-event",
+                  "revision": 1,
+                  "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+                },
+                "issuer": {
+                  "id": "isolated-custody-issuer",
+                  "revision": 1,
+                  "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+                },
+                "policy": {
+                  "id": "isolated-custody-policy",
+                  "revision": 1,
+                  "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+                }
+              },
+              "operationRecords": {
+                "read": {
+                  "action": "finance.read",
+                  "operation": "reporting.querySummary",
+                  "permission": "finance.summary.read",
+                  "state": "active",
+                  "revision": 1,
+                  "authorityReference": {
+                    "id": "isolated-read-authority",
+                    "revision": 1,
+                    "contentHash": "sha256:ffbc2dfc402782325da71132100e74ff511d1585dd80e4ea196ed4bcace3fef2"
+                  }
+                },
+                "export": {
+                  "action": "finance.export",
+                  "operation": "integrations.exportSummary",
+                  "permission": "finance.summary.export",
+                  "state": "revoked",
+                  "revision": 1,
+                  "authorityReference": {
+                    "id": "isolated-export-authority",
+                    "revision": 1,
+                    "contentHash": "sha256:ffbc2dfc402782325da71132100e74ff511d1585dd80e4ea196ed4bcace3fef2"
+                  }
+                }
+              },
+              "verifiedAt": "2026-10-12T01:00:00.000Z",
+              "expiresAt": "2026-10-13T00:00:00.000Z",
+              "governanceAction": {
+                "id": "isolated-maintainer-action",
+                "revision": 1
+              }
+            }
+          },
+          "changeContentHash": "sha256:a58ce0a1de97958f4427013cdda86a660db7ff8d97fbae10f6bef563d902da73",
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "entitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "financeBindingReference": {
+            "id": "isolated-binding",
+            "revision": 1,
+            "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z"
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "7jwJv304czFrDO1nXHq9SbuP5T2nGYAAWoYpTgUCypWf5F98f461scoasJm_ijCar-I6_z6Jtn7L77ZvTndVBA"
+        }
+      },
+      "bindingReference": {
+        "id": "isolated-binding",
+        "revision": 1,
+        "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+      },
+      "lineageReference": {
+        "id": "isolated-lineage",
+        "revision": 1,
+        "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+      },
+      "heads": {
+        "binding": {
+          "recordReference": {
+            "id": "isolated-binding",
+            "revision": 1,
+            "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+          },
+          "signedRecordContentHash": "sha256:cf11719655ec80113923ca2a0ed4a1bc59b91568b8041cf91f8edab47070ce5d",
+          "state": "active",
+          "custodyEpoch": 1
+        },
+        "lineage": {
+          "recordReference": {
+            "id": "isolated-lineage",
+            "revision": 1,
+            "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+          },
+          "signedRecordContentHash": "sha256:0f4f3d5ffd39d67602e419f69236ddf60407e7ba1111395338efebb4461a8ed7",
+          "state": "active",
+          "custodyEpoch": 1
+        }
+      },
+      "scope": {
+        "tenantId": "isolated-fixture-tenant",
+        "projectId": "isolated-fixture-project",
+        "actorId": "isolated-fixture-actor",
+        "environment": "test",
+        "billingMode": "simulated"
+      },
+      "partition": {
+        "tenantId": "isolated-fixture-tenant",
+        "projectId": "isolated-fixture-project",
+        "environment": "test",
+        "billingMode": "simulated"
+      },
+      "sourceTenantId": "isolated-source-tenant",
+      "sourceProjectRef": "isolated-source-project",
+      "pgOracle": {
+        "rootEvent": {
+          "eventId": "isolated-pg-root",
+          "eventHash": "sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a"
+        },
+        "currentHead": {
+          "eventId": "isolated-pg-head",
+          "eventHash": "sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9",
+          "revisionSequence": 2
+        },
+        "sourceIdentity": {
+          "sourceName": "isolated-fixture-source",
+          "sourceObjectId": "isolated-source-object",
+          "revisionSubjectId": "isolated-source-subject"
+        },
+        "partition": {
+          "tenantId": "isolated-fixture-tenant",
+          "projectId": "isolated-fixture-project",
+          "environment": "test",
+          "billingMode": "simulated"
+        },
+        "actualExecuted": false
+      },
+      "prior": {
+        "state": "absent",
+        "revision": null,
+        "contentHash": null,
+        "custodyEpoch": 1
+      },
+      "now": "2026-10-12T02:00:00.000Z"
+    },
+    "expected": "schema_refused",
+    "stage": "schema"
+  },
+  {
+    "id": "lineage-signed-record-revision-zero-invalid",
+    "kind": "lineage",
+    "recordCanonicalBytes": "{\"signature\":{\"algorithm\":\"Ed25519\",\"value\":\"8CBAmyjGI30nfi82CMgbR4sgl_KDzOb7ezjU6l8pJ82b9o4HNcTVRmuDjcY4JL3Skh-I7Xn9wnN-28U-5sBvAw\"},\"unsigned\":{\"currentHead\":{\"eventHash\":\"sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9\",\"eventId\":\"isolated-pg-head\",\"revisionSequence\":2},\"expiresAt\":\"2026-10-13T00:00:00.000Z\",\"format\":\"ci-finance-partition-source-lineage-1.0.0\",\"id\":\"isolated-lineage\",\"issuedAt\":\"2026-10-12T01:00:00.000Z\",\"issuerConfigurationReference\":{\"contentHash\":\"sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9\",\"id\":\"isolated-owner-config\",\"revision\":1},\"issuerEntitlementReference\":{\"contentHash\":\"sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841\",\"id\":\"isolated-entitlement\",\"revision\":1},\"issuerId\":\"isolated-finance-issuer\",\"issuerKeyReference\":{\"keyId\":\"isolated-key\",\"publicKeyContentHash\":\"sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16\",\"registryReference\":{\"contentHash\":\"sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde\",\"id\":\"isolated-registry\",\"revision\":1},\"revision\":1},\"issuerRegistryReference\":{\"contentHash\":\"sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde\",\"id\":\"isolated-registry\",\"revision\":1},\"ledgerBackendReference\":{\"contentHash\":\"sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad\",\"id\":\"isolated-pg-backend\",\"revision\":1},\"maintainerAccountRef\":\"isolated-maintainer-account\",\"maintainerSessionRef\":\"isolated-maintainer-session\",\"notBefore\":\"2026-10-12T00:00:00.000Z\",\"partition\":{\"billingMode\":\"simulated\",\"environment\":\"test\",\"projectId\":\"isolated-fixture-project\",\"tenantId\":\"isolated-fixture-tenant\"},\"policyReference\":{\"contentHash\":\"sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6\",\"id\":\"isolated-policy\",\"revision\":1},\"revision\":0,\"revocationRevision\":0,\"rootEvent\":{\"eventHash\":\"sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a\",\"eventId\":\"isolated-pg-root\"},\"scope\":{\"actorId\":\"isolated-fixture-actor\",\"billingMode\":\"simulated\",\"environment\":\"test\",\"projectId\":\"isolated-fixture-project\",\"tenantId\":\"isolated-fixture-tenant\"},\"sourceCustodyReferences\":{\"account\":{\"contentHash\":\"sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980\",\"id\":\"isolated-custody-account\",\"revision\":1},\"event\":{\"contentHash\":\"sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b\",\"id\":\"isolated-custody-event\",\"revision\":1},\"issuer\":{\"contentHash\":\"sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e\",\"id\":\"isolated-custody-issuer\",\"revision\":1},\"policy\":{\"contentHash\":\"sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f\",\"id\":\"isolated-custody-policy\",\"revision\":1},\"session\":{\"contentHash\":\"sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7\",\"id\":\"isolated-custody-session\",\"revision\":1}},\"sourceIdentity\":{\"revisionSubjectId\":\"isolated-source-subject\",\"sourceName\":\"isolated-fixture-source\",\"sourceObjectId\":\"isolated-source-object\"},\"sourceProjectRef\":\"isolated-source-project\",\"sourceTenantId\":\"isolated-source-tenant\",\"state\":\"active\"}}",
+    "store": {
+      "provenance": "ISOLATED STORED DESIGN VECTORS; NO LIVE ISSUER OR PG CAPTURE",
+      "registry": {
+        "id": "isolated-registry",
+        "revision": 1,
+        "state": "active",
+        "verifierId": "isolated-verifier",
+        "keys": [
+          {
+            "id": "isolated-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAiDY9pcrocgAPM5e-RJgKxqBDWm__4nyO2_iBctKNako",
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-kind-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEA8OSZN8cehtDCufz-6Vf7yQYpvkJDp6qL5Qt10CJAtyw",
+            "publicKeyContentHash": "sha256:be8e096437c5e0a4c2f117fd6769ed7e4046994cf4382334ae136536e66effed",
+            "allowedRecordKinds": [
+              "ci-finance-partition-source-lineage-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-action-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEALywHHIeGFlcNKjiiEbgn3kyk5tgr9-6YaLUd2AZ5B1U",
+            "publicKeyContentHash": "sha256:dab72fb30b70545822dfa46955b5754c3d95e775043b3dbe07c7b402f1b7bc53",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "registerSourceLineage"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-scope-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAJQ-By9ZwMQWoaSQ0VF7t-_7QCHU3WcVvuI8Tg9xuzCE",
+            "publicKeyContentHash": "sha256:110af5d22a17e6cc360190ddd5f72ae4bdef9930d8627aca816511e19b3f6194",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "foreign",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-entitlement-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAg3d6aUjhOrJPPcDzjkErox-V2fpeDJtY0lQddYSWPhE",
+            "publicKeyContentHash": "sha256:60a04e9ec5a187d88d7f226da7cf0dbd0b20f669d0910d2e3bc85be4b68cd27c",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-other-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:5b2aea0fa81f0541e14590061d03ae72a6abde7e01215f8096d55e0284b31b37"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          }
+        ],
+        "entitlements": [
+          {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "accountRef": "isolated-maintainer-account",
+            "sessionRef": "isolated-maintainer-session",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "sourceTenantId": "isolated-source-tenant",
+            "sourceProjectRef": "isolated-source-project",
+            "policyReference": {
+              "id": "isolated-policy",
+              "revision": 1,
+              "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+            },
+            "issuerConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            },
+            "ledgerBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-other-entitlement",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "accountRef": "isolated-other-account",
+            "sessionRef": "isolated-maintainer-session",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "sourceTenantId": "isolated-source-tenant",
+            "sourceProjectRef": "isolated-source-project",
+            "policyReference": {
+              "id": "isolated-policy",
+              "revision": 1,
+              "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+            },
+            "issuerConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            },
+            "ledgerBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          }
+        ]
+      },
+      "registryReference": {
+        "id": "isolated-registry",
+        "revision": 1,
+        "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+      },
+      "key": {
+        "id": "isolated-key",
+        "revision": 1,
+        "state": "active",
+        "issuerId": "isolated-finance-issuer",
+        "registryId": "isolated-registry",
+        "registryRevision": 1,
+        "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAiDY9pcrocgAPM5e-RJgKxqBDWm__4nyO2_iBctKNako",
+        "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16",
+        "allowedRecordKinds": [
+          "ci-finance-ledger-partition-binding-1.0.0",
+          "ci-finance-partition-source-lineage-1.0.0",
+          "ci-finance-maintainer-action-1.0.0"
+        ],
+        "allowedActions": [
+          "bindPartition",
+          "registerSourceLineage",
+          "provisionMapping",
+          "reviseMapping",
+          "revokeMapping"
+        ],
+        "allowedScopes": [
+          {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          }
+        ],
+        "entitlementReferences": [
+          {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          }
+        ],
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "entitlement": {
+        "id": "isolated-entitlement",
+        "revision": 1,
+        "state": "active",
+        "issuerId": "isolated-finance-issuer",
+        "registryId": "isolated-registry",
+        "registryRevision": 1,
+        "accountRef": "isolated-maintainer-account",
+        "sessionRef": "isolated-maintainer-session",
+        "allowedRecordKinds": [
+          "ci-finance-ledger-partition-binding-1.0.0",
+          "ci-finance-partition-source-lineage-1.0.0",
+          "ci-finance-maintainer-action-1.0.0"
+        ],
+        "allowedActions": [
+          "bindPartition",
+          "registerSourceLineage",
+          "provisionMapping",
+          "reviseMapping",
+          "revokeMapping"
+        ],
+        "allowedScopes": [
+          {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          }
+        ],
+        "sourceTenantId": "isolated-source-tenant",
+        "sourceProjectRef": "isolated-source-project",
+        "policyReference": {
+          "id": "isolated-policy",
+          "revision": 1,
+          "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+        },
+        "issuerConfigurationReference": {
+          "id": "isolated-owner-config",
+          "revision": 1,
+          "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+        },
+        "ledgerBackendReference": {
+          "id": "isolated-pg-backend",
+          "revision": 1,
+          "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+        },
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "entitlementReference": {
+        "id": "isolated-entitlement",
+        "revision": 1,
+        "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+      },
+      "principal": {
+        "id": "isolated-principal-session",
+        "revision": 1,
+        "state": "active",
+        "accountRef": "isolated-maintainer-account",
+        "sessionRef": "isolated-maintainer-session",
+        "scope": {
+          "tenantId": "isolated-fixture-tenant",
+          "projectId": "isolated-fixture-project",
+          "actorId": "isolated-fixture-actor",
+          "environment": "test",
+          "billingMode": "simulated"
+        },
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "policyReference": {
+        "id": "isolated-policy",
+        "revision": 1,
+        "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+      },
+      "policyArtifactUtf8": "ISOLATED FINANCE POLICY ARTIFACT BYTES v1\n",
+      "backendReference": {
+        "id": "isolated-pg-backend",
+        "revision": 1,
+        "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+      },
+      "configurationReference": {
+        "id": "isolated-owner-config",
+        "revision": 1,
+        "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+      },
+      "binding": {
+        "unsigned": {
+          "format": "ci-finance-ledger-partition-binding-1.0.0",
+          "id": "isolated-binding",
+          "revision": 1,
+          "state": "active",
+          "issuerId": "isolated-finance-issuer",
+          "issuerRegistryReference": {
+            "id": "isolated-registry",
+            "revision": 1,
+            "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "issuerEntitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "maintainerAccountRef": "isolated-maintainer-account",
+          "maintainerSessionRef": "isolated-maintainer-session",
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "partition": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "ledgerBackendReference": {
+            "id": "isolated-pg-backend",
+            "revision": 1,
+            "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+          },
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerConfigurationReference": {
+            "id": "isolated-owner-config",
+            "revision": 1,
+            "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+          },
+          "sourceCustodyReferences": {
+            "session": {
+              "id": "isolated-custody-session",
+              "revision": 1,
+              "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+            },
+            "account": {
+              "id": "isolated-custody-account",
+              "revision": 1,
+              "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+            },
+            "event": {
+              "id": "isolated-custody-event",
+              "revision": 1,
+              "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+            },
+            "issuer": {
+              "id": "isolated-custody-issuer",
+              "revision": 1,
+              "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+            },
+            "policy": {
+              "id": "isolated-custody-policy",
+              "revision": 1,
+              "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+            }
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z",
+          "revocationRevision": 0,
+          "sourceLineageReferences": [
+            {
+              "id": "isolated-lineage",
+              "revision": 1,
+              "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+            }
+          ]
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "5lpS0tDY610cvrvpuGXNRZJn9GvdMVfZPSXfGFborMh6Kx_XYS1bnWbeKdi-Pp9PfJa6lk-VipblCDYPLGVUCA"
+        }
+      },
+      "lineage": {
+        "unsigned": {
+          "format": "ci-finance-partition-source-lineage-1.0.0",
+          "id": "isolated-lineage",
+          "revision": 1,
+          "state": "active",
+          "issuerId": "isolated-finance-issuer",
+          "issuerRegistryReference": {
+            "id": "isolated-registry",
+            "revision": 1,
+            "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "issuerEntitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "maintainerAccountRef": "isolated-maintainer-account",
+          "maintainerSessionRef": "isolated-maintainer-session",
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "partition": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "ledgerBackendReference": {
+            "id": "isolated-pg-backend",
+            "revision": 1,
+            "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+          },
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerConfigurationReference": {
+            "id": "isolated-owner-config",
+            "revision": 1,
+            "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+          },
+          "sourceCustodyReferences": {
+            "session": {
+              "id": "isolated-custody-session",
+              "revision": 1,
+              "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+            },
+            "account": {
+              "id": "isolated-custody-account",
+              "revision": 1,
+              "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+            },
+            "event": {
+              "id": "isolated-custody-event",
+              "revision": 1,
+              "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+            },
+            "issuer": {
+              "id": "isolated-custody-issuer",
+              "revision": 1,
+              "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+            },
+            "policy": {
+              "id": "isolated-custody-policy",
+              "revision": 1,
+              "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+            }
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z",
+          "revocationRevision": 0,
+          "sourceIdentity": {
+            "sourceName": "isolated-fixture-source",
+            "sourceObjectId": "isolated-source-object",
+            "revisionSubjectId": "isolated-source-subject"
+          },
+          "rootEvent": {
+            "eventId": "isolated-pg-root",
+            "eventHash": "sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a"
+          },
+          "currentHead": {
+            "eventId": "isolated-pg-head",
+            "eventHash": "sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9",
+            "revisionSequence": 2
+          }
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "e5KvHoZYYf5Xo0XCSV48H0sFk9JvLMBcalT_jbDCVgRHr8sN3RDhXuIw5WH0ffSpV4c_bZByaaqkzGUMDsPbDw"
+        }
+      },
+      "action": {
+        "unsigned": {
+          "format": "ci-finance-maintainer-action-1.0.0",
+          "id": "isolated-maintainer-action",
+          "revision": 1,
+          "action": "provisionMapping",
+          "target": {
+            "kind": "finance_scope_mapping",
+            "mappingId": "isolated-mapping",
+            "hostConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            }
+          },
+          "audience": {
+            "verifierId": "isolated-verifier",
+            "financeBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "issuerRegistryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            }
+          },
+          "operator": {
+            "accountRef": "isolated-maintainer-account",
+            "sessionRef": "isolated-maintainer-session"
+          },
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "expectedPrior": {
+            "state": "absent",
+            "revision": null,
+            "contentHash": null,
+            "custodyEpoch": 1
+          },
+          "change": {
+            "mapping": {
+              "id": "isolated-mapping",
+              "revision": 1,
+              "state": "active",
+              "sourceIssuer": "getticketstub.com",
+              "sourceAudience": "isolated-source-audience",
+              "sourceTenantId": "isolated-source-tenant",
+              "sourceProjectRef": "isolated-source-project",
+              "scope": {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              },
+              "ledgerPartition": {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "environment": "test",
+                "billingMode": "simulated"
+              },
+              "policyReference": {
+                "id": "isolated-policy",
+                "revision": 1,
+                "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+              },
+              "issuerConfigurationReference": {
+                "id": "isolated-owner-config",
+                "revision": 1,
+                "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+              },
+              "financeBindingReference": {
+                "id": "isolated-binding",
+                "revision": 1,
+                "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+              },
+              "sourceCustodyReferences": {
+                "session": {
+                  "id": "isolated-custody-session",
+                  "revision": 1,
+                  "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+                },
+                "account": {
+                  "id": "isolated-custody-account",
+                  "revision": 1,
+                  "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+                },
+                "event": {
+                  "id": "isolated-custody-event",
+                  "revision": 1,
+                  "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+                },
+                "issuer": {
+                  "id": "isolated-custody-issuer",
+                  "revision": 1,
+                  "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+                },
+                "policy": {
+                  "id": "isolated-custody-policy",
+                  "revision": 1,
+                  "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+                }
+              },
+              "operationRecords": {
+                "read": {
+                  "action": "finance.read",
+                  "operation": "reporting.querySummary",
+                  "permission": "finance.summary.read",
+                  "state": "active",
+                  "revision": 1,
+                  "authorityReference": {
+                    "id": "isolated-read-authority",
+                    "revision": 1,
+                    "contentHash": "sha256:ffbc2dfc402782325da71132100e74ff511d1585dd80e4ea196ed4bcace3fef2"
+                  }
+                },
+                "export": {
+                  "action": "finance.export",
+                  "operation": "integrations.exportSummary",
+                  "permission": "finance.summary.export",
+                  "state": "revoked",
+                  "revision": 1,
+                  "authorityReference": {
+                    "id": "isolated-export-authority",
+                    "revision": 1,
+                    "contentHash": "sha256:ffbc2dfc402782325da71132100e74ff511d1585dd80e4ea196ed4bcace3fef2"
+                  }
+                }
+              },
+              "verifiedAt": "2026-10-12T01:00:00.000Z",
+              "expiresAt": "2026-10-13T00:00:00.000Z",
+              "governanceAction": {
+                "id": "isolated-maintainer-action",
+                "revision": 1
+              }
+            }
+          },
+          "changeContentHash": "sha256:a58ce0a1de97958f4427013cdda86a660db7ff8d97fbae10f6bef563d902da73",
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "entitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "financeBindingReference": {
+            "id": "isolated-binding",
+            "revision": 1,
+            "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z"
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "7jwJv304czFrDO1nXHq9SbuP5T2nGYAAWoYpTgUCypWf5F98f461scoasJm_ijCar-I6_z6Jtn7L77ZvTndVBA"
+        }
+      },
+      "bindingReference": {
+        "id": "isolated-binding",
+        "revision": 1,
+        "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+      },
+      "lineageReference": {
+        "id": "isolated-lineage",
+        "revision": 1,
+        "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+      },
+      "heads": {
+        "binding": {
+          "recordReference": {
+            "id": "isolated-binding",
+            "revision": 1,
+            "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+          },
+          "signedRecordContentHash": "sha256:cf11719655ec80113923ca2a0ed4a1bc59b91568b8041cf91f8edab47070ce5d",
+          "state": "active",
+          "custodyEpoch": 1
+        },
+        "lineage": {
+          "recordReference": {
+            "id": "isolated-lineage",
+            "revision": 1,
+            "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+          },
+          "signedRecordContentHash": "sha256:0f4f3d5ffd39d67602e419f69236ddf60407e7ba1111395338efebb4461a8ed7",
+          "state": "active",
+          "custodyEpoch": 1
+        }
+      },
+      "scope": {
+        "tenantId": "isolated-fixture-tenant",
+        "projectId": "isolated-fixture-project",
+        "actorId": "isolated-fixture-actor",
+        "environment": "test",
+        "billingMode": "simulated"
+      },
+      "partition": {
+        "tenantId": "isolated-fixture-tenant",
+        "projectId": "isolated-fixture-project",
+        "environment": "test",
+        "billingMode": "simulated"
+      },
+      "sourceTenantId": "isolated-source-tenant",
+      "sourceProjectRef": "isolated-source-project",
+      "pgOracle": {
+        "rootEvent": {
+          "eventId": "isolated-pg-root",
+          "eventHash": "sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a"
+        },
+        "currentHead": {
+          "eventId": "isolated-pg-head",
+          "eventHash": "sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9",
+          "revisionSequence": 2
+        },
+        "sourceIdentity": {
+          "sourceName": "isolated-fixture-source",
+          "sourceObjectId": "isolated-source-object",
+          "revisionSubjectId": "isolated-source-subject"
+        },
+        "partition": {
+          "tenantId": "isolated-fixture-tenant",
+          "projectId": "isolated-fixture-project",
+          "environment": "test",
+          "billingMode": "simulated"
+        },
+        "actualExecuted": false
+      },
+      "prior": {
+        "state": "absent",
+        "revision": null,
+        "contentHash": null,
+        "custodyEpoch": 1
+      },
+      "now": "2026-10-12T02:00:00.000Z"
+    },
+    "expected": "schema_refused",
+    "stage": "schema"
+  },
+  {
+    "id": "lineage-signed-reference-revision-zero-invalid",
+    "kind": "lineage",
+    "recordCanonicalBytes": "{\"signature\":{\"algorithm\":\"Ed25519\",\"value\":\"J7EcIg5_6TMGPprJvc9MhGNdgK8_jj-Obis_J1M2hmH6OgDr0HLzYlbHZ6x-4D7gjgUzKtbVRWp5Z5XoeobVAQ\"},\"unsigned\":{\"currentHead\":{\"eventHash\":\"sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9\",\"eventId\":\"isolated-pg-head\",\"revisionSequence\":2},\"expiresAt\":\"2026-10-13T00:00:00.000Z\",\"format\":\"ci-finance-partition-source-lineage-1.0.0\",\"id\":\"isolated-lineage\",\"issuedAt\":\"2026-10-12T01:00:00.000Z\",\"issuerConfigurationReference\":{\"contentHash\":\"sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9\",\"id\":\"isolated-owner-config\",\"revision\":1},\"issuerEntitlementReference\":{\"contentHash\":\"sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841\",\"id\":\"isolated-entitlement\",\"revision\":1},\"issuerId\":\"isolated-finance-issuer\",\"issuerKeyReference\":{\"keyId\":\"isolated-key\",\"publicKeyContentHash\":\"sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16\",\"registryReference\":{\"contentHash\":\"sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde\",\"id\":\"isolated-registry\",\"revision\":0},\"revision\":1},\"issuerRegistryReference\":{\"contentHash\":\"sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde\",\"id\":\"isolated-registry\",\"revision\":0},\"ledgerBackendReference\":{\"contentHash\":\"sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad\",\"id\":\"isolated-pg-backend\",\"revision\":1},\"maintainerAccountRef\":\"isolated-maintainer-account\",\"maintainerSessionRef\":\"isolated-maintainer-session\",\"notBefore\":\"2026-10-12T00:00:00.000Z\",\"partition\":{\"billingMode\":\"simulated\",\"environment\":\"test\",\"projectId\":\"isolated-fixture-project\",\"tenantId\":\"isolated-fixture-tenant\"},\"policyReference\":{\"contentHash\":\"sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6\",\"id\":\"isolated-policy\",\"revision\":1},\"revision\":1,\"revocationRevision\":0,\"rootEvent\":{\"eventHash\":\"sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a\",\"eventId\":\"isolated-pg-root\"},\"scope\":{\"actorId\":\"isolated-fixture-actor\",\"billingMode\":\"simulated\",\"environment\":\"test\",\"projectId\":\"isolated-fixture-project\",\"tenantId\":\"isolated-fixture-tenant\"},\"sourceCustodyReferences\":{\"account\":{\"contentHash\":\"sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980\",\"id\":\"isolated-custody-account\",\"revision\":1},\"event\":{\"contentHash\":\"sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b\",\"id\":\"isolated-custody-event\",\"revision\":1},\"issuer\":{\"contentHash\":\"sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e\",\"id\":\"isolated-custody-issuer\",\"revision\":1},\"policy\":{\"contentHash\":\"sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f\",\"id\":\"isolated-custody-policy\",\"revision\":1},\"session\":{\"contentHash\":\"sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7\",\"id\":\"isolated-custody-session\",\"revision\":1}},\"sourceIdentity\":{\"revisionSubjectId\":\"isolated-source-subject\",\"sourceName\":\"isolated-fixture-source\",\"sourceObjectId\":\"isolated-source-object\"},\"sourceProjectRef\":\"isolated-source-project\",\"sourceTenantId\":\"isolated-source-tenant\",\"state\":\"active\"}}",
+    "store": {
+      "provenance": "ISOLATED STORED DESIGN VECTORS; NO LIVE ISSUER OR PG CAPTURE",
+      "registry": {
+        "id": "isolated-registry",
+        "revision": 1,
+        "state": "active",
+        "verifierId": "isolated-verifier",
+        "keys": [
+          {
+            "id": "isolated-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAiDY9pcrocgAPM5e-RJgKxqBDWm__4nyO2_iBctKNako",
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-kind-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEA8OSZN8cehtDCufz-6Vf7yQYpvkJDp6qL5Qt10CJAtyw",
+            "publicKeyContentHash": "sha256:be8e096437c5e0a4c2f117fd6769ed7e4046994cf4382334ae136536e66effed",
+            "allowedRecordKinds": [
+              "ci-finance-partition-source-lineage-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-action-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEALywHHIeGFlcNKjiiEbgn3kyk5tgr9-6YaLUd2AZ5B1U",
+            "publicKeyContentHash": "sha256:dab72fb30b70545822dfa46955b5754c3d95e775043b3dbe07c7b402f1b7bc53",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "registerSourceLineage"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-scope-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAJQ-By9ZwMQWoaSQ0VF7t-_7QCHU3WcVvuI8Tg9xuzCE",
+            "publicKeyContentHash": "sha256:110af5d22a17e6cc360190ddd5f72ae4bdef9930d8627aca816511e19b3f6194",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "foreign",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-wrong-entitlement-key",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAg3d6aUjhOrJPPcDzjkErox-V2fpeDJtY0lQddYSWPhE",
+            "publicKeyContentHash": "sha256:60a04e9ec5a187d88d7f226da7cf0dbd0b20f669d0910d2e3bc85be4b68cd27c",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "entitlementReferences": [
+              {
+                "id": "isolated-other-entitlement",
+                "revision": 1,
+                "contentHash": "sha256:5b2aea0fa81f0541e14590061d03ae72a6abde7e01215f8096d55e0284b31b37"
+              }
+            ],
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          }
+        ],
+        "entitlements": [
+          {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "accountRef": "isolated-maintainer-account",
+            "sessionRef": "isolated-maintainer-session",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "sourceTenantId": "isolated-source-tenant",
+            "sourceProjectRef": "isolated-source-project",
+            "policyReference": {
+              "id": "isolated-policy",
+              "revision": 1,
+              "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+            },
+            "issuerConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            },
+            "ledgerBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          },
+          {
+            "id": "isolated-other-entitlement",
+            "revision": 1,
+            "state": "active",
+            "issuerId": "isolated-finance-issuer",
+            "registryId": "isolated-registry",
+            "registryRevision": 1,
+            "accountRef": "isolated-other-account",
+            "sessionRef": "isolated-maintainer-session",
+            "allowedRecordKinds": [
+              "ci-finance-ledger-partition-binding-1.0.0",
+              "ci-finance-partition-source-lineage-1.0.0",
+              "ci-finance-maintainer-action-1.0.0"
+            ],
+            "allowedActions": [
+              "bindPartition",
+              "registerSourceLineage",
+              "provisionMapping",
+              "reviseMapping",
+              "revokeMapping"
+            ],
+            "allowedScopes": [
+              {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              }
+            ],
+            "sourceTenantId": "isolated-source-tenant",
+            "sourceProjectRef": "isolated-source-project",
+            "policyReference": {
+              "id": "isolated-policy",
+              "revision": 1,
+              "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+            },
+            "issuerConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            },
+            "ledgerBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "notBefore": "2026-10-12T00:00:00.000Z",
+            "expiresAt": "2026-10-13T00:00:00.000Z",
+            "custodyEpoch": 1
+          }
+        ]
+      },
+      "registryReference": {
+        "id": "isolated-registry",
+        "revision": 1,
+        "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+      },
+      "key": {
+        "id": "isolated-key",
+        "revision": 1,
+        "state": "active",
+        "issuerId": "isolated-finance-issuer",
+        "registryId": "isolated-registry",
+        "registryRevision": 1,
+        "publicKeySpkiBase64url": "MCowBQYDK2VwAyEAiDY9pcrocgAPM5e-RJgKxqBDWm__4nyO2_iBctKNako",
+        "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16",
+        "allowedRecordKinds": [
+          "ci-finance-ledger-partition-binding-1.0.0",
+          "ci-finance-partition-source-lineage-1.0.0",
+          "ci-finance-maintainer-action-1.0.0"
+        ],
+        "allowedActions": [
+          "bindPartition",
+          "registerSourceLineage",
+          "provisionMapping",
+          "reviseMapping",
+          "revokeMapping"
+        ],
+        "allowedScopes": [
+          {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          }
+        ],
+        "entitlementReferences": [
+          {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          }
+        ],
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "entitlement": {
+        "id": "isolated-entitlement",
+        "revision": 1,
+        "state": "active",
+        "issuerId": "isolated-finance-issuer",
+        "registryId": "isolated-registry",
+        "registryRevision": 1,
+        "accountRef": "isolated-maintainer-account",
+        "sessionRef": "isolated-maintainer-session",
+        "allowedRecordKinds": [
+          "ci-finance-ledger-partition-binding-1.0.0",
+          "ci-finance-partition-source-lineage-1.0.0",
+          "ci-finance-maintainer-action-1.0.0"
+        ],
+        "allowedActions": [
+          "bindPartition",
+          "registerSourceLineage",
+          "provisionMapping",
+          "reviseMapping",
+          "revokeMapping"
+        ],
+        "allowedScopes": [
+          {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          }
+        ],
+        "sourceTenantId": "isolated-source-tenant",
+        "sourceProjectRef": "isolated-source-project",
+        "policyReference": {
+          "id": "isolated-policy",
+          "revision": 1,
+          "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+        },
+        "issuerConfigurationReference": {
+          "id": "isolated-owner-config",
+          "revision": 1,
+          "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+        },
+        "ledgerBackendReference": {
+          "id": "isolated-pg-backend",
+          "revision": 1,
+          "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+        },
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "entitlementReference": {
+        "id": "isolated-entitlement",
+        "revision": 1,
+        "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+      },
+      "principal": {
+        "id": "isolated-principal-session",
+        "revision": 1,
+        "state": "active",
+        "accountRef": "isolated-maintainer-account",
+        "sessionRef": "isolated-maintainer-session",
+        "scope": {
+          "tenantId": "isolated-fixture-tenant",
+          "projectId": "isolated-fixture-project",
+          "actorId": "isolated-fixture-actor",
+          "environment": "test",
+          "billingMode": "simulated"
+        },
+        "notBefore": "2026-10-12T00:00:00.000Z",
+        "expiresAt": "2026-10-13T00:00:00.000Z",
+        "custodyEpoch": 1
+      },
+      "policyReference": {
+        "id": "isolated-policy",
+        "revision": 1,
+        "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+      },
+      "policyArtifactUtf8": "ISOLATED FINANCE POLICY ARTIFACT BYTES v1\n",
+      "backendReference": {
+        "id": "isolated-pg-backend",
+        "revision": 1,
+        "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+      },
+      "configurationReference": {
+        "id": "isolated-owner-config",
+        "revision": 1,
+        "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+      },
+      "binding": {
+        "unsigned": {
+          "format": "ci-finance-ledger-partition-binding-1.0.0",
+          "id": "isolated-binding",
+          "revision": 1,
+          "state": "active",
+          "issuerId": "isolated-finance-issuer",
+          "issuerRegistryReference": {
+            "id": "isolated-registry",
+            "revision": 1,
+            "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "issuerEntitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "maintainerAccountRef": "isolated-maintainer-account",
+          "maintainerSessionRef": "isolated-maintainer-session",
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "partition": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "ledgerBackendReference": {
+            "id": "isolated-pg-backend",
+            "revision": 1,
+            "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+          },
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerConfigurationReference": {
+            "id": "isolated-owner-config",
+            "revision": 1,
+            "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+          },
+          "sourceCustodyReferences": {
+            "session": {
+              "id": "isolated-custody-session",
+              "revision": 1,
+              "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+            },
+            "account": {
+              "id": "isolated-custody-account",
+              "revision": 1,
+              "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+            },
+            "event": {
+              "id": "isolated-custody-event",
+              "revision": 1,
+              "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+            },
+            "issuer": {
+              "id": "isolated-custody-issuer",
+              "revision": 1,
+              "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+            },
+            "policy": {
+              "id": "isolated-custody-policy",
+              "revision": 1,
+              "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+            }
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z",
+          "revocationRevision": 0,
+          "sourceLineageReferences": [
+            {
+              "id": "isolated-lineage",
+              "revision": 1,
+              "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+            }
+          ]
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "5lpS0tDY610cvrvpuGXNRZJn9GvdMVfZPSXfGFborMh6Kx_XYS1bnWbeKdi-Pp9PfJa6lk-VipblCDYPLGVUCA"
+        }
+      },
+      "lineage": {
+        "unsigned": {
+          "format": "ci-finance-partition-source-lineage-1.0.0",
+          "id": "isolated-lineage",
+          "revision": 1,
+          "state": "active",
+          "issuerId": "isolated-finance-issuer",
+          "issuerRegistryReference": {
+            "id": "isolated-registry",
+            "revision": 1,
+            "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "issuerEntitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "maintainerAccountRef": "isolated-maintainer-account",
+          "maintainerSessionRef": "isolated-maintainer-session",
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "partition": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "ledgerBackendReference": {
+            "id": "isolated-pg-backend",
+            "revision": 1,
+            "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+          },
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerConfigurationReference": {
+            "id": "isolated-owner-config",
+            "revision": 1,
+            "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+          },
+          "sourceCustodyReferences": {
+            "session": {
+              "id": "isolated-custody-session",
+              "revision": 1,
+              "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+            },
+            "account": {
+              "id": "isolated-custody-account",
+              "revision": 1,
+              "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+            },
+            "event": {
+              "id": "isolated-custody-event",
+              "revision": 1,
+              "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+            },
+            "issuer": {
+              "id": "isolated-custody-issuer",
+              "revision": 1,
+              "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+            },
+            "policy": {
+              "id": "isolated-custody-policy",
+              "revision": 1,
+              "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+            }
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z",
+          "revocationRevision": 0,
+          "sourceIdentity": {
+            "sourceName": "isolated-fixture-source",
+            "sourceObjectId": "isolated-source-object",
+            "revisionSubjectId": "isolated-source-subject"
+          },
+          "rootEvent": {
+            "eventId": "isolated-pg-root",
+            "eventHash": "sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a"
+          },
+          "currentHead": {
+            "eventId": "isolated-pg-head",
+            "eventHash": "sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9",
+            "revisionSequence": 2
+          }
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "e5KvHoZYYf5Xo0XCSV48H0sFk9JvLMBcalT_jbDCVgRHr8sN3RDhXuIw5WH0ffSpV4c_bZByaaqkzGUMDsPbDw"
+        }
+      },
+      "action": {
+        "unsigned": {
+          "format": "ci-finance-maintainer-action-1.0.0",
+          "id": "isolated-maintainer-action",
+          "revision": 1,
+          "action": "provisionMapping",
+          "target": {
+            "kind": "finance_scope_mapping",
+            "mappingId": "isolated-mapping",
+            "hostConfigurationReference": {
+              "id": "isolated-owner-config",
+              "revision": 1,
+              "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+            }
+          },
+          "audience": {
+            "verifierId": "isolated-verifier",
+            "financeBackendReference": {
+              "id": "isolated-pg-backend",
+              "revision": 1,
+              "contentHash": "sha256:295115b6a3677a34fc8e6f4fc253a17d5076e341827ee32c5290c89c079affad"
+            },
+            "issuerRegistryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            }
+          },
+          "operator": {
+            "accountRef": "isolated-maintainer-account",
+            "sessionRef": "isolated-maintainer-session"
+          },
+          "sourceTenantId": "isolated-source-tenant",
+          "sourceProjectRef": "isolated-source-project",
+          "scope": {
+            "tenantId": "isolated-fixture-tenant",
+            "projectId": "isolated-fixture-project",
+            "actorId": "isolated-fixture-actor",
+            "environment": "test",
+            "billingMode": "simulated"
+          },
+          "expectedPrior": {
+            "state": "absent",
+            "revision": null,
+            "contentHash": null,
+            "custodyEpoch": 1
+          },
+          "change": {
+            "mapping": {
+              "id": "isolated-mapping",
+              "revision": 1,
+              "state": "active",
+              "sourceIssuer": "getticketstub.com",
+              "sourceAudience": "isolated-source-audience",
+              "sourceTenantId": "isolated-source-tenant",
+              "sourceProjectRef": "isolated-source-project",
+              "scope": {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "actorId": "isolated-fixture-actor",
+                "environment": "test",
+                "billingMode": "simulated"
+              },
+              "ledgerPartition": {
+                "tenantId": "isolated-fixture-tenant",
+                "projectId": "isolated-fixture-project",
+                "environment": "test",
+                "billingMode": "simulated"
+              },
+              "policyReference": {
+                "id": "isolated-policy",
+                "revision": 1,
+                "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+              },
+              "issuerConfigurationReference": {
+                "id": "isolated-owner-config",
+                "revision": 1,
+                "contentHash": "sha256:07e891b2ac8f6f937a9994044e197ecd79a319d8244a982c5706595ad89762f9"
+              },
+              "financeBindingReference": {
+                "id": "isolated-binding",
+                "revision": 1,
+                "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+              },
+              "sourceCustodyReferences": {
+                "session": {
+                  "id": "isolated-custody-session",
+                  "revision": 1,
+                  "contentHash": "sha256:6ec993b214561d36c795f253ea4fbe4830b9ed58b339442a02ea246b6af5cfe7"
+                },
+                "account": {
+                  "id": "isolated-custody-account",
+                  "revision": 1,
+                  "contentHash": "sha256:51e602e56e2c8e440bec16f00ca5da6928cbeeea5b2219106d6bed81e09ec980"
+                },
+                "event": {
+                  "id": "isolated-custody-event",
+                  "revision": 1,
+                  "contentHash": "sha256:5856dc3269ac658a04cadc2d99c441a262f10978faad55ed267419acf4e5722b"
+                },
+                "issuer": {
+                  "id": "isolated-custody-issuer",
+                  "revision": 1,
+                  "contentHash": "sha256:3fd106df31bdb752ddd9573007b496599e4e2382fdc446db285e113b209dfd2e"
+                },
+                "policy": {
+                  "id": "isolated-custody-policy",
+                  "revision": 1,
+                  "contentHash": "sha256:2b4ff6554559500b626d58fda7b73d71b9a9cb947110084dd513f0feb3f0c16f"
+                }
+              },
+              "operationRecords": {
+                "read": {
+                  "action": "finance.read",
+                  "operation": "reporting.querySummary",
+                  "permission": "finance.summary.read",
+                  "state": "active",
+                  "revision": 1,
+                  "authorityReference": {
+                    "id": "isolated-read-authority",
+                    "revision": 1,
+                    "contentHash": "sha256:ffbc2dfc402782325da71132100e74ff511d1585dd80e4ea196ed4bcace3fef2"
+                  }
+                },
+                "export": {
+                  "action": "finance.export",
+                  "operation": "integrations.exportSummary",
+                  "permission": "finance.summary.export",
+                  "state": "revoked",
+                  "revision": 1,
+                  "authorityReference": {
+                    "id": "isolated-export-authority",
+                    "revision": 1,
+                    "contentHash": "sha256:ffbc2dfc402782325da71132100e74ff511d1585dd80e4ea196ed4bcace3fef2"
+                  }
+                }
+              },
+              "verifiedAt": "2026-10-12T01:00:00.000Z",
+              "expiresAt": "2026-10-13T00:00:00.000Z",
+              "governanceAction": {
+                "id": "isolated-maintainer-action",
+                "revision": 1
+              }
+            }
+          },
+          "changeContentHash": "sha256:a58ce0a1de97958f4427013cdda86a660db7ff8d97fbae10f6bef563d902da73",
+          "policyReference": {
+            "id": "isolated-policy",
+            "revision": 1,
+            "contentHash": "sha256:6c54e5cfe4f0425c258ef04562a026243c39ba0922621417de4dc81bfdf08ae6"
+          },
+          "issuerKeyReference": {
+            "registryReference": {
+              "id": "isolated-registry",
+              "revision": 1,
+              "contentHash": "sha256:b1561df0804a08b15740a9f16ae01794dc39b9a9e723f95a32e77768502c9dde"
+            },
+            "keyId": "isolated-key",
+            "revision": 1,
+            "publicKeyContentHash": "sha256:f6e360eb36977b6cd94d077ece204985cdfb2a435396b33b87b2ff50446c1d16"
+          },
+          "entitlementReference": {
+            "id": "isolated-entitlement",
+            "revision": 1,
+            "contentHash": "sha256:13808283667ae954db8fb56ca3f2a3d9664b414b87996c5f8c38f7c3fff54841"
+          },
+          "financeBindingReference": {
+            "id": "isolated-binding",
+            "revision": 1,
+            "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+          },
+          "notBefore": "2026-10-12T00:00:00.000Z",
+          "issuedAt": "2026-10-12T01:00:00.000Z",
+          "expiresAt": "2026-10-13T00:00:00.000Z"
+        },
+        "signature": {
+          "algorithm": "Ed25519",
+          "value": "7jwJv304czFrDO1nXHq9SbuP5T2nGYAAWoYpTgUCypWf5F98f461scoasJm_ijCar-I6_z6Jtn7L77ZvTndVBA"
+        }
+      },
+      "bindingReference": {
+        "id": "isolated-binding",
+        "revision": 1,
+        "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+      },
+      "lineageReference": {
+        "id": "isolated-lineage",
+        "revision": 1,
+        "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+      },
+      "heads": {
+        "binding": {
+          "recordReference": {
+            "id": "isolated-binding",
+            "revision": 1,
+            "contentHash": "sha256:6f67f8e6d158ade0048bbdccd87a71425a7600fc41aa80ffde541a0c9908ba42"
+          },
+          "signedRecordContentHash": "sha256:cf11719655ec80113923ca2a0ed4a1bc59b91568b8041cf91f8edab47070ce5d",
+          "state": "active",
+          "custodyEpoch": 1
+        },
+        "lineage": {
+          "recordReference": {
+            "id": "isolated-lineage",
+            "revision": 1,
+            "contentHash": "sha256:f937de02db9eb47f4814801fd00459459ac501da02a2cd1589367c4aeac5618e"
+          },
+          "signedRecordContentHash": "sha256:0f4f3d5ffd39d67602e419f69236ddf60407e7ba1111395338efebb4461a8ed7",
+          "state": "active",
+          "custodyEpoch": 1
+        }
+      },
+      "scope": {
+        "tenantId": "isolated-fixture-tenant",
+        "projectId": "isolated-fixture-project",
+        "actorId": "isolated-fixture-actor",
+        "environment": "test",
+        "billingMode": "simulated"
+      },
+      "partition": {
+        "tenantId": "isolated-fixture-tenant",
+        "projectId": "isolated-fixture-project",
+        "environment": "test",
+        "billingMode": "simulated"
+      },
+      "sourceTenantId": "isolated-source-tenant",
+      "sourceProjectRef": "isolated-source-project",
+      "pgOracle": {
+        "rootEvent": {
+          "eventId": "isolated-pg-root",
+          "eventHash": "sha256:7558bfe2b22fd13c9f87fc5b003b04edc456264ccabf15dbfd635ea2522e2e1a"
+        },
+        "currentHead": {
+          "eventId": "isolated-pg-head",
+          "eventHash": "sha256:400631e76b67e8f5067f30cbd49d919fe98abb0d4149fc25e099e5c04aa59aa9",
+          "revisionSequence": 2
+        },
+        "sourceIdentity": {
+          "sourceName": "isolated-fixture-source",
+          "sourceObjectId": "isolated-source-object",
+          "revisionSubjectId": "isolated-source-subject"
+        },
+        "partition": {
+          "tenantId": "isolated-fixture-tenant",
+          "projectId": "isolated-fixture-project",
+          "environment": "test",
+          "billingMode": "simulated"
+        },
+        "actualExecuted": false
+      },
+      "prior": {
+        "state": "absent",
+        "revision": null,
+        "contentHash": null,
+        "custodyEpoch": 1
+      },
+      "now": "2026-10-12T02:00:00.000Z"
+    },
+    "expected": "schema_refused",
+    "stage": "schema"
+  }
+]

@@ -71,3 +71,5 @@ export function validateSummarySnapshot(args: {
 }) {
   return validateCanonical({ contract: 'FinancialSummary', value: args.summary, module: args.module, operation: args.operation, requestId: args.requestId });
 }
+
+export * from "./partition-binding.js";

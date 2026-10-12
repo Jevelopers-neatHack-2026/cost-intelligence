@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import registerTest from 'node:test';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import pg from 'pg';
+import { EXPECTED_MIGRATIONS } from '../migrations/migration-catalog.mjs';
 import {
   appendLedgerEvent,
   ingestUsage,
@@ -407,10 +408,8 @@ test('CI02 ledger persists exact immutable records and rebuilds scoped projectio
     assert.equal(Number(health.rows[0].required_migrations_present), 11,
       'the exact additive settlement capability extends the known core foundation to 0011; reporting 0012 remains a separate capability');
     const installed=await pool.query('SELECT version,checksum_sha256 FROM cost_intelligence.schema_migrations ORDER BY version');
-    const expectedVersions=['0001_foundation','0002_foundation_health','0003_financial_ledger','0004_pricing_catalog',
-      '0005_pricing_valuation_history','0006_finance_security_roles','0007_accounting_projection_snapshots','0008_budget_reservations',
-      '0009_usage_intake','0010_budget_authority_bindings','0011_budget_settlement_reconciliation','0012_reporting_snapshots'];
-    assert.deepEqual(installed.rows.map(row=>row.version),expectedVersions,'only the exact known core11 and independent reporting0012 migrations are installed');
+    const expectedVersions=EXPECTED_MIGRATIONS.map(name=>name.replace(/\.sql$/,''));
+    assert.deepEqual(installed.rows.map(row=>row.version),expectedVersions,'only the exact known core11 and independent reporting, coverage and evidence migrations are installed');
     for(const row of installed.rows)assert.equal(row.checksum_sha256,createHash('sha256').update(await readFile(join(root,'migrations',`${row.version}.sql`))).digest('hex'),'installed known migration bytes match their source commitments');
     assert.equal((await pool.query('SELECT migrations_ready FROM cost_intelligence.reporting_health')).rows[0].migrations_ready,true);
 

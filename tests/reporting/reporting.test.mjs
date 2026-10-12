@@ -1,3 +1,4 @@
+import './partition-binding-selected.test.mjs';
 import assert from 'node:assert/strict';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
