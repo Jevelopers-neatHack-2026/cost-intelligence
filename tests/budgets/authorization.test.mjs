@@ -1,5 +1,6 @@
 import './collector-evidence.test.mjs';
 import './reported-cost.test.mjs';
+import './settlement-integrity.test.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';

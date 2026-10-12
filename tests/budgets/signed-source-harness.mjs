@@ -31,6 +31,17 @@ export async function signedSourceHarness(scope,binding,attempt,clock){
   const ref=await publish('reported_cost',{usageEvent:usage,providerEvidence:evidence,references:fixture.context.references,amountSemantics:'cumulative_attempt_total',...(options.payloadExtra?{unreviewedCollectorExtra:options.payloadExtra}:{})},sourceBytes);
   priorUsage=structuredClone(usage);return ref;
  };
+ let priorNative=null;
+ const nativeCost=async(amount,options={})=>{
+  const payload={version:'ci-budget-reported-cost-1.0.0',observationId:randomUUID(),economicUsageId:priorNative?.economicUsageId??randomUUID(),
+    supersedesObservationId:priorNative?.observationId??null,evidenceId:randomUUID(),evidenceRevision:1,
+    predecessorEvidenceHash:priorNative?await budgetDigest(priorNative):null,correlationId:randomUUID(),
+    occurredAt:clock.now().toISOString(),observedAt:clock.now().toISOString(),producer:{module:'finance.synthetic.source',sourceRevision:'a'.repeat(40),buildRevision:'synthetic-1'},
+    amountSemantics:'cumulative_attempt_total',money:{amount,currency:'USD',scale:amount.split('.')[1]?.length??0},
+    usage:{completeness:'unknown',missingFields:['usage'],units:[]}};
+  const sourceBytes=options.sourceExtra?`{"usage":{"cost":${amount}},"unreviewed_provider_extra":${JSON.stringify(options.sourceExtra)}}`:`{"usage":{"cost":${amount}}}`;
+  const ref=await publish('reported_cost',payload,sourceBytes);priorNative=structuredClone(payload);return ref;
+ };
  const finality=async payload=>publish('execution_finality',payload,JSON.stringify({financial_finality:payload}));
- return {records,key,publish,cost,finality,backend:{loadCurrent:async ref=>structuredClone(records.get(ref.id)??null),loadCurrentIssuerKey:async id=>id==='synthetic-finance-collector'?structuredClone(key):null}};
+ return {records,key,publish,cost,nativeCost,finality,backend:{loadCurrent:async ref=>structuredClone(records.get(ref.id)??null),loadCurrentIssuerKey:async id=>id==='synthetic-finance-collector'?structuredClone(key):null}};
 }

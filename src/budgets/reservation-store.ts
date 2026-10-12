@@ -2,10 +2,8 @@ import { Value } from '@sinclair/typebox/value';
 import { budgetDigest, normalizedBudgetRequest, verifyBudgetSource, verifyReservationHost, CurrentReservationRequestSchema, PartialAcknowledgementRequestSchema, type BudgetEvidenceDecision, type ReservationAuthorityDecision, type BudgetEvidencePort, type BudgetReservationAuthorityPort, type BudgetReference, type CurrentReservationRequest, type PartialAcknowledgementRequest } from './authority.js';
 import { Type, type Static } from '@sinclair/typebox';
 import { type BudgetCollectorBackend, createAuthenticatedBudgetSourceResolver, budgetSourcePersistence, type AuthenticatedBudgetSource } from './evidence.js';
-import { resolveReportedCost, resolvePricingProfile, resolveExecutionFinality, BudgetExecutionFinalitySchema, type AuthenticatedReportedCost } from './reported-cost.js';
+import { resolveBudgetReportedCost,compareBudgetReportedUsage, resolvePricingProfile, resolveExecutionFinality, BudgetExecutionFinalitySchema, type ResolvedBudgetReportedCost,type BudgetReportedUsage } from './reported-cost.js';
 import { appendBudgetLedgerEventInTransaction,requireBudgetSettlementCapability,budgetExpenseSql,budgetExpenseAxisSql,budgetCurrentLedgerHeadSql,type LedgerAppendRequest } from '../ledger/store.js';
-import {compareReportedUnsettledUsageIdentity} from '@jevelopers/shared-contracts-reported-development/usage-reported-unsettled';
-import type {UsageEvent_2_0_0} from '@jevelopers/shared-contracts-reported-development';
 import {
   authorizeFinanceOperation,
   errorEnvelope,
@@ -97,8 +95,8 @@ export interface BudgetRuntimePorts {
   readonly budgetEvidence?: BudgetEvidencePort;
   /** Owner-mounted immutable source records and independently current collector key registry. */
   readonly sourceCollector?: BudgetCollectorBackend;
-  /** Explicit private development decoder opt-in; this is not canonical production adoption. */
-  readonly reportedCostContractMode?:'development_0_10_1';
+  /** Explicit Finance-native production or private development decoder mount; neither promotes canonical adoption. */
+  readonly reportedCostContractMode?:'development_0_10_1'|'finance_collector_v1';
 }
 
 const VersionedReferenceSchema = Type.Object({
@@ -1107,7 +1105,7 @@ interface ReservationState {
   readonly acknowledgementEvidence: unknown;
   readonly dispatchEvidence: unknown;
   readonly settlementSourceRef:unknown;
-  readonly latestReportedUsage:UsageEvent_2_0_0|null;
+  readonly latestReportedUsage:BudgetReportedUsage|null;
 }
 
 async function loadReservation(client: BudgetTransactionPort, scope: TrustedScope, reservationId: string): Promise<ReservationState | null> {
@@ -1159,7 +1157,7 @@ async function loadReservation(client: BudgetTransactionPort, scope: TrustedScop
     firstType: fromRow(row, 'first_type') ?? '',
     originalBinding: row.original_binding ?? null,
     settlementSourceRef:sourcePosting.rows[0]?.source_reference??null,
-    latestReportedUsage:reported.rows[0]?.usage_event as UsageEvent_2_0_0??null,
+    latestReportedUsage:reported.rows[0]?.usage_event as BudgetReportedUsage??null,
     authorizationRequest: row.authorization_request as ReservationRequest ?? null, financialExpiresAt: fromRow(row, 'financial_expires_at'), acknowledged: !!acknowledgement, acknowledgementEvidence: acknowledgement?.command_request ?? null, dispatchEvidence: row.dispatch_evidence ?? null,
   };
 }
@@ -1353,7 +1351,7 @@ async function applyCommand(args: {
             args.idempotencyKey,computed.eventType,formatScaledDecimal(computed.consumed),formatScaledDecimal(computed.released),computed.usageFinality,
             args.actorReference,JSON.stringify(args.sourceAuthorityRef),JSON.stringify(args.attemptBinding),JSON.stringify(normalizedBudgetRequest(args.command!)),JSON.stringify(await persistedBudgetProofs(proofs)),contentHash]);
       }else if(args.kind==='acknowledge_partial'){
-        await client.query(`INSERT INTO cost_intelligence.budget_reservation_acknowledgements (acknowledgement_id,tenant_id,project_id,environment,billing_mode,currency,reservation_id,event_sequence,expected_revision,idempotency_key,actor_reference,source_authority_ref,attempt_binding,command_request,content_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15::jsonb)`,[eventId,scope.tenantId,scope.projectId,scope.environment,scope.billingMode,effectiveCurrency,args.reservationId,nextSequence,args.expectedRevision,args.idempotencyKey,args.actorReference,JSON.stringify(args.sourceAuthorityRef),JSON.stringify(args.attemptBinding),JSON.stringify(normalizedBudgetRequest(args.command!)),contentHash]);
+        await client.query(`INSERT INTO cost_intelligence.budget_reservation_acknowledgements (acknowledgement_id,tenant_id,project_id,environment,billing_mode,currency,reservation_id,event_sequence,expected_revision,idempotency_key,actor_reference,source_authority_ref,attempt_binding,command_request,content_hash) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,$13::jsonb,$14::jsonb,$15)`,[eventId,scope.tenantId,scope.projectId,scope.environment,scope.billingMode,effectiveCurrency,args.reservationId,nextSequence,args.expectedRevision,args.idempotencyKey,args.actorReference,JSON.stringify(args.sourceAuthorityRef),JSON.stringify(args.attemptBinding),JSON.stringify(normalizedBudgetRequest(args.command!)),contentHash]);
       } else {
       await client.query(
         `INSERT INTO cost_intelligence.budget_reservation_events
@@ -1476,7 +1474,7 @@ async function verifiedSettlement(value:unknown,ports:BudgetRuntimePorts,correct
     return failure(makeError('settle', 'VALIDATION_ERROR', request.requestId, 'The canonical settlement amount and currency contradict the settlement.'));
   }
   if(currency!=='USD')return failure(makeError('settle','VALIDATION_ERROR',request.requestId,'Provider reported settlement is scoped to USD.'));
-  let accepted:AuthenticatedReportedCost|null=null;
+  let accepted:ResolvedBudgetReportedCost|null=null;
   let finalSource:AuthenticatedBudgetSource|null=null;
   let finality:'partial'|'final'='partial';
   const sourceQuery=(state:ReservationState)=>({scope:request.scope as TrustedScope,reference:request.sourceAuthorityRef,
@@ -1485,10 +1483,10 @@ async function verifiedSettlement(value:unknown,ports:BudgetRuntimePorts,correct
       operation:state.authorizationRequest.authorityBinding.operation,targetBindingSha256:state.authorizationRequest.authorityBinding.targetBindingSha256,
       authorityBinding:state.authorizationRequest.authorityBinding}:{}),attempt:request.attemptBinding});
   async function verify(state:ReservationState):Promise<ApiResult<readonly TimedBudgetProof[]>>{
-    if(ports.reportedCostContractMode!=='development_0_10_1'||request.scope.environment==='production')
+    if(!ports.reportedCostContractMode||(ports.reportedCostContractMode==='development_0_10_1'&&request.scope.environment==='production'))
       return failure(makeError('settle','SOURCE_UNAVAILABLE',request.requestId,'The reported-cost contract requires an explicit private development mount.'));
     if(!ports.sourceCollector)return failure(makeError('settle','SOURCE_UNAVAILABLE',request.requestId,'The authenticated collector source is not configured.'));
-    accepted=await resolveReportedCost(ports.sourceCollector,ports.clock,sourceQuery(state),state.latestReportedUsage??undefined);
+    accepted=await resolveBudgetReportedCost(ports.sourceCollector,ports.clock,sourceQuery(state),ports.reportedCostContractMode,state.latestReportedUsage??undefined);
     if(!accepted||parseScaledDecimal(accepted.evidence.reported_cost.state==='known'?accepted.evidence.reported_cost.money.amount:'-1')!==cumulative
       ||accepted.amountSemantics!=='cumulative_attempt_total')return failure(makeError('settle','VALIDATION_ERROR',request.requestId,'The settlement must match current authenticated cumulative attempt cost.'));
     const proofs:TimedBudgetProof[]=[accepted.source];
@@ -1564,7 +1562,7 @@ async function persistBudgetSource(client:BudgetTransactionPort,source:Authentic
   return id;
 }
 async function postAuthenticatedSettlement(client:BudgetTransactionPort,ports:BudgetRuntimePorts,request:SettleReservationCommand|VerifiedSettlementRequest|VerifiedExpenseCorrectionRequest,
-  state:ReservationState,revision:number,accepted:AuthenticatedReportedCost,authority:'budgets.settle'|'budgets.recordExpenseAdjustment',retainProof:(proof:TimedBudgetProof)=>void):Promise<ApiResult<unknown>>{
+  state:ReservationState,revision:number,accepted:ResolvedBudgetReportedCost,authority:'budgets.settle'|'budgets.recordExpenseAdjustment',retainProof:(proof:TimedBudgetProof)=>void):Promise<ApiResult<unknown>>{
   const scope=request.scope as TrustedScope,usage=accepted.usage;
   const observationId=await persistBudgetSource(client,accepted.source);
   const previousObservation=await client.query(`SELECT reservation_id,usage_event,provider_evidence,ledger_event_id
@@ -1573,7 +1571,7 @@ async function postAuthenticatedSettlement(client:BudgetTransactionPort,ports:Bu
     [scope.tenantId,scope.projectId,scope.environment,scope.billingMode,usage.source_observation_id]);
   const duplicate=previousObservation.rows[0];
   if(duplicate){
-    const relationship=compareReportedUnsettledUsageIdentity(duplicate.usage_event,usage);
+    const relationship=compareBudgetReportedUsage(duplicate.usage_event as BudgetReportedUsage,usage);
     if(duplicate.reservation_id!==request.reservationId||!relationship.ok||relationship.value!=='duplicate_observation'
       ||!sameJson(duplicate.provider_evidence,accepted.evidence))
       return failure(makeError('settle','IDEMPOTENCY_CONFLICT',request.requestId,'The durable reported observation has different economic facts or ownership.'));
@@ -1585,7 +1583,7 @@ async function postAuthenticatedSettlement(client:BudgetTransactionPort,ports:Bu
     [scope.tenantId,scope.projectId,scope.environment,scope.billingMode,accepted.evidence.evidence_id,accepted.evidence.revision]);
   if(evidenceRevision.rows.length)return failure(makeError('settle','IDEMPOTENCY_CONFLICT',request.requestId,'The provider evidence revision already belongs to another immutable observation.'));
   if(state.latestReportedUsage){
-    const relationship=compareReportedUnsettledUsageIdentity(state.latestReportedUsage,usage);
+    const relationship=compareBudgetReportedUsage(state.latestReportedUsage,usage);
     if(!relationship.ok||relationship.value!=='superseding_observation')return failure(makeError('settle','IDEMPOTENCY_CONFLICT',request.requestId,
       'A changed cumulative total must supersede the current durable observation of this exact attempt.'));
   }else if(usage.supersedes_observation_id!==null){
@@ -1644,7 +1642,7 @@ async function postAuthenticatedSettlement(client:BudgetTransactionPort,ports:Bu
   return appended;
 }
 async function linkSettlementPosting(client:BudgetTransactionPort,request:SettleReservationCommand|VerifiedSettlementRequest|VerifiedExpenseCorrectionRequest,
-  revision:number,observationId:string,postedId:string,accepted:AuthenticatedReportedCost):Promise<void>{
+  revision:number,observationId:string,postedId:string,accepted:ResolvedBudgetReportedCost):Promise<void>{
   const scope=request.scope;
   // Explicit economic coverage is derived from authenticated cumulative attempt
   // identity and observation time, never from coincident amounts or API-key totals.
@@ -1848,10 +1846,10 @@ export async function reconcileReservationEvidence(value:unknown,ports:BudgetRun
       const state=await loadReservation(client,scope,request.reservationId);
       if(!state?.authorizationRequest?.authorityBinding||state.currency!=='USD'||!sameJson(state.originalBinding,request.attemptBinding))
         return failure(makeError('reconcileEvidence','FORBIDDEN_SCOPE',request.requestId,'The source does not correspond to this durable financial attempt.'));
-      if(!ports.sourceCollector||ports.reportedCostContractMode!=='development_0_10_1')return unavailable();
+      if(!ports.sourceCollector||!ports.reportedCostContractMode)return unavailable();
       const binding=state.authorizationRequest.authorityBinding;
-      const source=await gate.wait(resolveReportedCost(ports.sourceCollector,ports.clock,{scope,reference:request.sourceAuthorityRef,kind:'reported_cost',attempt:request.attemptBinding,
-        authorityBinding:binding,provider:binding.provider,model:binding.model,operation:binding.operation,targetBindingSha256:binding.targetBindingSha256},state.latestReportedUsage??undefined));gate.checkpoint();
+      const source=await gate.wait(resolveBudgetReportedCost(ports.sourceCollector,ports.clock,{scope,reference:request.sourceAuthorityRef,kind:'reported_cost',attempt:request.attemptBinding,
+        authorityBinding:binding,provider:binding.provider,model:binding.model,operation:binding.operation,targetBindingSha256:binding.targetBindingSha256},ports.reportedCostContractMode,state.latestReportedUsage??undefined));gate.checkpoint();
       if(!source||source.amountSemantics!=='cumulative_attempt_total'||source.evidence.reported_cost.state!=='known')return unavailable();
       proofs.push(source.source);
       const correction=parseScaledDecimal(source.evidence.reported_cost.money.amount)<state.consumed;
@@ -2201,6 +2199,7 @@ export async function readVerifiedReservationSnapshot(value:unknown,ports:Budget
       const proofs:TimedBudgetProof[]=[initial.value];
       client=await ports.database.connect();gate.checkpoint();await client.query('BEGIN');transaction=true;
       await bindFinancialDatabaseScope(client,request.scope);await bindDeadline(client,gate);
+      if(!(await acquirePartitionLock(client,request.scope,'USD',gate)))return unavailable();
       const state=await loadReservation(client,request.scope,request.reservationId);
       if(!state||state.currency!=='USD'||!state.authorizationRequest)return failure(makeError('getReservationSnapshot','FORBIDDEN_SCOPE',request.requestId,'The USD reservation is unavailable in this current scope.'));
       const fresh=await refreshScopeProof(request.scope,request.requestId,ports,'getReservationSnapshot','budgets.readReservation',gate,proofs);if(!fresh.ok)return fresh;
@@ -2225,7 +2224,7 @@ export async function readReservationSnapshot(value: unknown, ports: BudgetRunti
     try {
       const denied=await authorizeScope(request.scope,request.requestId,ports,'getReservationSnapshot','budgets.readReservation');gate.checkpoint();if(denied)return failure(denied);
       const now=trustedNow(ports);if(!now)return unavailable();
-      client=await ports.database.connect();gate.checkpoint();await client.query('BEGIN');transaction=true;await bindFinancialDatabaseScope(client,request.scope);await bindDeadline(client,gate);
+      client=await ports.database.connect();gate.checkpoint();await client.query('BEGIN');transaction=true;await bindFinancialDatabaseScope(client,request.scope);await bindDeadline(client,gate);if(!(await acquirePartitionLock(client,request.scope,'budget-read',gate)))return unavailable();
       const state=await loadReservation(client,request.scope,request.reservationId);if(!state){await rollback(client);transaction=false;return failure(makeError('getReservationSnapshot','FORBIDDEN_SCOPE',request.requestId,'The reservation is unavailable in this authorized scope.'));}
       const snapshot=await snapshotFrom(client,request,state,now);gate.beginCommit();await client.query('COMMIT');transaction=false;
       if(!snapshot)return unavailable();

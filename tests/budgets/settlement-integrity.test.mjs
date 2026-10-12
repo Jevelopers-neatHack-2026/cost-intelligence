@@ -1,25 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {Value} from '@sinclair/typebox/value';
 import * as api from '../../dist/budgets/index.js';
 import {appendLedgerEvent} from '../../dist/ledger/store.js';
 import {loadReserveFixture,setBudgetLimit,reservationPool,makeScope,makePorts,reservationRequest,markDispatchedCommand,settleCommand,releaseCommand,FIXED_TIME} from './reservation-harness.mjs';
 import {signedSourceHarness} from './signed-source-harness.mjs';
 
-async function fixture(label){
- const pool=reservationPool(),scope=makeScope(label);await setBudgetLimit(pool,scope,'10');
- const request=reservationRequest(scope,await loadReserveFixture(),{amount:'1.00'});
+async function fixture(label,options={}){
+ const pool=reservationPool(),scope=makeScope(label);if(options.production)scope.environment='production';await setBudgetLimit(pool,scope,options.limit??'10');
+ const request=reservationRequest(scope,await loadReserveFixture(),{amount:options.amount??'1.00',...(options.partial?{allowPartialAuthorization:true,workPlan:{requestedUnits:2,unit:'image',unitMaximumAmount:'1'}}:{})});
  request.attemptBinding.providerAttemptId=randomUUID();request.attemptBinding.transportAttemptId=randomUUID();
  let currentTime=Date.parse(FIXED_TIME);const clock={now:()=>new Date(currentTime)};
  const low=makePorts(pool,scope,{clock});
  const source=await signedSourceHarness(scope,request.authorityBinding,request.attemptBinding,low.clock);
  const digest=await api.pricingEconomicRequestDigest(request);
- request.pricingProfileRef=await source.publish('pricing_profile',{schemaVersion:'ci-budget-pricing-1.0.0',pricingUnit:'fixed_per_attempt',currency:'USD',economicRequestDigest:digest,fixedAttemptAmount:'1.00',maximumPolicyRef:null},JSON.stringify({financial_pricing_policy:{schemaVersion:'ci-budget-pricing-1.0.0',pricingUnit:'fixed_per_attempt',currency:'USD',economicRequestDigest:digest,fixedAttemptAmount:'1.00',maximumPolicyRef:null}}));
- const ports={...low,budgets:{database:low.database,budgetEvidence:low.budgetEvidence,reservationAuthority:low.reservationAuthority,sourceCollector:source.backend,reportedCostContractMode:'development_0_10_1'}};
- const reserved=await api.authorize(request,ports);assert.equal(reserved.ok,true);assert.equal(reserved.value.status,'authorized');
+ request.pricingProfileRef=await source.publish('pricing_profile',{schemaVersion:'ci-budget-pricing-1.0.0',pricingUnit:'fixed_per_attempt',currency:'USD',economicRequestDigest:digest,fixedAttemptAmount:options.amount??'1.00',maximumPolicyRef:null},JSON.stringify({financial_pricing_policy:{schemaVersion:'ci-budget-pricing-1.0.0',pricingUnit:'fixed_per_attempt',currency:'USD',economicRequestDigest:digest,fixedAttemptAmount:options.amount??'1.00',maximumPolicyRef:null}}));
+ const ports={...low,budgets:{database:low.database,budgetEvidence:low.budgetEvidence,reservationAuthority:low.reservationAuthority,sourceCollector:source.backend,reportedCostContractMode:options.native?'finance_collector_v1':'development_0_10_1'}};
+ const reserved=await api.authorize(request,ports);assert.equal(reserved.ok,true);assert.equal(reserved.value.status,options.partial?'partial':'authorized');
  const dispatch=markDispatchedCommand(scope,reserved.value.reservationId,1,{attemptBinding:request.attemptBinding});
- const dispatched=await api.markDispatched(dispatch,ports);assert.equal(dispatched.ok,true);
- return {pool,scope,request,ports,source,reservationId:reserved.value.reservationId,dispatch,advance:ms=>{currentTime+=ms;}};
+ if(!options.skipDispatch){const dispatched=await api.markDispatched(dispatch,ports);assert.equal(dispatched.ok,true);}
+ return {pool,scope,request,ports,source,reservationId:reserved.value.reservationId,dispatch,grant:reserved.value,advance:ms=>{currentTime+=ms;}};
 }
 function native(request){const {canonicalCommand,...value}=request;return {...value,schemaVersion:'2.0.0'};}
 async function settlement(f,revision,amount,finality='partial'){
@@ -128,8 +129,8 @@ test('CI05B expense capacity excludes cash/cash corrections and bounded reversal
   const expense=await post(expenseFixture(f.scope,{amount:'1'})),cash=expenseFixture(f.scope,{amount:'-5'});cash.eventType='cash_movement';await post(cash);
   const afterCash=await api.readCapacity(f.scope,'USD','cash-does-not-offset',f.ports.budgets?{...f.ports,...f.ports.budgets}:f.ports);
   assert.equal(afterCash.ok,true,JSON.stringify(afterCash));assert.equal(afterCash.value.effectiveConsumedSpend,'1');assert.equal(afterCash.value.outstandingHolds,'1');assert.equal(afterCash.value.usedCapacity,'2');
-  const correction=(original,amount)=>{const next=structuredClone(original),id=randomUUID();Object.assign(next,{eventId:id,requestId:id,idempotencyKey:id,eventType:'correction',supersedesEventId:original.eventId});next.money={amount,currency:'USD',scale:amount.split('.')[1]?.length??0};next.sourceIdentity={...original.sourceIdentity,sourceEventId:id,revisionSequence:original.sourceIdentity.revisionSequence+1,sourceRevision:'fixture-2',contentHash:`sha256:${'e'.repeat(64)}`};return next;};
-  await post(correction(cash,'-7'));await post(correction(expense,'0.8'));
+  const correction=async(original,amount)=>{const next=structuredClone(original),id=randomUUID();Object.assign(next,{eventId:id,requestId:id,idempotencyKey:id,eventType:'correction',supersedesEventId:original.eventId});next.money={amount,currency:'USD',scale:amount.split('.')[1]?.length??0};next.sourceIdentity={...original.sourceIdentity,sourceEventId:id,revisionSequence:original.sourceIdentity.revisionSequence+1,sourceRevision:'fixture-2',contentHash:`sha256:${'e'.repeat(64)}`};const prior=await f.pool.query('SELECT event_hash FROM cost_intelligence.financial_ledger_events WHERE event_id=$1',[original.eventId]);next.sourceRefs=[{contract:'financial-ledger-event',schema_version:'1.0.0',id:original.eventId,revision:1,content_hash:prior.rows[0].event_hash}];return next;};
+  await post(await correction(cash,'-7'));await post(await correction(expense,'0.8'));
   const corrected=await api.readCapacity(f.scope,'USD','correct-expense-axis',{...f.ports,...f.ports.budgets});assert.equal(corrected.value.effectiveConsumedSpend,'0.8');assert.equal(corrected.value.usedCapacity,'1.8');
  }finally{await f.pool.end();}
 });
@@ -144,15 +145,15 @@ test('CI05B privacy-quarantined scoped financial history refuses admission repla
   assert.equal((await api.readCapacity(f.scope,'USD','quarantined-capacity',{...f.ports,...f.ports.budgets})).ok,false);
   assert.equal((await api.authorize(f.request,f.ports)).ok,false);
   const finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_no_bill',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:null,fenceReference:null});
-  const release=native(releaseCommand(f.scope,f.reservationId,2,{amount:'1',proof:'final_usage_known',attemptBinding:f.request.attemptBinding}));release.release.finalityEvidenceRef=finality;
-  assert.equal((await api.release(release,f.ports)).ok,false);
+  const release=native(releaseCommand(f.scope,f.reservationId,2,{amount:'1',proof:'final_usage_known',attemptBinding:f.request.attemptBinding}));release.sourceAuthorityRef=finality;release.release.evidenceRefs=[finality];assert.equal(Value.Check(api.VerifiedReleaseRequestSchema,release),true);
+  const refusedRelease=await api.release(release,f.ports);assert.equal(refusedRelease.ok,false);assert.equal(refusedRelease.error.code,'BUDGET_UNAVAILABLE');
   const held=await f.pool.query('SELECT sum(held_amount)::text AS held,sum(released_amount)::text AS released,count(*)::int AS events FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$1',[f.reservationId]);assert.equal(held.rows[0].held,'1');assert.equal(held.rows[0].released,'0');assert.equal(held.rows[0].events,2);
  }finally{await f.pool.end();}
 });
 test('CI05B authenticated no-bill release is terminal against stale unverified timeout, with late authenticated expense still recognized',async()=>{
  const f=await fixture('no-bill-terminal');try{
   const finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_no_bill',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:null,fenceReference:null});
-  const release=native(releaseCommand(f.scope,f.reservationId,2,{amount:'1',proof:'final_usage_known',attemptBinding:f.request.attemptBinding}));release.release.finalityEvidenceRef=finality;
+  const release=native(releaseCommand(f.scope,f.reservationId,2,{amount:'1',proof:'final_usage_known',attemptBinding:f.request.attemptBinding}));release.sourceAuthorityRef=finality;release.release.evidenceRefs=[finality];assert.equal(Value.Check(api.VerifiedReleaseRequestSchema,release),true);
   const released=await api.release(release,f.ports);assert.equal(released.ok,true,JSON.stringify(released));assert.equal(released.value.usageFinality,'final');assert.equal(released.value.releasedAmount,'1');assert.equal(released.value.outstandingHold,'0');
   const unknown={schemaVersion:'1.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope:f.scope,reservationId:f.reservationId,expectedRevision:3,actorReference:f.scope.actorId,sourceAuthorityRef:f.dispatch.sourceAuthorityRef,attemptBinding:f.request.attemptBinding,outcome:'timeout',httpStatus:524,dispatchIntentRef:f.dispatch.dispatchIntentRef};
   assert.equal((await api.retainUnknownOutcome(unknown,f.ports)).ok,false);
@@ -168,5 +169,31 @@ test('CI05B signed private provider extras are absent from every runtime-readabl
   for(const table of ['budget_source_observations','budget_command_receipts','budget_reported_observations','budget_reconciliation_exceptions']){
     const rows=await f.pool.query(`SELECT to_jsonb(t)::text AS body FROM cost_intelligence.${table} t WHERE tenant_id=$1 AND project_id=$2`,[f.scope.tenantId,f.scope.projectId]);assert.equal(rows.rows.some(row=>row.body.includes(canary)),false);
   }
+ }finally{await f.pool.end();}
+});
+
+test('CI05B public Finance-native production-mode lifecycle posts exact reported USD18 without development decoder or canonical label',async()=>{
+ const f=await fixture('native-production-lifecycle',{native:true,production:true});try{
+  const amount='0.800000000000000001',cost=await f.source.nativeCost(amount);
+  const finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_billed',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:cost,fenceReference:null});
+  const command=native(settleCommand(f.scope,f.reservationId,2,{cumulativeAmount:amount,finality:'final',attemptBinding:f.request.attemptBinding}));command.sourceAuthorityRef=cost;command.settlement.sourceObservationRefs=[cost];command.settlement.finalityEvidenceRef=finality;command.settlement.usageCompleteness='unknown';
+  assert.equal(Value.Check(api.VerifiedSettlementRequestSchema,command),true);
+  const settled=await api.settle(command,f.ports);assert.equal(settled.ok,true,JSON.stringify(settled));assert.equal(settled.value.consumedAmount,amount);assert.equal(settled.value.releasedAmount,'0.199999999999999999');assert.equal(settled.value.usageFinality,'final');
+  const read=await api.getReservationSnapshot({schemaVersion:'2.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId},f.ports);assert.equal(read.ok,true,JSON.stringify(read));assert.equal(read.value.consumedAmount,amount);assert.equal(read.value.dispatchEligible,false);
+  const replay=await api.settle(command,f.ports);assert.equal(replay.ok,true);assert.equal(replay.value.status,'replay');
+  const ledger=await f.pool.query(`SELECT e.amount::text AS amount,e.valuation,count(*) OVER()::int AS count FROM cost_intelligence.financial_ledger_events e WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.financial_effect`,[f.scope.tenantId,f.scope.projectId]);assert.equal(ledger.rows[0].count,1);assert.equal(ledger.rows[0].amount,amount);assert.equal(ledger.rows[0].valuation,'provider_reported_unsettled');
+ }finally{await f.pool.end();}
+});
+test('CI05B public partial acknowledgement persists SHA text, replays one receipt, and permits exactly one held-to-dispatched transition',async()=>{
+ const f=await fixture('partial-ack-persistence',{limit:'1',amount:'2',partial:true,skipDispatch:true});try{
+  const ack={schemaVersion:'1.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope:f.scope,reservationId:f.reservationId,expectedRevision:1,
+    actorReference:f.scope.actorId,sourceAuthorityRef:f.request.sourceAuthorityRef,attemptBinding:f.request.attemptBinding,
+    allowedAmount:'1',allowedWorkUnits:1,unit:'image',revisedPlan:{requestedUnits:1,unit:'image',unitMaximumAmount:'1'},revisedPlanHash:await api.budgetDigest({requestedUnits:1,unit:'image',unitMaximumAmount:'1'})};
+  assert.equal(Value.Check(api.PartialAcknowledgementRequestSchema,ack),true);
+  const accepted=await api.acknowledgePartial(ack,f.ports);assert.equal(accepted.ok,true,JSON.stringify(accepted));assert.equal(accepted.value.state,'held');assert.equal(accepted.value.revision,2);
+  const replay=await api.acknowledgePartial(ack,f.ports);assert.equal(replay.ok,true);assert.equal(replay.value.status,'replay');
+  const command=markDispatchedCommand(f.scope,f.reservationId,2,{attemptBinding:f.request.attemptBinding});const dispatched=await api.markDispatched(command,f.ports);assert.equal(dispatched.ok,true,JSON.stringify(dispatched));assert.equal(dispatched.value.state,'dispatched');assert.equal(dispatched.value.revision,3);
+  const rows=await f.pool.query(`SELECT count(*)::int AS n,min(content_hash)::text AS digest FROM cost_intelligence.budget_reservation_acknowledgements WHERE reservation_id=$1`,[f.reservationId]);assert.equal(rows.rows[0].n,1);assert.match(rows.rows[0].digest,/^sha256:[a-f0-9]{64}$/);
+  const capacity=await api.readCapacity(f.scope,'USD','partial-conservation',{...f.ports,...f.ports.budgets});assert.equal(capacity.value.outstandingHolds,'1');assert.equal(capacity.value.usedCapacity,'1');
  }finally{await f.pool.end();}
 });

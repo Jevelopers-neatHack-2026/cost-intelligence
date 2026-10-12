@@ -157,3 +157,93 @@ export function finalityAllowsRelease(value:BudgetExecutionFinality):boolean {
     value.state==='final_no_bill'?value.dispatchIntentRef!==null:
     value.state==='fenced_not_dispatched'?value.fenceReference!==null:false;
 }
+
+/** Finance-owned production payload; it is not a canonical UsageEvent or a provider signature. */
+export const FinanceReportedCostPayloadSchema=Type.Object({
+  version:Type.Literal('ci-budget-reported-cost-1.0.0'),observationId:Ref,economicUsageId:Ref,
+  supersedesObservationId:Type.Union([Ref,Type.Null()]),evidenceId:Ref,evidenceRevision:Type.Integer({minimum:1}),
+  predecessorEvidenceHash:Type.Union([Type.String({pattern:'^sha256:[a-f0-9]{64}$'}),Type.Null()]),
+  correlationId:Ref,occurredAt:Type.String({format:'date-time'}),observedAt:Type.String({format:'date-time'}),
+  producer:Type.Object({module:Ref,sourceRevision:Ref,buildRevision:Ref},{additionalProperties:false}),
+  amountSemantics:Type.Literal('cumulative_attempt_total'),
+  money:Type.Object({amount:Amount,currency:Type.Literal('USD'),scale:Type.Integer({minimum:0,maximum:18})},{additionalProperties:false}),
+  usage:Type.Object({completeness:Type.Union([Type.Literal('unknown'),Type.Literal('incomplete'),Type.Literal('complete')]),
+    missingFields:Type.Array(Ref),units:Type.Array(Type.Object({name:Ref,quantity:Type.Union([Amount,Type.Null()]),scale:Type.Integer({minimum:0,maximum:18}),
+      relation:Type.Union([Type.Literal('standalone'),Type.Literal('included_subset'),Type.Literal('unknown_relation')]),includedIn:Type.Optional(Ref)},{additionalProperties:false}))
+  },{additionalProperties:false}),
+},{additionalProperties:false});
+export type FinanceReportedCostPayload=Static<typeof FinanceReportedCostPayloadSchema>;
+/** Internal financial mapping, never emitted or identified as a canonical contract. */
+export interface FinanceReportedUsage {
+  finance_mapping_version:'ci-budget-normalized-reported-1.0.0';
+  tenant_id:string;project_id:string;environment:string;billing_mode:string;
+  usage_event_id:string;source_observation_id:string;supersedes_observation_id:string|null;
+  logical_operation_id:string;provider_attempt_id:string;billable_attempt_id:string;transport_attempt_id:string;provider_request_id:string|null;
+  provider:string;model:string;correlation_id:string;occurred_at:string;observed_at:string;
+  producer:{module:string;source_revision:string;build_revision:string};
+  completeness:'unknown'|'incomplete'|'complete';missing_fields:readonly string[];
+  usage_units:readonly {name:string;quantity:string|null;scale:number;relation:'standalone'|'included_subset'|'unknown_relation';included_in?:string}[];
+  valuation:{basis:'provider_reported_unsettled';rate_card_ref:null;provider_evidence_ref:import('./authority.js').BudgetReference};
+}
+export type BudgetReportedUsage=UsageEvent_2_0_0|FinanceReportedUsage;
+export interface FinanceReportedEvidence {
+  finance_evidence_version:'ci-budget-reported-cost-1.0.0';evidence_id:string;revision:number;content_hash:string;
+  predecessor_evidence_hash:string|null;source_bytes_hash:string;source_observation_id:string;
+  reported_cost:{state:'known';money:FinanceReportedCostPayload['money']};
+}
+export interface ResolvedBudgetReportedCost {
+  readonly source:AuthenticatedBudgetSource;readonly usage:BudgetReportedUsage;
+  readonly evidence:ProviderReportedCostEvidence_1_0_0|FinanceReportedEvidence;
+  readonly amountSemantics:'cumulative_attempt_total'|'distinct_charge';
+}
+function nativeUsage(value:BudgetReportedUsage):value is FinanceReportedUsage{return 'finance_mapping_version' in value;}
+export function compareBudgetReportedUsage(prior:BudgetReportedUsage,next:BudgetReportedUsage):{ok:true;value:string}|{ok:false}{
+  if(!nativeUsage(prior)&&!nativeUsage(next))return compareReportedUnsettledUsageIdentity(prior,next);
+  if(!nativeUsage(prior)||!nativeUsage(next))return {ok:false};
+  const fields=['tenant_id','project_id','environment','billing_mode','usage_event_id','logical_operation_id','provider_attempt_id','billable_attempt_id','provider_request_id','provider','model'] as const;
+  if(fields.some(key=>prior[key]!==next[key]))return {ok:false};
+  if(prior.source_observation_id===next.source_observation_id)
+    return canonicalBudgetJson(prior)===canonicalBudgetJson(next)?{ok:true,value:'duplicate_observation'}:{ok:false};
+  return next.supersedes_observation_id===prior.source_observation_id?{ok:true,value:'superseding_observation'}:{ok:false};
+}
+/** Current Finance authentication is separate from the private SDK compatibility decoder. */
+export async function resolveBudgetReportedCost(backend:BudgetCollectorBackend,clock:Clock,query:BudgetSourceQuery,
+  mode:'development_0_10_1'|'finance_collector_v1',prior?:BudgetReportedUsage):Promise<ResolvedBudgetReportedCost|null>{
+  if(mode==='development_0_10_1'){
+    if(prior&&nativeUsage(prior))return null;
+    return resolveReportedCost(backend,clock,query,prior as UsageEvent_2_0_0|undefined);
+  }
+  try{
+    if(mode!=='finance_collector_v1'||query.kind!=='reported_cost'||!query.attempt||!query.authorityBinding)return null;
+    const source=await createAuthenticatedBudgetSourceResolver(backend,clock).resolveCurrent(query);
+    if(!source||!Value.Check(FinanceReportedCostPayloadSchema,source.record.payload))return null;
+    const payload=source.record.payload,attempt=query.attempt,scope=query.scope;
+    if(sourceCost(source)!==exactSourceDecimal(payload.money.amount)||payload.money.scale<(payload.money.amount.split('.')[1]?.length??0)
+      ||Date.parse(payload.observedAt)>Date.parse(source.verifiedAt)||Date.parse(payload.occurredAt)>Date.parse(payload.observedAt)
+      ||payload.usage.units.some(unit=>unit.quantity!==null&&unit.scale<(unit.quantity.split('.')[1]?.length??0))
+      ||(payload.usage.completeness==='complete'&&(payload.usage.missingFields.length!==0||payload.usage.units.some(unit=>unit.quantity===null))))return null;
+    const hash=await budgetDigest(payload),reference={contract:'FinanceReportedCostEvidence',schema_version:'1.0.0' as const,
+      id:payload.evidenceId,revision:payload.evidenceRevision,content_hash:hash};
+    const usage:FinanceReportedUsage={finance_mapping_version:'ci-budget-normalized-reported-1.0.0',
+      tenant_id:scope.tenantId,project_id:scope.projectId,environment:scope.environment,billing_mode:scope.billingMode,
+      usage_event_id:payload.economicUsageId,source_observation_id:payload.observationId,supersedes_observation_id:payload.supersedesObservationId,
+      logical_operation_id:attempt.logicalOperationId,provider_attempt_id:attempt.providerAttemptId,billable_attempt_id:attempt.billableAttemptId,
+      transport_attempt_id:attempt.transportAttemptId,provider_request_id:attempt.providerRequestId,provider:source.record.provider,model:source.record.model,
+      correlation_id:payload.correlationId,occurred_at:payload.occurredAt,observed_at:payload.observedAt,
+      producer:{module:payload.producer.module,source_revision:payload.producer.sourceRevision,build_revision:payload.producer.buildRevision},
+      completeness:payload.usage.completeness,missing_fields:payload.usage.missingFields,
+      usage_units:payload.usage.units.map(({includedIn,...unit})=>({...unit,...(includedIn!==undefined?{included_in:includedIn}:{})})),
+      valuation:{basis:'provider_reported_unsettled',rate_card_ref:null,provider_evidence_ref:reference}};
+    if(prior){
+      if(!nativeUsage(prior))return null;
+      const relationship=compareBudgetReportedUsage(prior,usage);
+      if(!relationship.ok)return null;
+      if(relationship.value==='superseding_observation'&&payload.predecessorEvidenceHash!==prior.valuation.provider_evidence_ref?.content_hash)return null;
+    }else if(payload.supersedesObservationId!==null||payload.predecessorEvidenceHash!==null||payload.evidenceRevision!==1)return null;
+    const evidence:FinanceReportedEvidence={finance_evidence_version:payload.version,evidence_id:payload.evidenceId,revision:payload.evidenceRevision,
+      content_hash:hash,predecessor_evidence_hash:payload.predecessorEvidenceHash,source_bytes_hash:source.record.sourceBytesSha256,
+      source_observation_id:payload.observationId,reported_cost:{state:'known',money:payload.money}};
+    return {source:{...source,financialFacts:{usageEventHash:await budgetDigest(usage),providerEvidenceHash:hash,sourceObservationId:payload.observationId,
+      amountSemantics:payload.amountSemantics,reportedCost:evidence.reported_cost}},usage,evidence,amountSemantics:payload.amountSemantics};
+  }catch{return null;}
+}

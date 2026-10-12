@@ -66,6 +66,8 @@ export interface BudgetSourceQuery {
   readonly authorityBinding?:ReservationAuthorityBinding|null;
 }
 export interface AuthenticatedBudgetSource {
+  /** Only the Finance decoder sets this validated financial projection; backend envelopes cannot provide it. */
+  readonly financialFacts?:Record<string,unknown>;
   readonly reference: BudgetReference;
   readonly record: BudgetCollectorRecord;
   readonly sourceBytes: string;
@@ -163,7 +165,8 @@ export async function budgetSourcePersistence(source:AuthenticatedBudgetSource):
 }> {
   const record=source.record;
   let facts:Record<string,unknown>;
-  if(record.kind==='reported_cost'){
+  if(record.kind==='reported_cost'&&source.financialFacts){facts=structuredClone(source.financialFacts);}
+  else if(record.kind==='reported_cost'){
     const payload=record.payload as {usageEvent?:Record<string,unknown>;providerEvidence?:Record<string,unknown>;amountSemantics?:unknown};
     const evidence=payload.providerEvidence;
     if(!payload.usageEvent||!evidence)throw new Error('Unsupported financial provenance.');
