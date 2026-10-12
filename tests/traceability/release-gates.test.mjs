@@ -53,8 +53,10 @@ test('foundation suites name nonempty real evidence and integration/release fail
 
   const authorization = suitePlan('budgets', existing, 'authorization');
   assert.deepEqual(authorization.requiredFiles, ['tests/budgets/authorization.test.mjs']);
-  assert.deepEqual(authorization.selectedFiles, []);
-  assert.deepEqual(authorization.missingFiles, ['tests/budgets/authorization.test.mjs']);
+  // CI-05A delivers the budget reservation leaves, so the authorization
+  // sub-suite now resolves to a present, selected test file.
+  assert.deepEqual(authorization.selectedFiles, ['tests/budgets/authorization.test.mjs']);
+  assert.deepEqual(authorization.missingFiles, []);
   assert.deepEqual(suitePlan('budgets', existing, 'authorization,contention').requiredFiles, [
     'tests/budgets/authorization.test.mjs', 'tests/budgets/contention.test.mjs',
   ]);

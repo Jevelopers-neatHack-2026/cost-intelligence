@@ -39,6 +39,12 @@ jobs:
         run: npm run test:ledger -- --offline
       - name: Verify financial authorization and tenant isolation
         run: npm run test:security -- --offline
+      - name: Verify atomic budget reservation authorization
+        run: npm run test:budgets -- --offline --suite=authorization
+      - name: Verify budget reservation concurrency under real contention
+        run: npm run test:budgets -- --offline --suite=contention
+      - name: Verify budget reservation lifecycle
+        run: npm run test:budgets -- --offline --suite=lifecycle
       - name: Verify disposable PostgreSQL migration lifecycle
         run: npm run test:migrations -- --offline
       - name: Verify offline API boundary behavior

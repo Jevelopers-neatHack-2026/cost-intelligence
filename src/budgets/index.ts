@@ -241,3 +241,9 @@ export async function changeBudget(request: BudgetChangeRequest, ports: RuntimeP
 export async function recordExpenseAdjustment(request: ExpenseAdjustmentRequest, ports: RuntimePorts): Promise<ApiResult<PostingReceipt>> {
   return blockedBoundary<ExpenseAdjustmentRequest, PostingReceipt>({ module: 'budgets', operation: 'recordExpenseAdjustment', authorityOperation: 'budgets.recordExpenseAdjustment', schema: ExpenseAdjustmentRequestSchema, request, ports, unavailableCode: 'SOURCE_UNAVAILABLE', safeMessage: 'Expense adjustment posting is not available until the accounting leaf is delivered.', retryable: true });
 }
+
+// CI-05A: the real PostgreSQL-backed atomic reservation engine. The RuntimePorts
+// boundaries above remain the published package surface and stay BUDGET_UNAVAILABLE
+// until a host wires this engine; the engine itself is exported for the budget
+// worker composition and its database-backed acceptance suites.
+export * from './reservation-store.js';
