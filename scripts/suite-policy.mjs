@@ -32,7 +32,7 @@ const leafPaths = Object.freeze({
   release: [...foundationTestFiles, ...databaseTestFiles],
   reporting: ['tests/reporting/reporting.test.mjs'],
   security: ['tests/security/security.test.mjs'],
-  smoke: ['tests/smoke/api-boundaries.test.mjs'],
+  smoke: ['tests/smoke/api-boundaries.test.mjs', 'tests/smoke/postgres-cleanup.test.mjs'],
   traceability: ['tests/traceability/release-gates.test.mjs', 'tests/evidence/evidence.test.mjs'],
   unit: foundationTestFiles,
 });
