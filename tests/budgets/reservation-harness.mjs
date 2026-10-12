@@ -95,6 +95,22 @@ export function authorityRef(id = randomUUID()) {
   return ref('cost-intelligence.authority', id);
 }
 
+// Applicable stored policy references, keyed by tenant+currency, so request builders
+// bind the canonical policy_ref to the real stored policy the way a producer must.
+const policyRefs = new Map();
+
+/** Append a budget policy limit and remember its reference for canonical request binding. */
+export async function setBudgetLimit(pool, scope, limitAmount, currency = 'USD') {
+  const { changeBudgetPolicy } = await import('../../dist/index.js');
+  const receipt = await changeBudgetPolicy(policyChange(scope, { limitAmount, currency, expectedPolicyRevision: policyRefs.get(`${scope.tenantId}:${currency}`)?.revision ?? 0 }), makePorts(pool, scope));
+  if (!receipt.ok) throw new Error(`policy change failed: ${receipt.error.code}: ${receipt.error.safe_message}`);
+  if (receipt.value.status !== 'applied') throw new Error(`policy change was not applied: ${receipt.value.status}`);
+  policyRefs.set(`${scope.tenantId}:${currency}`, receipt.value.policyRef);
+  return receipt.value;
+}
+
+export function policyRefFor(scope, currency = 'USD') { return policyRefs.get(`${scope.tenantId}:${currency}`); }
+
 /** Build a BudgetPolicyChangeRequest for changeBudgetPolicy. */
 export function policyChange(scope, { limitAmount, currency = 'USD', expectedPolicyRevision = 0, idempotencyKey = `policy-${randomUUID()}`, requestId = `req-${randomUUID()}` } = {}) {
   return {
@@ -125,7 +141,8 @@ export function reservationRequest(scope, reserveFixture, options = {}) {
     currency, idempotency_key: idem, request_id: randomUUID(), correlation_id: randomUUID(),
     event_id: randomUUID(), budget_scope_id: randomUUID(),
     logical_operation_id: canonicalLogicalOperationId, billable_attempt_id: canonicalBillableAttemptId,
-    requested: { amount, currency, scale: amount.includes('.') ? amount.split('.')[1].length : 0 },
+    requested: { amount: options.requestedAmount ?? amount, currency, scale: (options.requestedAmount ?? amount).includes('.') ? (options.requestedAmount ?? amount).split('.')[1].length : 0 },
+    policy_ref: options.policyRef ?? policyRefs.get(`${scope.tenantId}:${currency}`) ?? reserveFixture.policy_ref,
   };
   const estimate = options.estimate ?? {
     completeness: 'complete', knownSubtotal: amount, currency, rateCardRef: null, missingDimensions: [],
@@ -141,11 +158,11 @@ export function reservationRequest(scope, reserveFixture, options = {}) {
   };
 }
 
-export function lifecycleBase(scope, reservationId, expectedRevision, { idempotencyKey = `cmd-${randomUUID()}`, requestId = `req-${randomUUID()}`, logicalOperationId = `logical-${randomUUID()}`, billableAttemptId = `billable-${randomUUID()}` } = {}) {
+export function lifecycleBase(scope, reservationId, expectedRevision, { idempotencyKey = `cmd-${randomUUID()}`, requestId = `req-${randomUUID()}`, logicalOperationId = `logical-${randomUUID()}`, billableAttemptId = `billable-${randomUUID()}`, attemptBinding } = {}) {
   return {
     schemaVersion: '1.0.0', requestId, idempotencyKey, scope, reservationId, expectedRevision,
     actorReference: 'ci05a-worker', sourceAuthorityRef: authorityRef(),
-    attemptBinding: { logicalOperationId, transportAttemptId: `transport-${logicalOperationId}`, providerRequestId: null, providerAttemptId: `provider-${logicalOperationId}`, billableAttemptId },
+    attemptBinding: attemptBinding ?? { logicalOperationId, transportAttemptId: `transport-${logicalOperationId}`, providerRequestId: null, providerAttemptId: `provider-${logicalOperationId}`, billableAttemptId },
   };
 }
 
@@ -196,4 +213,45 @@ function canonicalCommand(contract, scope, reservationId, expectedRevision, curr
   if ('consumed' in extra) base.consumed = extra.consumed;
   if ('reason' in extra) base.reason = extra.reason;
   return base;
+}
+
+/**
+ * A scripted PostgreSQL client for database-free regression tests. `handler(sql, values)`
+ * returns rows for a statement; every statement is recorded. Nothing here claims PostgreSQL
+ * validation: it exercises the engine's own control flow only.
+ */
+export function scriptedClient(handler = () => []) {
+  const statements = [];
+  const state = { released: 0 };
+  const client = {
+    async query(sql, values) {
+      statements.push(sql.replace(/\s+/g, ' ').trim());
+      const rows = await handler(sql, values);
+      return { rows: rows ?? [], rowCount: (rows ?? []).length };
+    },
+    release() { state.released += 1; },
+  };
+  return {
+    client, statements, state,
+    wrote: () => statements.some(sql => sql.startsWith('INSERT')),
+    committed: () => statements.includes('COMMIT'),
+  };
+}
+
+export const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Scripted ports whose database hands out the given client (optionally late or never). */
+export function scriptedPorts(scope, connect, options = {}) {
+  return makePorts({ connect }, scope, options);
+}
+
+/** The policy row, aggregate row and event rows a typical scripted authorization partition returns. */
+export function partitionRows(policyRef, limit = '1.00', used = '0') {
+  return sql => {
+    if (sql.includes('FROM cost_intelligence.budget_scope_policies')) {
+      return [{ policy_version_id: policyRef.id, policy_revision: policyRef.revision, limit_amount: limit, content_hash: policyRef.content_hash }];
+    }
+    if (sql.includes('WITH per_reservation')) return [{ reservation_count: used === '0' ? 0 : 1, consumed: '0', outstanding_holds: used, used }];
+    return null;
+  };
 }

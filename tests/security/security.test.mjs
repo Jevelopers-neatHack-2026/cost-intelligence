@@ -744,7 +744,7 @@ test('CI-05A PostgreSQL budget reservations recheck grants and isolate tenants',
       return allowedDecision(request, { principalKind: 'service' });
     } },
   });
-  function reservationRequestFor(targetScope) {
+  function reservationRequestFor(targetScope, policyRef) {
     const idem = `ci05a-sec-${randomUUID()}`;
     return {
       schemaVersion: '1.0.0', requestId: randomUUID(), idempotencyKey: idem, scope: targetScope,
@@ -754,6 +754,7 @@ test('CI-05A PostgreSQL budget reservations recheck grants and isolate tenants',
         idempotency_key: idem, request_id: randomUUID(), correlation_id: randomUUID(), event_id: randomUUID(),
         budget_scope_id: randomUUID(), logical_operation_id: randomUUID(), billable_attempt_id: randomUUID(),
         requested: { amount: '0.25', currency: 'USD', scale: 2 },
+        policy_ref: policyRef ?? reserve.policy_ref,
       },
       estimate: { completeness: 'complete', knownSubtotal: '0.25', currency: 'USD', rateCardRef: null, missingDimensions: [] },
       allowPartialAuthorization: false,
@@ -771,9 +772,21 @@ test('CI-05A PostgreSQL budget reservations recheck grants and isolate tenants',
   try {
     const policy = await changeBudgetPolicy(policyFor(tenantA), portsFor(tenantA));
     assert.equal(policy.ok, true, policy.ok ? '' : policy.error.code);
-    const authorized = await authorizeReservation(reservationRequestFor(tenantA), portsFor(tenantA));
+    const policyRef = policy.value.policyRef;
+    const authorizedRequest = reservationRequestFor(tenantA, policyRef);
+    const authorized = await authorizeReservation(authorizedRequest, portsFor(tenantA));
     assert.equal(authorized.ok, true, authorized.ok ? '' : authorized.error.code);
     assert.equal(authorized.value.status, 'authorized');
+
+    // A stale/foreign canonical policy reference and a conflicting replay of a used key are typed failures.
+    const stalePolicy = await authorizeReservation(reservationRequestFor(tenantA), portsFor(tenantA));
+    assert.equal(stalePolicy.ok, false);
+    if (!stalePolicy.ok) assert.equal(stalePolicy.error.code, 'VALIDATION_ERROR');
+    const conflicting = structuredClone(authorizedRequest);
+    conflicting.attemptBinding.billableAttemptId = `billable-${randomUUID()}`;
+    const conflict = await authorizeReservation(conflicting, portsFor(tenantA));
+    assert.equal(conflict.ok, false);
+    if (!conflict.ok) assert.equal(conflict.error.code, 'IDEMPOTENCY_CONFLICT');
 
     // Forced RLS hides budget rows from an unbound runtime transaction.
     const rawRows = await pool.query('SELECT reservation_id FROM cost_intelligence.budget_reservation_events LIMIT 20');
@@ -791,7 +804,7 @@ test('CI-05A PostgreSQL budget reservations recheck grants and isolate tenants',
 
     // Revocation blocks a subsequent identical authorization.
     active = false;
-    const revoked = await authorizeReservation(reservationRequestFor(tenantA), portsFor(tenantA));
+    const revoked = await authorizeReservation(reservationRequestFor(tenantA, policyRef), portsFor(tenantA));
     assert.equal(revoked.ok, false);
     if (!revoked.ok) assert.equal(revoked.error.code, 'FORBIDDEN_SCOPE');
   } finally {

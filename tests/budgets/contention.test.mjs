@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { authorizeReservation, changeBudgetPolicy, readCapacity } from '../../dist/index.js';
 import {
-  loadReserveFixture, reservationPool, makePorts, makeScope, policyChange, reservationRequest,
+  loadReserveFixture, setBudgetLimit, reservationPool, makePorts, makeScope, policyChange, reservationRequest,
 } from './reservation-harness.mjs';
 
 const fixturePromise = loadReserveFixture();
@@ -13,8 +13,7 @@ function toBig(value) {
 }
 
 async function setLimit(pool, scope, limitAmount) {
-  const receipt = await changeBudgetPolicy(policyChange(scope, { limitAmount }), makePorts(pool, scope));
-  assert.equal(receipt.ok, true, receipt.ok ? '' : `${receipt.error.code}: ${receipt.error.safe_message}`);
+  await setBudgetLimit(pool, scope, limitAmount);
 }
 
 async function countEvents(pool, scope) {

@@ -5,7 +5,8 @@ import {
   authorizeReservation, changeBudgetPolicy, readCapacity, markReservationDispatched,
 } from '../../dist/index.js';
 import {
-  loadReserveFixture, reservationPool, makePorts, makeScope, policyChange, reservationRequest,
+  loadReserveFixture, setBudgetLimit, reservationPool, makePorts, makeScope, policyChange, reservationRequest,
+  scriptedClient, scriptedPorts, partitionRows, delay,
 } from './reservation-harness.mjs';
 
 const fixturePromise = loadReserveFixture();
@@ -20,11 +21,9 @@ async function countEvents(pool, scope) {
 }
 
 async function setLimit(pool, scope, limitAmount, currency = 'USD') {
-  const receipt = await changeBudgetPolicy(policyChange(scope, { limitAmount, currency }), makePorts(pool, scope));
-  assert.equal(receipt.ok, true, receipt.ok ? '' : `${receipt.error.code}: ${receipt.error.safe_message}`);
-  assert.equal(receipt.value.status, 'applied');
-  assert.equal(Number(receipt.value.effectiveLimit), Number(limitAmount), 'the limit round-trips as a canonical exact decimal');
-  return receipt.value;
+  const receipt = await setBudgetLimit(pool, scope, limitAmount, currency);
+  assert.equal(Number(receipt.effectiveLimit), Number(limitAmount), 'the limit round-trips as a canonical exact decimal');
+  return receipt;
 }
 
 test('CI-05A.1/.2/.3 authorizes within capacity, denies by default, and opts into partial', async () => {
@@ -65,7 +64,7 @@ test('CI-05A.1/.2/.3 authorizes within capacity, denies by default, and opts int
   }
 });
 
-test('CI-05A.3 unknown or unbounded pricing cannot auto-authorize without an explicit maximum policy', async () => {
+test('CI-05A.3 unknown or unbounded pricing cannot auto-authorize (no trusted maximum-policy resolver)', async () => {
   const reserve = await fixturePromise;
   const pool = reservationPool(6);
   try {
@@ -77,7 +76,7 @@ test('CI-05A.3 unknown or unbounded pricing cannot auto-authorize without an exp
     assert.equal(unknown.value.status, 'denied', 'unknown exposure cannot auto-authorize');
     assert.equal(await countEvents(pool, scope), 0, 'no conservative hold is created for unbounded pricing');
 
-    // An authorized explicit maximum policy makes it conservative-but-authorizable.
+    // A caller-supplied maximumPolicyRef is not authority: no trusted resolver exists, so it stays denied.
     const boundedEstimate = {
       completeness: 'incomplete', knownSubtotal: '0.20', currency: 'USD', rateCardRef: null, missingDimensions: ['provider'],
       boundedConservativeMaximum: '2.00',
@@ -85,8 +84,8 @@ test('CI-05A.3 unknown or unbounded pricing cannot auto-authorize without an exp
     };
     const bounded = await authorizeReservation(reservationRequest(scope, reserve, { amount: '0.20', estimate: boundedEstimate }), makePorts(pool, scope));
     assert.equal(bounded.ok, true, bounded.ok ? '' : bounded.error.code);
-    assert.equal(bounded.value.status, 'authorized');
-    assert.equal(bounded.value.heldAmount, '2', 'the conservative maximum is held, not the known subtotal');
+    assert.equal(bounded.value.status, 'denied', 'a forged maximum policy reference cannot authorize unknown exposure');
+    assert.equal(await countEvents(pool, scope), 0);
   } finally {
     await pool.end();
   }
@@ -204,6 +203,317 @@ test('CI-05A.4 an unavailable or throwing authority rejects new work with retry 
     }, makePorts(pool, scope));
     assert.equal(orphanDispatch.ok, false);
     if (!orphanDispatch.ok) assert.equal(orphanDispatch.error.code, 'VALIDATION_ERROR');
+  } finally {
+    await pool.end();
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * Review-remediation regressions (PR #32 findings 1, 4, 5, 6).
+ * The scripted-client tests below run without PostgreSQL: they exercise the
+ * engine's own control flow and are NOT database validation. The
+ * PostgreSQL-backed variants follow and run in the budgets suite on CI.
+ * ------------------------------------------------------------------ */
+
+const POLICY = { contract: 'cost-intelligence.budget-policy', schema_version: '1.0.0', id: '123e4567-e89b-42d3-a456-000000000a01', revision: 1, content_hash: `sha256:${'a'.repeat(64)}` };
+
+/** The stored authorization event row for a request, as the database would return it. */
+function storedAuthorization(request, overrides = {}) {
+  return {
+    reservation_id: 'stored-reservation', event_type: 'authorized', event_sequence: 1, currency: request.estimate.currency,
+    held_amount: request.estimate.knownSubtotal, partial_allowed_amount: null,
+    estimate_completeness: request.estimate.completeness, known_subtotal: request.estimate.knownSubtotal, bounded_maximum: null,
+    allow_partial: request.allowPartialAuthorization, attempt_binding: structuredClone(request.attemptBinding),
+    policy_version_id: POLICY.id, policy_ref: POLICY, rate_card_ref: null, ...overrides,
+  };
+}
+
+function scriptedAuthorization(rowsForReplay = []) {
+  const partition = partitionRows(POLICY, '5.00');
+  const script = scriptedClient(sql => {
+    if (sql.includes('ORDER BY event_sequence ASC')) return rowsForReplay;
+    return partition(sql);
+  });
+  return { ...script, connectCalls: 0 };
+}
+
+async function scriptedRequest(scope, options = {}) {
+  const reserve = await fixturePromise;
+  return reservationRequest(scope, reserve, { policyRef: POLICY, ...options });
+}
+
+test('CI-05A.1 replaying an idempotency key with a different currency, amount, policy or attempt is a typed conflict', async () => {
+  const scope = makeScope('replay-conflict');
+  const original = await scriptedRequest(scope, { amount: '0.75' });
+  const variants = {
+    currency: { ...original, estimate: { ...original.estimate, currency: 'EUR' }, canonicalRequest: { ...original.canonicalRequest, currency: 'EUR', requested: { ...original.canonicalRequest.requested, currency: 'EUR' } } },
+    amount: { ...original, estimate: { ...original.estimate, knownSubtotal: '100' }, canonicalRequest: { ...original.canonicalRequest, requested: { amount: '100', currency: 'USD', scale: 0 } } },
+    attempt: { ...original, attemptBinding: { ...original.attemptBinding, billableAttemptId: 'another-attempt' } },
+    policy: { ...original, canonicalRequest: { ...original.canonicalRequest, policy_ref: { ...POLICY, revision: 2 } } },
+    partial: { ...original, allowPartialAuthorization: true },
+  };
+  for (const [label, changed] of Object.entries(variants)) {
+    const script = scriptedAuthorization([storedAuthorization(original)]);
+    const result = await authorizeReservation(changed, scriptedPorts(scope, async () => script.client));
+    assert.equal(result.ok, false, `${label}: a conflicting replay must not produce a decision`);
+    assert.equal(result.error.code, 'IDEMPOTENCY_CONFLICT', label);
+    assert.equal(script.wrote(), false, `${label}: no hold is written`);
+    assert.equal(script.committed(), false, `${label}: nothing is committed`);
+    assert.equal(script.state.released, 1, `${label}: the connection is returned`);
+  }
+
+  // The identical request still replays the single stored hold with its stored binding.
+  const script = scriptedAuthorization([storedAuthorization(original)]);
+  const replay = await authorizeReservation(original, scriptedPorts(scope, async () => script.client));
+  assert.equal(replay.ok, true);
+  assert.equal(replay.value.status, 'authorized');
+  assert.equal(replay.value.reservationId, 'stored-reservation');
+  assert.deepEqual(replay.value.attemptBinding, original.attemptBinding);
+  assert.equal(script.wrote(), false);
+
+  // A stored row that is not the authorization event of this key is also a conflict.
+  const command = scriptedAuthorization([storedAuthorization(original, { event_type: 'dispatched', event_sequence: 2 })]);
+  const notAuthorization = await authorizeReservation(original, scriptedPorts(scope, async () => command.client));
+  assert.equal(notAuthorization.ok, false);
+  assert.equal(notAuthorization.error.code, 'IDEMPOTENCY_CONFLICT');
+});
+
+test('CI-05A.1 the review probe: a prior USD hold is never replayed as an EUR authorization', async () => {
+  const scope = makeScope('probe');
+  const usd = await scriptedRequest(scope, { amount: '0.75', idempotencyKey: 'prior-usd-key' });
+  const eur = await scriptedRequest(scope, { currency: 'EUR', amount: '100', idempotencyKey: 'prior-usd-key' });
+  const script = scriptedAuthorization([storedAuthorization(usd, { reservation_id: 'prior-usd-reservation' })]);
+  const result = await authorizeReservation(eur, scriptedPorts(scope, async () => script.client));
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'IDEMPOTENCY_CONFLICT');
+});
+
+test('CI-05A.6 a stale or foreign canonical policy reference is rejected before any hold', async () => {
+  const scope = makeScope('stale-policy');
+  for (const [label, policyRef] of Object.entries({
+    stale_revision: { ...POLICY, revision: 0 },
+    foreign_id: { ...POLICY, id: '123e4567-e89b-42d3-a456-000000000a02' },
+    foreign_hash: { ...POLICY, content_hash: `sha256:${'b'.repeat(64)}` },
+  })) {
+    const request = await scriptedRequest(scope, { amount: '0.50', policyRef });
+    const script = scriptedAuthorization();
+    const result = await authorizeReservation(request, scriptedPorts(scope, async () => script.client));
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error.code, 'VALIDATION_ERROR', label);
+    assert.equal(script.wrote(), false, label);
+    assert.equal(script.committed(), false, label);
+  }
+  // The exact applicable policy reference authorizes.
+  const script = scriptedAuthorization();
+  const ok = await authorizeReservation(await scriptedRequest(scope, { amount: '0.50' }), scriptedPorts(scope, async () => script.client));
+  assert.equal(ok.ok, true);
+  assert.equal(ok.value.status, 'authorized');
+  assert.equal(script.wrote(), true);
+});
+
+test('CI-05A.6 contradictory financial fields, including a zero estimate for a nonzero request, are rejected', async () => {
+  const scope = makeScope('contradiction');
+  let connects = 0;
+  const countingPorts = () => scriptedPorts(scope, async () => { connects += 1; return scriptedAuthorization().client; });
+  const zeroEstimate = await scriptedRequest(scope, { amount: '100', estimate: { completeness: 'complete', knownSubtotal: '0', currency: 'USD', rateCardRef: null, missingDimensions: [] } });
+  const lowEstimate = await scriptedRequest(scope, { amount: '100', estimate: { completeness: 'complete', knownSubtotal: '1', currency: 'USD', rateCardRef: null, missingDimensions: [] } });
+  const requestedCurrency = await scriptedRequest(scope, { amount: '1' });
+  requestedCurrency.canonicalRequest.requested = { ...requestedCurrency.canonicalRequest.requested, currency: 'EUR' };
+  for (const [label, request] of Object.entries({ zeroEstimate, lowEstimate, requestedCurrency })) {
+    const result = await authorizeReservation(request, countingPorts());
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error.code, 'VALIDATION_ERROR', label);
+  }
+  assert.equal(connects, 0, 'contradictions are rejected before any database work');
+  // Equal amounts with different decimal scale are the same exact money.
+  const scaled = await scriptedRequest(scope, { amount: '0.50', requestedAmount: '0.500000' });
+  const script = scriptedAuthorization();
+  const result = await authorizeReservation(scaled, scriptedPorts(scope, async () => script.client));
+  assert.equal(result.ok && result.value.status, 'authorized');
+});
+
+test('CI-05A.3 a caller-supplied maximumPolicyRef is not authority for unknown or unbounded exposure', async () => {
+  const scope = makeScope('forged-maximum');
+  const forged = { contract: 'cost-intelligence.max-policy', schema_version: '1.0.0', id: 'forged', revision: 1, content_hash: `sha256:${'c'.repeat(64)}` };
+  for (const completeness of ['unknown', 'incomplete']) {
+    const request = await scriptedRequest(scope, {
+      amount: '0.20',
+      estimate: { completeness, knownSubtotal: '0.20', currency: 'USD', rateCardRef: null, missingDimensions: ['provider'], boundedConservativeMaximum: '2.00', maximumPolicyRef: forged },
+    });
+    const script = scriptedAuthorization();
+    const result = await authorizeReservation(request, scriptedPorts(scope, async () => script.client));
+    assert.equal(result.ok, true, completeness);
+    assert.equal(result.value.status, 'denied', completeness);
+    assert.equal(result.value.heldAmount, '0');
+    assert.equal(script.wrote(), false, completeness);
+  }
+});
+
+test('CI-05A.4 zero, infinite and malformed wait settings are rejected', async () => {
+  const scope = makeScope('wait-config');
+  const request = await scriptedRequest(scope, { amount: '0.10' });
+  for (const authorityWaitMs of [0, -1, Infinity, NaN, 1.5, 60_001, '100']) {
+    let connects = 0;
+    const ports = scriptedPorts(scope, async () => { connects += 1; return scriptedAuthorization().client; }, { authorityWaitMs });
+    ports.authorityWaitMs = authorityWaitMs;
+    const decision = await authorizeReservation(request, ports);
+    assert.equal(decision.ok, false, `authorize ${String(authorityWaitMs)}`);
+    assert.equal(decision.error.code, 'VALIDATION_ERROR');
+    const capacity = await readCapacity(scope, 'USD', 'wait-config', ports);
+    assert.equal(capacity.ok, false, `readCapacity ${String(authorityWaitMs)}`);
+    const policy = await changeBudgetPolicy(policyChange(scope, { limitAmount: '1.00' }), ports);
+    assert.equal(policy.ok, false, `changeBudget ${String(authorityWaitMs)}`);
+    assert.equal(connects, 0);
+  }
+});
+
+test('CI-05A.4 a stalled authority returns unavailable within the bound and never creates a hold afterwards', async () => {
+  const scope = makeScope('stalled-authority');
+  const request = await scriptedRequest(scope, { amount: '0.10' });
+  let connects = 0;
+  let releaseAuthority;
+  const stalled = new Promise(resolve => { releaseAuthority = resolve; });
+  const script = scriptedAuthorization();
+  const ports = scriptedPorts(scope, async () => { connects += 1; return script.client; }, { authorityWaitMs: 25 });
+  const grant = ports.financeAuthority;
+  ports.financeAuthority = { authorizeCurrent: async input => { await stalled; return grant.authorizeCurrent(input); } };
+  const started = Date.now();
+  const result = await authorizeReservation(request, ports);
+  assert.ok(Date.now() - started < 1_000, 'the call returns promptly instead of waiting on the authority');
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'unavailable');
+  assert.ok(result.value.retryAfterMs > 0, 'retry guidance is returned');
+  // The authority answers late: the abandoned work must not connect, write or commit.
+  releaseAuthority();
+  await delay(60);
+  assert.equal(connects, 0, 'late authority never opens a connection');
+  assert.equal(script.wrote(), false);
+  assert.equal(script.committed(), false);
+});
+
+test('CI-05A.4 an exhausted connection pool is bounded, and a late connection is returned unused', async () => {
+  const scope = makeScope('pool-exhausted');
+  const request = await scriptedRequest(scope, { amount: '0.10' });
+  const never = await authorizeReservation(request, scriptedPorts(scope, () => new Promise(() => {}), { authorityWaitMs: 25 }));
+  assert.equal(never.ok, true);
+  assert.equal(never.value.status, 'unavailable');
+
+  let grantConnection;
+  const script = scriptedAuthorization();
+  const late = authorizeReservation(request, scriptedPorts(scope, () => new Promise(resolve => { grantConnection = () => resolve(script.client); }), { authorityWaitMs: 25 }));
+  const result = await late;
+  assert.equal(result.value.status, 'unavailable');
+  grantConnection();
+  await delay(60);
+  assert.equal(script.wrote(), false, 'a connection granted after the deadline creates no hold');
+  assert.equal(script.committed(), false);
+  assert.equal(script.statements.includes('BEGIN'), false, 'a late connection does not even begin a transaction');
+  assert.equal(script.state.released, 1, 'the late connection is released back to the pool');
+});
+
+test('CI-05A.4 slow database work past the deadline is rolled back and cannot commit a hold', async () => {
+  const scope = makeScope('slow-database');
+  const request = await scriptedRequest(scope, { amount: '0.10' });
+  const partition = partitionRows(POLICY, '5.00');
+  const script = scriptedClient(async sql => {
+    if (sql.includes('WITH per_reservation')) await delay(80);
+    return partition(sql);
+  });
+  const result = await authorizeReservation(request, scriptedPorts(scope, async () => script.client, { authorityWaitMs: 25 }));
+  assert.equal(result.ok, true);
+  assert.equal(result.value.status, 'unavailable');
+  await delay(150);
+  assert.equal(script.wrote(), false, 'work finishing after the deadline never inserts a hold');
+  assert.equal(script.committed(), false, 'work finishing after the deadline never commits');
+  assert.ok(script.statements.includes('ROLLBACK'));
+  assert.equal(script.state.released, 1);
+});
+
+test('CI-05A.1 a conflicting policy-change replay is a typed conflict', async () => {
+  const scope = makeScope('policy-replay');
+  const change = policyChange(scope, { limitAmount: '5.00', idempotencyKey: 'policy-key' });
+  const stored = {
+    policy_version_id: 'p1', policy_revision: 1, currency: 'USD', limit_amount: '5.00', content_hash: POLICY.content_hash,
+    actor_reference: change.actorReference, reason_reference: change.reasonReference, source_authority_ref: change.sourceAuthorityRef,
+  };
+  const run = async candidate => {
+    const script = scriptedClient(sql => (sql.includes('idempotency_key = $5') ? [stored] : partitionRows(POLICY, '5.00')(sql)));
+    return { script, result: await changeBudgetPolicy(candidate, scriptedPorts(scope, async () => script.client)) };
+  };
+  const same = await run(change);
+  assert.equal(same.result.ok && same.result.value.status, 'replay');
+  for (const candidate of [
+    { ...change, limitAmount: '500.00' }, { ...change, currency: 'EUR' }, { ...change, reasonReference: 'other' },
+    { ...change, actorReference: 'other' }, { ...change, expectedPolicyRevision: 3 },
+  ]) {
+    const { script, result } = await run(candidate);
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'IDEMPOTENCY_CONFLICT');
+    assert.equal(script.wrote(), false);
+  }
+});
+
+test('CI-05A.1/.6 PostgreSQL: conflicting replays and stale policy references create no second hold', async () => {
+  assert.ok(process.env.CI_TEST_DB_RUNTIME_HOST, 'authorization suite requires the restricted disposable PostgreSQL role');
+  const reserve = await fixturePromise;
+  const pool = reservationPool(6);
+  try {
+    const scope = makeScope('db-replay');
+    const first = await setLimit(pool, scope, '5.00');
+    const request = reservationRequest(scope, reserve, { amount: '0.75' });
+    const authorized = await authorizeReservation(request, makePorts(pool, scope));
+    assert.equal(authorized.value.status, 'authorized');
+
+    // Same key, different currency / amount / attempt: typed conflict, one hold.
+    const eur = reservationRequest(scope, reserve, { amount: '0.75', currency: 'EUR', idempotencyKey: request.idempotencyKey });
+    const changedAmount = reservationRequest(scope, reserve, { amount: '4.00', idempotencyKey: request.idempotencyKey });
+    const changedAttempt = { ...request, attemptBinding: { ...request.attemptBinding, billableAttemptId: `billable-${randomUUID()}` } };
+    for (const conflicting of [eur, changedAmount, changedAttempt]) {
+      const result = await authorizeReservation(conflicting, makePorts(pool, scope));
+      assert.equal(result.ok, false);
+      assert.equal(result.error.code, 'IDEMPOTENCY_CONFLICT');
+    }
+    assert.equal(await countEvents(pool, scope), 1);
+
+    // After a newer policy revision, the stored policy reference still replays identically,
+    // while a fresh request carrying the superseded reference is rejected as stale.
+    const second = await changeBudgetPolicy(policyChange(scope, { limitAmount: '6.00', expectedPolicyRevision: 1 }), makePorts(pool, scope));
+    assert.equal(second.value.status, 'applied');
+    const replay = await authorizeReservation(request, makePorts(pool, scope));
+    assert.equal(replay.ok && replay.value.reservationId, authorized.value.reservationId);
+    const stale = await authorizeReservation(reservationRequest(scope, reserve, { amount: '0.10', policyRef: first.policyRef }), makePorts(pool, scope));
+    assert.equal(stale.ok, false);
+    assert.equal(stale.error.code, 'VALIDATION_ERROR');
+    const zero = await authorizeReservation(reservationRequest(scope, reserve, { amount: '0.10', policyRef: second.value.policyRef,
+      estimate: { completeness: 'complete', knownSubtotal: '0', currency: 'USD', rateCardRef: null, missingDimensions: [] } }), makePorts(pool, scope));
+    assert.equal(zero.ok, false);
+    assert.equal(zero.error.code, 'VALIDATION_ERROR');
+    assert.equal(await countEvents(pool, scope), 1, 'rejections persist nothing');
+  } finally {
+    await pool.end();
+  }
+});
+
+test('CI-05A.4 PostgreSQL: a held partition lock yields unavailable within the bound', async () => {
+  assert.ok(process.env.CI_TEST_DB_RUNTIME_HOST, 'authorization suite requires the restricted disposable PostgreSQL role');
+  const reserve = await fixturePromise;
+  const pool = reservationPool(6);
+  try {
+    const scope = makeScope('db-lock-timeout');
+    await setLimit(pool, scope, '5.00');
+    const holder = await pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [`ci05a-budget:${scope.tenantId}:${scope.projectId}:${scope.environment}:${scope.billingMode}:USD`]);
+      const started = Date.now();
+      const result = await authorizeReservation(reservationRequest(scope, reserve, { amount: '0.10' }), makePorts(pool, scope, { authorityWaitMs: 200 }));
+      assert.equal(result.ok && result.value.status, 'unavailable');
+      assert.ok(Date.now() - started < 3_000);
+      await holder.query('ROLLBACK');
+    } finally {
+      holder.release();
+    }
+    assert.equal(await countEvents(pool, scope), 0);
   } finally {
     await pool.end();
   }
