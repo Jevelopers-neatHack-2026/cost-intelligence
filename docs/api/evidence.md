@@ -4,11 +4,13 @@
 
 ## References
 
-`EvidenceReference` has four statuses: `resolved` (the only one carrying `namespace` and `id`), `unknown`, `unavailable` (with a reason) and `not_applicable` (with a reason). The non-resolved variants reject any id, so a missing value cannot be fabricated. Ids reject whitespace, `?`, `#` and `@`, so URLs with query parameters cannot be stored as references. Hash and commit kinds require `sha256:<64 hex>` and 40/64-hex respectively.
+`EvidenceReference` has four statuses: `resolved` (the only one carrying `namespace` and `id`), `unknown`, `unavailable` (with a reason) and `not_applicable` (with a reason). The non-resolved variants reject any id, so a missing value cannot be fabricated. Ids reject whitespace, `/`, `?`, `#` and `@`, so URLs, URL paths and query strings cannot be stored as references. Hash and commit kinds require `sha256:<64 hex>` and 40/64-hex respectively.
 
 The kind-to-namespace registry in `src/evidence/index.ts` is a **local policy**, not an accepted shared-contracts vocabulary. Provider request ids (`provider:<name>` namespace) are `correlation_only`; trace, session, checkpoint, design and build refs are `evidence_only`; only ledger identities are `ledger_identity`. Every result carries `billingAuthority: false`.
 
 ## Lookups
+
+Every public output is an explicit allowlist projection of the store row (no object spreading). Malformed or URL-shaped source fields are dropped and surfaced as `malformed_source_field` or `unavailable: broken_link`, never echoed. The reverse lookup passes the full resolved reference (kind, namespace, id) to the store and rechecks each returned row for an exact match.
 
 Both lookups authorize with the existing `ledger.readSnapshot` grant (no new permission) and read through an injected `EvidenceLinkStorePort` that must filter by scope. Returned rows are re-verified against the requested scope. An absent posting and a posting in another tenant/project/environment/billing mode are indistinguishable (`not_found`).
 

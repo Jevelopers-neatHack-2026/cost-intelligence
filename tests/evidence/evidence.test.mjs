@@ -43,7 +43,7 @@ function record(scope, overrides = {}) {
 }
 
 /** In-memory store that honors scope the way a real store must. */
-function store(rows, { leak = false, unavailable = new Set(), calls = [] } = {}) {
+function store(rows, { leak = false, permissive = false, unavailable = new Set(), calls = [] } = {}) {
   const same = (s, r) => r.scope.tenantId === s.tenantId && r.scope.projectId === s.projectId
     && r.scope.environment === s.environment && r.scope.billingMode === s.billingMode;
   const visible = scope => (leak ? rows : rows.filter(r => same(scope, r)));
@@ -58,10 +58,14 @@ function store(rows, { leak = false, unavailable = new Set(), calls = [] } = {})
       if (unavailable.has('list')) return { status: 'unavailable' };
       return { status: 'ok', value: { records: visible(scope).filter(r => r.logicalOperationId === id), truncated: false } };
     },
-    async findByReference(scope, kind, id) {
+    async findByReference(scope, reference) {
       calls.push('findByReference');
-      const field = { logical_operation: 'logicalOperationId', source_observation: 'sourceObservationId', correlation: 'correlationId', reservation: 'reservationId', workflow: 'workflowId' }[kind];
-      const records = visible(scope).filter(r => field && r[field] === id);
+      calls.lastReference = reference;
+      if (permissive) return { status: 'ok', value: { records: visible(scope), truncated: false } };
+      const field = { logical_operation: 'logicalOperationId', source_observation: 'sourceObservationId', correlation: 'correlationId', reservation: 'reservationId', workflow: 'workflowId' }[reference.kind];
+      const records = visible(scope).filter(r => (reference.kind === 'provider_request'
+        ? r.providerRequest.id === reference.id && `provider:${String(r.provider).toLowerCase()}` === reference.namespace
+        : field && r[field] === reference.id));
       return { status: 'ok', value: { records, truncated: false } };
     },
   };
@@ -259,4 +263,93 @@ test('store outages are retryable errors; a throwing store never leaks details; 
 test('lookups reuse the existing ledger read grant and add no new finance permission', () => {
   assert.equal(FINANCE_OPERATION_POLICY['ledger.readSnapshot'].permission, 'ledger.snapshot.read');
   assert.equal(Object.keys(FINANCE_OPERATION_POLICY).some(name => name.startsWith('evidence.')), false);
+});
+
+const hash = `sha256:${'a'.repeat(64)}`;
+const sensitive = /token=SECRET|RAW_PRIVATE_PROMPT|rates\.example|logs\.example|SECRET/;
+
+test('reverse lookup passes the full reference and rechecks namespace, so provider id collisions do not cross', async () => {
+  const rows = [record(scopeA, { eventId: 'evt-openai', provider: 'openai', providerRequest: { status: 'known', id: 'req-shared' } }),
+    record(scopeA, { eventId: 'evt-anthropic', provider: 'anthropic', providerRequest: { status: 'known', id: 'req-shared' } })];
+  const reference = { status: 'resolved', kind: 'provider_request', namespace: 'provider:openai', id: 'req-shared' };
+  for (const permissive of [false, true]) {
+    const p = ports(rows, { permissive });
+    const result = await lookupByOperationalReference(request(scopeA, { reference }), p);
+    assert.deepEqual(result.value.matches.map(m => m.eventId), ['evt-openai'], `permissive=${permissive}`);
+    assert.deepEqual(p.store.calls.lastReference, reference, 'namespace reaches the store');
+  }
+});
+
+test('a permissive or faulty store cannot return same-scope unrelated rows', async () => {
+  const rows = [record(scopeA), record(scopeA, { eventId: 'evt-other', logicalOperationId: 'op-other', correlationId: 'corr-other', sourceObservationId: 'obs-other', providerRequest: { status: 'unknown' } })];
+  const result = await lookupByOperationalReference(
+    request(scopeA, { reference: { status: 'resolved', kind: 'logical_operation', namespace: 'cost-intelligence', id: 'op-1' } }),
+    ports(rows, { permissive: true }));
+  assert.deepEqual(result.value.matches.map(m => m.eventId), ['evt-expense-1']);
+  const junk = { store: { ...store(rows), async findByReference() { return { status: 'ok', value: { records: [null, 7, { eventId: 'x' }, ...rows], truncated: false } }; } }, clock, financeAuthority: authority() };
+  const survived = await lookupByOperationalReference(
+    request(scopeA, { reference: { status: 'resolved', kind: 'logical_operation', namespace: 'cost-intelligence', id: 'op-1' } }), junk);
+  assert.deepEqual(survived.value.matches.map(m => m.eventId), ['evt-expense-1']);
+});
+
+test('public outputs are allowlist projections: URL token in rateCardRef and extra prompt property never leak', async () => {
+  const dirty = record(scopeA, {
+    pricing: { policyVersion: 'p1', ruleVersion: 'r1', prompt: 'RAW_PRIVATE_PROMPT',
+      rateCardRef: { contract: 'rate-card', id: 'https://rates.example/card?token=SECRET', revision: 1, content_hash: hash, prompt: 'RAW_PRIVATE_PROMPT' } },
+    prompt: 'RAW_PRIVATE_PROMPT',
+  });
+  const result = await lookupPostingEvidence(request(scopeA, { eventId: 'evt-expense-1' }), ports([dirty]));
+  assert.ok(result.ok);
+  assert.equal(sensitive.test(JSON.stringify(result.value)), false);
+  assert.equal(result.value.rateRule.rateCardRef, null);
+  assert.ok(result.value.gaps.includes('malformed_source_field'));
+  assert.deepEqual(result.value.rateRule, { policyVersion: 'p1', ruleVersion: 'r1', rateCardRef: null });
+
+  const clean = record(scopeA, { pricing: { policyVersion: 'p1', ruleVersion: 'r1', rateCardRef: { contract: 'rate-card', id: 'card-1', revision: 2, content_hash: hash, prompt: 'RAW_PRIVATE_PROMPT' } } });
+  const projected = await lookupPostingEvidence(request(scopeA, { eventId: 'evt-expense-1' }), ports([clean]));
+  assert.deepEqual(projected.value.rateRule.rateCardRef, { contract: 'rate-card', id: 'card-1', revision: 2, content_hash: hash });
+  assert.equal(JSON.stringify(projected.value).includes('RAW_PRIVATE_PROMPT'), false);
+});
+
+test('sensitive summary, related-event, observation and version fields are dropped and declared', async () => {
+  const dirtyPosting = record(scopeA, {
+    eventType: 'expense?token=SECRET', classification: 'https://logs.example/SECRET',
+    supersedesEventId: 'https://logs.example/evt?token=SECRET', reversesEventId: 'evt-ok-1',
+    pricing: { policyVersion: 'v1?token=SECRET', ruleVersion: 'r1', rateCardRef: null },
+    workflowId: 'wf/../../SECRET', providerRequest: { status: 'known', id: 'req?token=SECRET' },
+  });
+  const dirtyObservation = { ...observation(scopeA), sourceObservationId: 'obs?token=SECRET', eventId: 'evt-obs-ok' };
+  const unsafeObservation = { ...observation(scopeA), eventId: 'https://logs.example/evt?token=SECRET' };
+  const result = await lookupPostingEvidence(request(scopeA, { eventId: 'evt-expense-1' }), ports([dirtyPosting, dirtyObservation, unsafeObservation]));
+  assert.ok(result.ok);
+  assert.equal(sensitive.test(JSON.stringify(result.value)), false, JSON.stringify(result.value));
+  assert.equal(result.value.posting.eventType, null);
+  assert.equal(result.value.posting.classification, null);
+  assert.deepEqual(result.value.relatedEventIds, { supersedes: null, reverses: 'evt-ok-1' });
+  assert.equal(result.value.rateRule.policyVersion, null);
+  assert.deepEqual(result.value.sourceObservations.map(o => [o.eventId, o.sourceObservationId]), [['evt-obs-ok', null]]);
+  assert.ok(result.value.gaps.includes('malformed_source_field'));
+  const byKind = kind => result.value.operationalReferences.find(ref => ref.kind === kind);
+  assert.deepEqual(byKind('workflow'), { status: 'unavailable', kind: 'workflow', reason: 'broken_link' });
+  assert.deepEqual(byKind('provider_request'), { status: 'unavailable', kind: 'provider_request', reason: 'broken_link' });
+});
+
+test('unsafe posting event ids and reverse-lookup match ids are not echoed', async () => {
+  const bad = await lookupPostingEvidence(request(scopeA, { eventId: 'https://logs.example/evt?token=SECRET' }), ports([]));
+  assert.equal(bad.error.code, 'VALIDATION_ERROR');
+  const rows = [record(scopeA, { eventId: 'https://logs.example/evt?token=SECRET' })];
+  const reverse = await lookupByOperationalReference(
+    request(scopeA, { reference: { status: 'resolved', kind: 'logical_operation', namespace: 'cost-intelligence', id: 'op-1' } }), ports(rows));
+  assert.deepEqual(reverse.value.matches, []);
+  assert.ok(reverse.value.gaps.includes('malformed_source_field'));
+  assert.equal(sensitive.test(JSON.stringify(reverse.value)), false);
+});
+
+test('URL-shaped ids are rejected for every kind, including paths and query strings', () => {
+  const urls = ['https://logs.example/private/SECRET', 'logs.example/private/SECRET', 'a/b', 'x?token=SECRET', 'x#frag', 'http://h', '//h/p'];
+  const samples = [['trace', 'neatlogs'], ['correlation', 'cost-intelligence'], ['logical_operation', 'cost-intelligence'],
+    ['provider_request', 'provider:openai'], ['design', 'design-system'], ['build', 'ci'], ['dev_session', 'entire'], ['checkpoint', 'entire']];
+  for (const [kind, namespace] of samples) {
+    for (const id of urls) assert.equal(validateEvidenceReference({ status: 'resolved', kind, namespace, id }).ok, false, `${kind} ${id}`);
+  }
 });

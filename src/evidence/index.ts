@@ -70,8 +70,8 @@ export function evidenceAuthority(kind: EvidenceKind): EvidenceAuthority {
 }
 
 const EvidenceKindSchema = Type.Union(EVIDENCE_KINDS.map(kind => Type.Literal(kind)));
-/** No whitespace, control characters, query/fragment delimiters or credentials separators: ids cannot carry URLs with parameters. */
-const EVIDENCE_ID_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._:/=+-]{0,255}$';
+/** No whitespace, control characters, slashes, query/fragment delimiters or credential separators: an id can never be a URL, URL path or query string. */
+const EVIDENCE_ID_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._:=+-]{0,255}$';
 const EvidenceIdSchema = Type.String({ pattern: EVIDENCE_ID_PATTERN, maxLength: 256 });
 const NamespaceSchema = Type.String({ pattern: '^[a-z0-9][a-z0-9:_-]{0,63}$', maxLength: 64 });
 export const UnavailableReasonSchema = Type.Union([
@@ -155,7 +155,7 @@ export type EvidenceStoreRead<T> = { readonly status: 'ok'; readonly value: T } 
 export interface EvidenceLinkStorePort {
   getPosting(scope: TrustedScope, eventId: string): Promise<EvidenceStoreRead<EvidenceLedgerRecord | null>>;
   listByLogicalOperation(scope: TrustedScope, logicalOperationId: string, limit: number): Promise<EvidenceStoreRead<{ readonly records: readonly EvidenceLedgerRecord[]; readonly truncated: boolean }>>;
-  findByReference(scope: TrustedScope, kind: ReverseLookupKind, id: string, limit: number): Promise<EvidenceStoreRead<{ readonly records: readonly EvidenceLedgerRecord[]; readonly truncated: boolean }>>;
+  findByReference(scope: TrustedScope, reference: ResolvedEvidenceReference & { readonly kind: ReverseLookupKind }, limit: number): Promise<EvidenceStoreRead<{ readonly records: readonly EvidenceLedgerRecord[]; readonly truncated: boolean }>>;
 }
 
 export interface EvidenceRuntimePorts {
@@ -185,6 +185,7 @@ export const EvidenceGapCodeSchema = Type.Union([
   Type.Literal('reference_kinds_not_indexed'),
   Type.Literal('no_match_is_not_proof_of_zero_usage'),
   Type.Literal('correlation_only_match'),
+  Type.Literal('malformed_source_field'),
   Type.Literal('store_unavailable'),
 ]);
 export type EvidenceGapCode = Static<typeof EvidenceGapCodeSchema>;
@@ -195,7 +196,7 @@ const LookupBaseProperties = {
   scope: TrustedScopeSchema,
 };
 export const PostingEvidenceRequestSchema = Type.Object({
-  ...LookupBaseProperties, eventId: Type.String({ minLength: 1, maxLength: 256 }),
+  ...LookupBaseProperties, eventId: EvidenceIdSchema,
 }, { additionalProperties: false });
 export type PostingEvidenceRequest = Static<typeof PostingEvidenceRequestSchema>;
 export const ReverseEvidenceRequestSchema = Type.Object({
@@ -205,10 +206,21 @@ export type ReverseEvidenceRequest = Static<typeof ReverseEvidenceRequestSchema>
 
 export interface LinkedRecordSummary {
   readonly eventId: string;
-  readonly eventType: string;
-  readonly classification: string;
-  readonly financialEffect: boolean;
-  readonly sourceObservationId: string;
+  readonly eventType: string | null;
+  readonly classification: string | null;
+  readonly financialEffect: boolean | null;
+  readonly sourceObservationId: string | null;
+}
+export interface RateCardReference {
+  readonly contract: string;
+  readonly id: string;
+  readonly revision: number;
+  readonly content_hash: string;
+}
+export interface RateRuleEvidence {
+  readonly policyVersion: string | null;
+  readonly ruleVersion: string | null;
+  readonly rateCardRef: RateCardReference | null;
 }
 export interface PostingEvidence {
   readonly schemaVersion: typeof EVIDENCE_REFERENCE_SCHEMA_VERSION;
@@ -217,7 +229,7 @@ export interface PostingEvidence {
   readonly posting: LinkedRecordSummary | null;
   readonly sourceObservations: readonly LinkedRecordSummary[];
   readonly reservation: EvidenceReference | null;
-  readonly rateRule: { readonly policyVersion: string; readonly ruleVersion: string; readonly rateCardRef: { readonly contract: string; readonly id: string; readonly revision: number; readonly content_hash: string } | null } | null;
+  readonly rateRule: RateRuleEvidence | null;
   readonly operationalReferences: readonly EvidenceReference[];
   readonly relatedEventIds: { readonly supersedes: string | null; readonly reverses: string | null };
   readonly gaps: readonly EvidenceGapCode[];
@@ -234,14 +246,54 @@ export interface ReverseEvidence {
 
 const NOT_INTEGRATED: readonly EvidenceKind[] = ['trace', 'run', 'design', 'design_version', 'artifact', 'artifact_hash', 'repo_commit', 'build', 'dev_session', 'checkpoint'];
 
-function summarize(record: EvidenceLedgerRecord): LinkedRecordSummary {
+const ID_RE = new RegExp(EVIDENCE_ID_PATTERN);
+const LABEL_RE = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$/;
+const VERSION_RE = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$/;
+const HASH_RE = /^sha256:[a-f0-9]{64}$/;
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+function safeString(value: unknown, pattern: RegExp): string | null {
+  return typeof value === 'string' && value.length <= 256 && pattern.test(value) ? value : null;
+}
+function safeId(value: unknown): string | null { return safeString(value, ID_RE); }
+
+/** Explicit allowlist projection. Returns null when the eventId itself is unsafe; other malformed fields become null and set `malformed`. */
+function summarize(record: unknown, malformed: { value: boolean }): LinkedRecordSummary | null {
+  if (!isObject(record)) return null;
+  const eventId = safeId(record.eventId);
+  if (eventId === null) return null;
+  const pick = <T>(value: T | null, present: unknown): T | null => { if (value === null && present !== null) malformed.value = true; return value; };
   return {
-    eventId: record.eventId, eventType: record.eventType, classification: record.classification,
-    financialEffect: record.financialEffect, sourceObservationId: record.sourceObservationId,
+    eventId,
+    eventType: pick(safeString(record.eventType, LABEL_RE), record.eventType),
+    classification: pick(safeString(record.classification, LABEL_RE), record.classification),
+    financialEffect: typeof record.financialEffect === 'boolean' ? record.financialEffect : null,
+    sourceObservationId: pick(safeId(record.sourceObservationId), record.sourceObservationId),
   };
 }
 
+function projectRateRule(pricing: unknown, malformed: { value: boolean }): RateRuleEvidence | null {
+  if (!isObject(pricing)) { if (pricing !== null) malformed.value = true; return null; }
+  const policyVersion = safeString(pricing.policyVersion, VERSION_RE);
+  const ruleVersion = safeString(pricing.ruleVersion, VERSION_RE);
+  if (policyVersion === null || ruleVersion === null) malformed.value = true;
+  let rateCardRef: RateCardReference | null = null;
+  const raw = pricing.rateCardRef;
+  if (raw !== null && raw !== undefined) {
+    const contract = isObject(raw) ? safeString(raw.contract, LABEL_RE) : null;
+    const id = isObject(raw) ? safeId(raw.id) : null;
+    const hash = isObject(raw) ? safeString(raw.content_hash, HASH_RE) : null;
+    const revision = isObject(raw) && Number.isInteger(raw.revision) && (raw.revision as number) >= 0 ? raw.revision as number : null;
+    if (contract !== null && id !== null && hash !== null && revision !== null) rateCardRef = { contract, id, revision, content_hash: hash };
+    else malformed.value = true;
+  }
+  return { policyVersion, ruleVersion, rateCardRef };
+}
+
 function fromIdentity(kind: EvidenceKind, fact: IdentityFact, namespace: string): EvidenceReference {
+  if (!isObject(fact)) return { status: 'unavailable', kind, reason: 'broken_link' };
   if (fact.status === 'known') {
     const candidate = { status: 'resolved', kind, namespace, id: fact.id };
     const checked = validateEvidenceReference(candidate);
@@ -249,16 +301,17 @@ function fromIdentity(kind: EvidenceKind, fact: IdentityFact, namespace: string)
     return checked.ok ? checked.value : { status: 'unavailable', kind, reason: 'broken_link' };
   }
   if (fact.status === 'unknown') return { status: 'unknown', kind };
-  return { status: 'not_applicable', kind, reason: 'not_part_of_operation' };
+  if (fact.status === 'not_applicable') return { status: 'not_applicable', kind, reason: 'not_part_of_operation' };
+  return { status: 'unavailable', kind, reason: 'broken_link' };
 }
 
 function providerNamespace(provider: string | null): string {
   // An unusable provider name yields a namespace the policy rejects, which surfaces as a broken link rather than a guess.
-  return provider === null ? 'provider:' : `provider:${provider.toLowerCase()}`;
+  return typeof provider === 'string' ? `provider:${provider.toLowerCase()}` : 'provider:';
 }
 
 function optionalId(kind: EvidenceKind, id: string | null, namespace: string): EvidenceReference {
-  return id === null ? { status: 'unknown', kind } : fromIdentity(kind, { status: 'known', id }, namespace);
+  return id === null || id === undefined ? { status: 'unknown', kind } : fromIdentity(kind, { status: 'known', id }, namespace);
 }
 
 /** Build the typed reference set for one ledger record. Nothing is invented: absent facts become unknown, integrated-nowhere kinds unavailable. */
@@ -271,6 +324,9 @@ export function operationalReferencesFor(record: EvidenceLedgerRecord): Evidence
     fromIdentity('provider_attempt', record.providerAttempt, LEDGER_NAMESPACE),
     fromIdentity('billable_attempt', record.billableAttempt, LEDGER_NAMESPACE),
     fromIdentity('provider_request', record.providerRequest, providerNamespace(record.provider)),
+    record.reservationId === null || record.reservationId === undefined
+      ? { status: 'not_applicable', kind: 'reservation', reason: 'not_part_of_operation' }
+      : fromIdentity('reservation', { status: 'known', id: record.reservationId }, LEDGER_NAMESPACE),
     optionalId('workflow', record.workflowId, LEDGER_NAMESPACE),
     optionalId('job', record.jobId, LEDGER_NAMESPACE),
     ...NOT_INTEGRATED.map((kind): EvidenceReference => ({ status: 'unavailable', kind, reason: 'source_not_integrated' })),
@@ -279,8 +335,14 @@ export function operationalReferencesFor(record: EvidenceLedgerRecord): Evidence
 }
 
 function recordInScope(record: EvidenceLedgerRecord, scope: TrustedScope): boolean {
-  return record.scope.tenantId === scope.tenantId && record.scope.projectId === scope.projectId
+  return isObject(record) && isObject(record.scope) && record.scope.tenantId === scope.tenantId && record.scope.projectId === scope.projectId
     && record.scope.environment === scope.environment && record.scope.billingMode === scope.billingMode;
+}
+
+/** A returned row matches only if one of its own resolved references equals the requested kind, namespace and id exactly. */
+function recordHasReference(record: EvidenceLedgerRecord, wanted: ResolvedEvidenceReference): boolean {
+  return operationalReferencesFor(record).some(ref => ref.status === 'resolved'
+    && ref.kind === wanted.kind && ref.namespace === wanted.namespace && ref.id === wanted.id);
 }
 
 async function authorize(request: { requestId: string; scope: TrustedScope }, ports: EvidenceRuntimePorts) {
@@ -328,33 +390,49 @@ export async function lookupPostingEvidence(value: unknown, ports: EvidenceRunti
   }
 
   const gaps: EvidenceGapCode[] = ['reconciliation_lineage_not_linked', 'adjustment_lineage_not_linked', 'export_lineage_not_linked', 'reference_kinds_not_indexed'];
-  const linked = await guarded(() => ports.store.listByLogicalOperation(request.scope, record.logicalOperationId, MAX_RESULTS));
+  const malformed = { value: false };
+  const logicalOperationId = safeId(record.logicalOperationId);
   let sourceObservations: LinkedRecordSummary[] = [];
-  if (linked.status === 'unavailable') {
+  if (logicalOperationId === null) {
+    malformed.value = true;
     gaps.push('source_observations_unavailable');
   } else {
-    const inScope = linked.value.records.filter(item => recordInScope(item, request.scope) && item.logicalOperationId === record.logicalOperationId);
-    sourceObservations = inScope.filter(item => item.eventType === 'usage_observation').map(summarize);
-    if (linked.value.truncated) gaps.push('result_limit_reached');
+    const linked = await guarded(() => ports.store.listByLogicalOperation(request.scope, logicalOperationId, MAX_RESULTS));
+    if (linked.status === 'unavailable' || !Array.isArray(linked.value?.records)) {
+      gaps.push('source_observations_unavailable');
+    } else {
+      for (const item of linked.value.records) {
+        if (!recordInScope(item, request.scope) || item.logicalOperationId !== logicalOperationId || item.eventType !== 'usage_observation') continue;
+        const projected = summarize(item, malformed);
+        if (projected === null) malformed.value = true; else sourceObservations.push(projected);
+      }
+      if (linked.value.truncated === true) gaps.push('result_limit_reached');
+    }
   }
-  if (record.pricing === null) gaps.push('pricing_not_recorded');
-  else if (record.pricing.rateCardRef === null) gaps.push('rate_card_not_recorded');
+  const posted = summarize(record, malformed);
+  if (posted === null) return notFound(['malformed_source_field']);
+  const rateRule = projectRateRule(record.pricing ?? null, malformed);
+  if (rateRule === null) gaps.push('pricing_not_recorded');
+  else if (rateRule.rateCardRef === null) gaps.push('rate_card_not_recorded');
 
-  const reservation: EvidenceReference = record.reservationId === null
+  const reservation: EvidenceReference = record.reservationId === null || record.reservationId === undefined
     ? { status: 'not_applicable', kind: 'reservation', reason: 'not_part_of_operation' }
     : fromIdentity('reservation', { status: 'known', id: record.reservationId }, LEDGER_NAMESPACE);
+  const related = (id: unknown): string | null => {
+    if (id === null || id === undefined) return null;
+    const safe = safeId(id);
+    if (safe === null) malformed.value = true;
+    return safe;
+  };
+  const relatedEventIds = { supersedes: related(record.supersedesEventId), reverses: related(record.reversesEventId) };
+  const operationalReferences = operationalReferencesFor(record);
+  if (malformed.value || operationalReferences.some(ref => ref.status === 'unavailable' && ref.reason === 'broken_link')) gaps.push('malformed_source_field');
 
   return {
     ok: true,
     value: {
-      schemaVersion: EVIDENCE_REFERENCE_SCHEMA_VERSION, status: 'found', posting: summarize(record), sourceObservations, reservation,
-      rateRule: record.pricing === null ? null : {
-        policyVersion: record.pricing.policyVersion, ruleVersion: record.pricing.ruleVersion,
-        rateCardRef: record.pricing.rateCardRef === null ? null : { ...record.pricing.rateCardRef },
-      },
-      operationalReferences: operationalReferencesFor(record),
-      relatedEventIds: { supersedes: record.supersedesEventId, reverses: record.reversesEventId },
-      gaps, billingAuthority: false,
+      schemaVersion: EVIDENCE_REFERENCE_SCHEMA_VERSION, status: 'found', posting: posted, sourceObservations, reservation,
+      rateRule, operationalReferences, relatedEventIds, gaps, billingAuthority: false,
     },
   };
 }
@@ -377,12 +455,22 @@ export async function lookupByOperationalReference(value: unknown, ports: Eviden
   if (!authorization.ok) return failure(authorization.error);
 
   const kind = reference.kind as ReverseLookupKind;
-  const found = await guarded(() => ports.store.findByReference(request.scope, kind, reference.id, MAX_RESULTS));
+  const wanted = { status: 'resolved', kind, namespace: reference.namespace, id: reference.id } as const;
+  const found = await guarded(() => ports.store.findByReference(request.scope, wanted, MAX_RESULTS));
   if (found.status === 'unavailable') return failure(errorEnvelope('evidence', 'lookupByOperationalReference', 'SOURCE_UNAVAILABLE', request.requestId, 'Evidence source is temporarily unavailable.', true));
 
   const gaps: EvidenceGapCode[] = ['reconciliation_lineage_not_linked', 'export_lineage_not_linked', 'reference_kinds_not_indexed'];
-  const matches = found.value.records.filter(item => recordInScope(item, request.scope)).map(summarize);
-  if (found.value.truncated) gaps.push('result_limit_reached');
+  const malformed = { value: false };
+  const matches: LinkedRecordSummary[] = [];
+  const returned: unknown = found.value?.records;
+  for (const item of Array.isArray(returned) ? returned : []) {
+    // Defense in depth: a permissive store cannot widen the query past scope, kind, namespace or id.
+    if (!recordInScope(item, request.scope) || !recordHasReference(item, wanted)) continue;
+    const projected = summarize(item, malformed);
+    if (projected === null) malformed.value = true; else matches.push(projected);
+  }
+  if (malformed.value) gaps.push('malformed_source_field');
+  if (found.value?.truncated === true) gaps.push('result_limit_reached');
   if (matches.length === 0) gaps.push('no_match_is_not_proof_of_zero_usage');
   const basis = evidenceAuthority(kind);
   if (basis === 'correlation_only') gaps.push('correlation_only_match');
