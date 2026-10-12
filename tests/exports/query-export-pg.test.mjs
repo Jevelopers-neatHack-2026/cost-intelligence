@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -11,6 +11,7 @@ import { fixtureScope, posting, query, exportRequest, checked, hostPorts, hash }
 
 const PRODUCER = '22a3237dd44f376017969ac881586ff396f19cf8';
 const digest = value => 'sha256:' + createHash('sha256').update(value).digest('hex');
+const TEST_SOURCE_HASH = digest(await readFile(new URL(import.meta.url)));
 const document = receipt => JSON.parse(receipt.artifacts.find(row => row.fileName === 'summary.json').content);
 const metric = (doc, name, currency = 'USD', recognition = 'actual') => doc.currencies.find(row => row.currency === currency)[recognition === 'actual' ? 'metrics' : 'simulated'].find(row => row.metric === name);
 const economicPage = ({ requestId, ...page }) => page;
@@ -20,8 +21,16 @@ await test('real disposable PostgreSQL ledger → query → verified snapshot �
   const admin = new pg.Pool({ ...databaseConfigFromEnvironment(), max: 2 });
   const pool = new pg.Pool({ ...runtimeDatabaseConfigFromEnvironment(), max: 4 });
   const directory = await mkdtemp(join(tmpdir(), 'ci08x-pg-artifacts-'));
-  const receipts = []; const failures = [];
+  const receipts = []; const failures = []; const authorizationCases = [];
   const run = (name, fn) => t.test(name, async () => { try { await fn(); } catch (error) { failures.push({ name, message: error.message }); throw error; } });
+  const counters = host => ({ sourceQueries: host.counters.reads, authorityCalls: host.counters.calls, fenceValidations: host.counters.validations, stateTransitions: host.counters.transitions });
+  function captureAuthorization(caseId, current, page, path, before, result, reached, expectedCode = null) {
+    // This is the evaluated public response, never an inferred or manufactured envelope.
+    authorizationCases.push({ caseId, version: page.schemaVersion, path, fixtureMode: 'synthetic_coherent_authority_with_actual_postgresql',
+      sourceBinding: { scopeHash: hash(current.scope), snapshotReferenceHash: hash({ snapshotId: page.snapshotId }), queryContentHash: page.queryContentHash, summaryContentHash: page.summaryContentHash },
+      expectedCode, actualResult: structuredClone(result), reached: structuredClone(reached), counters: { before, after: counters(current.host) } });
+    if (expectedCode !== null) { assert.equal(result.ok, false); assert.equal(result.error.code, expectedCode); assert.equal(Object.hasOwn(result, 'value'), false); } else assert.equal(result.ok, true);
+  }
   async function setup(scope = fixtureScope(), payloads = [posting(scope, 'direct', { amount: '1' }), posting(scope, 'operating', { amount: '5', classification: 'operating_expense' })]) {
     const host = hostPorts(scope, pool);
     for (const payload of payloads) {
@@ -162,16 +171,20 @@ await test('real disposable PostgreSQL ledger → query → verified snapshot �
         const selected = version === '1.0.0' ? legacyStore : richStore;
         const ports = finance.createReportingExportRuntimePorts(current.host.ports, legacyStore, richStore, current.host.fence);
         const first = replay ? await checked(finance.exportSummaryV2(request, ports)) : null;
-        const originalVerification = selected.verifyOriginal; let triggered = false;
+        const originalVerification = selected.verifyOriginal; let triggered = false, verified = false;
         selected.verifyOriginal = async (...args) => {
-          const original = await originalVerification(...args); assert.equal(original, true, 'real filesystem original receipt authenticated before grant revocation');
+          const original = await originalVerification(...args); assert.equal(original, true, 'real filesystem original receipt authenticated before grant revocation'); verified = true;
           if (!triggered) { current.host.state[denied] = true; triggered = true; }
           return original;
         };
+        const before = counters(current.host);
         const response = await (replay ? finance.getPreparedExportArtifacts : finance.exportSummaryV2)(request, ports);
+        captureAuthorization(`${version}.${replay ? 'retrieve' : 'create'}.F1.${denied}`, current, page, replay ? 'getPreparedExportArtifacts' : 'exportSummaryV2', before, response, { originalVerified: verified, revocationTriggered: triggered }, 'FORBIDDEN_SCOPE');
         assert.equal(triggered, true); assert.equal(response.ok, false); assert.equal(response.error.code, 'FORBIDDEN_SCOPE');
-        current.host.state[denied] = false;
-        const control = await checked(finance.getPreparedExportArtifacts(request, ports));
+        current.host.state[denied] = false; verified = false;
+        const positiveBefore = counters(current.host), controlResponse = await finance.getPreparedExportArtifacts(request, ports);
+        captureAuthorization(`${version}.${replay ? 'retrieve' : 'create'}.F1.${denied}.restored-retrieve`, current, page, 'getPreparedExportArtifacts', positiveBefore, controlResponse, { originalVerified: verified, authorityRestored: !current.host.state[denied] });
+        const control = await checked(controlResponse);
         if (first) assert.deepEqual(control, first);
         else assert.equal(control.manifest.createdAt, '2026-10-12T22:00:00.000Z');
       }
@@ -186,17 +199,21 @@ await test('real disposable PostgreSQL ledger → query → verified snapshot �
         const selected = version === '1.0.0' ? legacyStore : richStore;
         const ports = finance.createReportingExportRuntimePorts(current.host.ports, legacyStore, richStore, current.host.fence);
         const first = replay ? await checked(finance.exportSummaryV2(request, ports)) : null;
-        const verify = selected.verifyOriginal; let triggered = false;
+        const verify = selected.verifyOriginal; let triggered = false, verified = false;
         selected.verifyOriginal = async (...args) => {
-          const original = await verify(...args); assert.equal(original, true);
+          const original = await verify(...args); assert.equal(original, true); verified = true;
           if (!triggered) { current.host.controller.setContext(context === 'null' ? 'absent' : 'present', { ...current.scope, projectId: 'foreign-context-project' }); triggered = true; }
           return original;
         };
+        const before = counters(current.host);
         const response = await (replay ? finance.getPreparedExportArtifacts : finance.exportSummaryV2)(request, ports);
+        captureAuthorization(`${version}.${replay ? 'retrieve' : 'create'}.F2.${context}`, current, page, replay ? 'getPreparedExportArtifacts' : 'exportSummaryV2', before, response, { originalVerified: verified, contextTransitionTriggered: triggered }, 'FORBIDDEN_SCOPE');
         assert.equal(triggered, true); assert.equal(response.ok, false); assert.equal(response.error.code, 'FORBIDDEN_SCOPE');
         assert.equal(current.host.state.denyRead, false); assert.equal(current.host.state.denyExport, false);
-        current.host.controller.setContext('present', current.scope);
-        const control = await checked(finance.getPreparedExportArtifacts(request, ports));
+        current.host.controller.setContext('present', current.scope); verified = false;
+        const positiveBefore = counters(current.host), controlResponse = await finance.getPreparedExportArtifacts(request, ports);
+        captureAuthorization(`${version}.${replay ? 'retrieve' : 'create'}.F2.${context}.restored-retrieve`, current, page, 'getPreparedExportArtifacts', positiveBefore, controlResponse, { originalVerified: verified, contextRestored: true });
+        const control = await checked(controlResponse);
         if (first) assert.deepEqual(control, first); else assert.equal(control.manifest.createdAt, '2026-10-12T22:00:00.000Z');
       }
 
@@ -211,18 +228,57 @@ await test('real disposable PostgreSQL ledger → query → verified snapshot �
         const first = replay ? await checked(finance.exportSummaryV2(request, ports)) : null;
         const verify = selected.verifyOriginal; let verified = false, waited = false;
         selected.verifyOriginal = async (...args) => { const original = await verify(...args); assert.equal(original, true); verified = true; current.host.controller.onBoundary('context.resolve', async controller => { await Promise.resolve(); waited = true; controller.setGrant(permission, 'denied'); }); return original; };
+        const before = counters(current.host);
         const result = await (replay ? finance.getPreparedExportArtifacts : finance.exportSummaryV2)(request, ports);
+        captureAuthorization(`${version}.${replay ? 'retrieve' : 'create'}.F3.${permission}`, current, page, replay ? 'getPreparedExportArtifacts' : 'exportSummaryV2', before, result, { originalVerified: verified, governedContextAwait: waited }, 'FORBIDDEN_SCOPE');
         assert.equal(verified, true); assert.equal(waited, true); assert.equal(result.ok, false); assert.equal(result.error.code, 'FORBIDDEN_SCOPE'); assert.equal(Object.hasOwn(result, 'value'), false);
-        selected.verifyOriginal = verify; current.host.controller.setGrant(permission, 'allowed');
+        selected.verifyOriginal = verify; current.host.controller.setGrant(permission, 'allowed'); verified = false;
         let positiveWaited = false;
-        selected.verifyOriginal = async (...args) => { const original = await verify(...args); assert.equal(original, true); current.host.controller.onBoundary('context.resolve', async () => { await Promise.resolve(); positiveWaited = true; }); return original; };
-        const control = await checked(finance.getPreparedExportArtifacts(request, ports)); assert.equal(positiveWaited, true); if (first) assert.deepEqual(control, first); else assert.equal(control.manifest.createdAt, '2026-10-12T22:00:00.000Z');
+        selected.verifyOriginal = async (...args) => { const original = await verify(...args); assert.equal(original, true); verified = true; current.host.controller.onBoundary('context.resolve', async () => { await Promise.resolve(); positiveWaited = true; }); return original; };
+        const positiveBefore = counters(current.host), controlResponse = await finance.getPreparedExportArtifacts(request, ports);
+        captureAuthorization(`${version}.${replay ? 'retrieve' : 'create'}.F3.${permission}.unchanged-retrieve`, current, page, 'getPreparedExportArtifacts', positiveBefore, controlResponse, { originalVerified: verified, governedContextAwait: positiveWaited, authorityRestored: true });
+        const control = await checked(controlResponse); assert.equal(positiveWaited, true); if (first) assert.deepEqual(control, first); else assert.equal(control.manifest.createdAt, '2026-10-12T22:00:00.000Z');
       }
+
+      async function authorizationFixture(version, replay) {
+        const current = await setup(); let page = current.page;
+        if (version === '1.0.0') { const q = { ...current.q, schemaVersion: version, filters: { ...current.q.filters, currency: 'USD' } }; delete q.policyVersion; delete q.groupings; page = await checked(finance.querySummary(q, current.host.ports)); }
+        const request = exportRequest(page, current.scope), legacyStore = finance.createFileExportArtifactStore(current.storeOptions), richStore = finance.createFileReportingExportArtifactStore(current.storeOptions);
+        const selected = version === '1.0.0' ? legacyStore : richStore, ports = finance.createReportingExportRuntimePorts(current.host.ports, legacyStore, richStore, current.host.fence);
+        const first = replay ? await checked(finance.exportSummaryV2(request, ports)) : null;
+        return { current, page, request, legacyStore, richStore, selected, ports, first, call: replay ? finance.getPreparedExportArtifacts : finance.exportSummaryV2 };
+      }
+      for (const version of ['1.0.0', '2.0.0']) for (const replay of [false, true]) {
+        const path = replay ? 'getPreparedExportArtifacts' : 'exportSummaryV2', prefix = `${version}.${replay ? 'retrieve' : 'create'}`;
+        // Missing capability is an entry failure; it is never counted as a reached late-boundary veto.
+        const missing = await authorizationFixture(version, replay); let lookups = 0;
+        const lookup = missing.selected.lookup; missing.selected.lookup = async (...args) => { lookups++; return lookup(...args); };
+        const absent = finance.createReportingExportRuntimePorts(missing.current.host.ports, missing.legacyStore, missing.richStore);
+        const before = counters(missing.current.host), denied = await missing.call(missing.request, absent);
+        captureAuthorization(`${prefix}.missing-fourth-fence`, missing.current, missing.page, path, before, denied, { capabilityAbsent: true, originalPrepared: missing.first !== null, storeLookups: lookups }, 'SOURCE_UNAVAILABLE');
+        assert.equal(denied.ok, false); assert.equal(denied.error.code, 'SOURCE_UNAVAILABLE'); assert.equal(Object.hasOwn(denied, 'value'), false); assert.equal(lookups, 0); assert.deepEqual(counters(missing.current.host), before);
+        const positive = await authorizationFixture(version, replay); let originalVerified = false, governedContextAwait = false;
+        const verify = positive.selected.verifyOriginal;
+        positive.selected.verifyOriginal = async (...args) => { const valid = await verify(...args); assert.equal(valid, true); originalVerified = true; positive.current.host.controller.onBoundary('context.resolve', async () => { await Promise.resolve(); governedContextAwait = true; }); return valid; };
+        const positiveBefore = counters(positive.current.host), allowed = await positive.call(positive.request, positive.ports);
+        captureAuthorization(`${prefix}.unchanged-fourth-fence`, positive.current, positive.page, path, positiveBefore, allowed, { originalVerified, governedContextAwait });
+        const value = await checked(allowed); assert.equal(originalVerified, true); assert.equal(governedContextAwait, true); if (positive.first) assert.deepEqual(value, positive.first);
+        for (const control of ['tenantId', 'projectId', 'actorId', 'environment', 'billingMode', 'principal', 'contextRevision', 'readRevision', 'exportRevision']) {
+          const x = await authorizationFixture(version, replay); let authenticated = false, transitioned = false; const original = x.selected.verifyOriginal;
+          x.selected.verifyOriginal = async (...args) => { const valid = await original(...args); assert.equal(valid, true); authenticated = true;
+            if (!transitioned) { const c = x.current.host.controller; if (control === 'principal') c.setPrincipal(false); else if (control.endsWith('Revision')) c.bumpRevision(control.replace('Revision', '')); else c.setScope({ ...x.current.scope, [control]: control === 'environment' ? 'production' : control === 'billingMode' ? 'simulated' : 'foreign-' + control }); transitioned = true; } return valid; };
+          const before = counters(x.current.host), result = await x.call(x.request, x.ports);
+          captureAuthorization(`${prefix}.current-host.${control}`, x.current, x.page, path, before, result, { originalVerified: authenticated, authorityTransition: transitioned }, 'FORBIDDEN_SCOPE');
+          assert.equal(authenticated, true); assert.equal(transitioned, true); assert.equal(result.ok, false); assert.equal(result.error.code, 'FORBIDDEN_SCOPE'); assert.equal(Object.hasOwn(result, 'value'), false);
+        }
+      }
+      assert.equal(authorizationCases.length, 92); // 48 original F1/F2/F3 +44 missing/current/positive captures.
 
     });
   } finally {
+    const executionProvenance = { reportedCheckoutCommit: process.env.GITHUB_SHA ?? null, testSourceHash: TEST_SOURCE_HASH, authorityMode: 'synthetic_single_state_host_NOT_live_issuer', producerLabel: 'reporting_lineage_only_NOT_export_execution_revision' };
     await mkdir(new URL('../../artifacts/exports/', import.meta.url), { recursive: true });
-    await writeFile(new URL('../../artifacts/exports/postgres-composition.json', import.meta.url), JSON.stringify({ fixtureMode: 'real_disposable_postgresql_synthetic_financial_postings', producer: PRODUCER, consumerAcknowledgement: 'pending', actualProviderCharges: 'not_tested', failures, receipts }, null, 2) + '\n');
+    await writeFile(new URL('../../artifacts/exports/postgres-composition.json', import.meta.url), JSON.stringify({ fixtureMode: 'real_disposable_postgresql_synthetic_financial_postings', producer: PRODUCER, consumerAcknowledgement: 'pending', actualProviderCharges: 'not_tested', failures, receipts, authorizationCaptureVersion: '1.0.0', executionProvenance, authorizationCases }, null, 2) + '\n');
     await pool.end(); await admin.end(); await rm(directory, { recursive: true, force: true });
   }
 });
