@@ -1061,6 +1061,10 @@ export async function markReservationDispatched(value: unknown, ports: BudgetRun
   });
 }
 
+function attemptMismatch(operation: string, requestId: string): { reject: ErrorEnvelope } {
+  return { reject: makeError(operation, 'VALIDATION_ERROR', requestId, 'The attempt binding does not match the reservation\'s original attempt.') };
+}
+
 /**
  * Final usage is authoritative only when the usage is also complete. Reported usage that is
  * incomplete is a lower bound (partial) and unknown usage proves nothing (unknown), so neither can
@@ -1077,6 +1081,11 @@ export async function settleReservation(value: unknown, ports: BudgetRuntimePort
   const request = validated.value as SettleReservationCommand;
   const currency = request.settlement.currency;
   const cumulative = parseScaledDecimal(request.settlement.cumulativeAmount);
+  const consumed = request.canonicalCommand.consumed;
+  if (consumed.currency !== currency || request.canonicalCommand.currency !== currency
+      || parseScaledDecimal(consumed.amount) !== cumulative) {
+    return failure(makeError('settle', 'VALIDATION_ERROR', request.requestId, 'The canonical settlement amount and currency contradict the settlement.'));
+  }
   const settledFinality = effectiveFinality(request.settlement.finality, request.settlement.usageCompleteness);
   return applyCommand({
     requestId: request.requestId, idempotencyKey: request.idempotencyKey, scope: request.scope as TrustedScope,
@@ -1087,6 +1096,7 @@ export async function settleReservation(value: unknown, ports: BudgetRuntimePort
     kind: 'settle', ports, operation: 'settle', authority: 'budgets.settle',
     identity: { eventType: 'settled', consumed: cumulative, released: 0n, usageFinality: settledFinality, settlementSequence: request.settlement.sequence },
     compute(state) {
+      if (!sameJson(state.originalBinding, request.attemptBinding)) return attemptMismatch('settle', request.requestId);
       if (state.lastType === 'released' || state.lastType === 'expired') {
         return { reject: makeError('settle', 'VALIDATION_ERROR', request.requestId, 'A released or expired reservation cannot be settled.') };
       }
@@ -1117,6 +1127,7 @@ export async function releaseReservation(value: unknown, ports: BudgetRuntimePor
     kind: 'release', ports, operation: 'release', authority: 'budgets.release',
     identity: { eventType: 'released', consumed: 0n, released: releaseAmount, usageFinality: null, settlementSequence: null },
     compute(state) {
+      if (!sameJson(state.originalBinding, request.attemptBinding)) return attemptMismatch('release', request.requestId);
       const remaining = state.held - state.released - state.consumed;
       const floorRemaining = remaining > 0n ? remaining : 0n;
       if (state.lastType === 'released' || state.lastType === 'expired') {

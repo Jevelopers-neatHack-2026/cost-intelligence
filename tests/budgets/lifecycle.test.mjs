@@ -33,12 +33,12 @@ test('CI-05A.2/.4 full reservation lifecycle settles without double-counting and
     assert.equal(dispatched.value.state, 'dispatched');
     assert.equal(dispatched.value.revision, 2);
 
-    const partial = await settleReservation(settleCommand(scope, reservationId, 2, { cumulativeAmount: '0.500000', finality: 'partial', sequence: 1 }), makePorts(pool, scope));
+    const partial = await settleReservation(settleCommand(scope, reservationId, 2, { cumulativeAmount: '0.500000', finality: 'partial', sequence: 1 , attemptBinding: authorized.value.attemptBinding }), makePorts(pool, scope));
     assert.equal(partial.ok, true, partial.ok ? '' : `${partial.error.code}: ${partial.error.safe_message}`);
     assert.equal(partial.value.state, 'partially_settled');
     assert.equal(partial.value.consumedAmount, '0.5');
 
-    const final = await settleReservation(settleCommand(scope, reservationId, 3, { cumulativeAmount: '1.200000', finality: 'final', sequence: 2 }), makePorts(pool, scope));
+    const final = await settleReservation(settleCommand(scope, reservationId, 3, { cumulativeAmount: '1.200000', finality: 'final', sequence: 2 , attemptBinding: authorized.value.attemptBinding }), makePorts(pool, scope));
     assert.equal(final.ok, true, final.ok ? '' : final.error.code);
     assert.equal(final.value.state, 'settled');
     assert.equal(final.value.consumedAmount, '1.2');
@@ -46,7 +46,7 @@ test('CI-05A.2/.4 full reservation lifecycle settles without double-counting and
     const beforeRelease = await readCapacity(scope, 'USD', 'lifecycle-before', makePorts(pool, scope));
     assert.equal(beforeRelease.value.usedCapacity, '2', 'the hold stands until the unused remainder is released');
 
-    const released = await releaseReservation(releaseCommand(scope, reservationId, 4, { amount: '0.800000', proof: 'final_usage_known' }), makePorts(pool, scope));
+    const released = await releaseReservation(releaseCommand(scope, reservationId, 4, { amount: '0.800000', proof: 'final_usage_known' , attemptBinding: authorized.value.attemptBinding }), makePorts(pool, scope));
     assert.equal(released.ok, true, released.ok ? '' : released.error.code);
     assert.equal(released.value.state, 'released');
     assert.equal(released.value.releasedAmount, '0.8');
@@ -97,7 +97,7 @@ test('CI-05A.2 a release cannot exceed the outstanding hold', async () => {
     await setLimit(pool, scope, '10.00');
     const authorized = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00' }), makePorts(pool, scope));
     const reservationId = authorized.value.reservationId;
-    const over = await releaseReservation(releaseCommand(scope, reservationId, 1, { amount: '5.000000' }), makePorts(pool, scope));
+    const over = await releaseReservation(releaseCommand(scope, reservationId, 1, { amount: '5.000000' , attemptBinding: authorized.value.attemptBinding }), makePorts(pool, scope));
     assert.equal(over.ok, false);
     if (!over.ok) assert.equal(over.error.code, 'VALIDATION_ERROR');
   } finally {
@@ -144,7 +144,7 @@ test('CI-05A.2 release of a dispatched reservation never frees capacity without 
   const scope = scopeFor('release-dispatched');
   const dispatched = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
   for (const proof of ['never_dispatched_fenced', 'final_usage_known']) {
-    const { script, result } = await run(releaseCommand(scope, R1, 2, { amount: '1.000000', proof }), releaseReservation, dispatched);
+    const { script, result } = await run(releaseCommand(scope, R1, 2, { amount: '1.000000', proof , attemptBinding: ATTEMPT }), releaseReservation, dispatched);
     assert.equal(result.ok, false, proof);
     assert.equal(result.error.code, 'BUDGET_UNAVAILABLE', proof);
     assert.match(result.error.safe_message, /hold is preserved/);
@@ -153,29 +153,29 @@ test('CI-05A.2 release of a dispatched reservation never frees capacity without 
   }
   // Partial (non-final) settlement is not final usage either.
   const partial = reservationRow({ revision: 3, last_type: 'settled', last_finality: 'partial', consumed: '0.4', ever_dispatched: true });
-  const refused = await run(releaseCommand(scope, R1, 3, { amount: '0.600000', proof: 'final_usage_known' }), releaseReservation, partial);
+  const refused = await run(releaseCommand(scope, R1, 3, { amount: '0.600000', proof: 'final_usage_known' , attemptBinding: ATTEMPT }), releaseReservation, partial);
   assert.equal(refused.result.ok, false);
   assert.equal(refused.result.error.code, 'BUDGET_UNAVAILABLE');
   assert.equal(refused.script.wrote(), false);
   // final-usage proof on a never-settled held reservation is refused too.
-  const unsettled = await run(releaseCommand(scope, R1, 1, { amount: '1.000000', proof: 'final_usage_known' }), releaseReservation, reservationRow());
+  const unsettled = await run(releaseCommand(scope, R1, 1, { amount: '1.000000', proof: 'final_usage_known' , attemptBinding: ATTEMPT }), releaseReservation, reservationRow());
   assert.equal(unsettled.result.ok, false);
   assert.equal(unsettled.script.wrote(), false);
 });
 
 test('CI-05A.2 never-dispatched release is accepted only for a whole, durably undispatched hold', async () => {
   const scope = scopeFor('release-fenced');
-  const whole = await run(releaseCommand(scope, R1, 1, { amount: '1.000000', proof: 'never_dispatched_fenced' }), releaseReservation, reservationRow());
+  const whole = await run(releaseCommand(scope, R1, 1, { amount: '1.000000', proof: 'never_dispatched_fenced' , attemptBinding: ATTEMPT }), releaseReservation, reservationRow());
   assert.equal(whole.result.ok, true, whole.result.ok ? '' : whole.result.error.code);
   assert.equal(whole.script.wrote(), true);
   assert.equal(whole.script.committed(), true);
   // A partial release would leave a dispatchable remainder, so it is not a fence.
-  const some = await run(releaseCommand(scope, R1, 1, { amount: '0.500000', proof: 'never_dispatched_fenced' }), releaseReservation, reservationRow());
+  const some = await run(releaseCommand(scope, R1, 1, { amount: '0.500000', proof: 'never_dispatched_fenced' , attemptBinding: ATTEMPT }), releaseReservation, reservationRow());
   assert.equal(some.result.ok, false);
   assert.equal(some.result.error.code, 'BUDGET_UNAVAILABLE');
   assert.equal(some.script.wrote(), false);
   // Already released: nothing to release.
-  const again = await run(releaseCommand(scope, R1, 2, { amount: '0', proof: 'never_dispatched_fenced' }), releaseReservation, reservationRow({ revision: 2, last_type: 'released' }));
+  const again = await run(releaseCommand(scope, R1, 2, { amount: '0', proof: 'never_dispatched_fenced' , attemptBinding: ATTEMPT }), releaseReservation, reservationRow({ revision: 2, last_type: 'released' }));
   assert.equal(again.result.ok, false);
   assert.equal(again.script.wrote(), false);
 });
@@ -183,10 +183,10 @@ test('CI-05A.2 never-dispatched release is accepted only for a whole, durably un
 test('CI-05A.2 final settlement permits releasing exactly the known unused remainder', async () => {
   const scope = scopeFor('release-final');
   const settled = reservationRow({ revision: 3, last_type: 'settled', last_finality: 'final', consumed: '0.4', ever_dispatched: true });
-  const ok = await run(releaseCommand(scope, R1, 3, { amount: '0.600000', proof: 'final_usage_known' }), releaseReservation, settled);
+  const ok = await run(releaseCommand(scope, R1, 3, { amount: '0.600000', proof: 'final_usage_known' , attemptBinding: ATTEMPT }), releaseReservation, settled);
   assert.equal(ok.result.ok, true, ok.result.ok ? '' : ok.result.error.code);
   assert.equal(ok.script.committed(), true);
-  const over = await run(releaseCommand(scope, R1, 3, { amount: '0.700000', proof: 'final_usage_known' }), releaseReservation, settled);
+  const over = await run(releaseCommand(scope, R1, 3, { amount: '0.700000', proof: 'final_usage_known' , attemptBinding: ATTEMPT }), releaseReservation, settled);
   assert.equal(over.result.ok, false);
   assert.equal(over.result.error.code, 'VALIDATION_ERROR');
   assert.equal(over.script.wrote(), false);
@@ -234,10 +234,10 @@ test('CI-05A.1 a lifecycle command key reused for a different command is a typed
   assert.equal(otherAttempt.result.error.code, 'IDEMPOTENCY_CONFLICT');
 
   // The same key now used to settle a different amount, or to release, conflicts rather than replaying the dispatch.
-  const settle = settleCommand(scope, R1, 1, { cumulativeAmount: '0.500000', finality: 'final', sequence: 1, idempotencyKey: dispatch.idempotencyKey });
+  const settle = settleCommand(scope, R1, 1, { cumulativeAmount: '0.500000', finality: 'final', sequence: 1, idempotencyKey: dispatch.idempotencyKey , attemptBinding: ATTEMPT });
   const settleConflict = await run(settle, settleReservation, reservationRow(), [storedDispatch]);
   assert.equal(settleConflict.result.error.code, 'IDEMPOTENCY_CONFLICT');
-  const release = releaseCommand(scope, R1, 1, { amount: '1.000000', idempotencyKey: dispatch.idempotencyKey });
+  const release = releaseCommand(scope, R1, 1, { amount: '1.000000', idempotencyKey: dispatch.idempotencyKey , attemptBinding: ATTEMPT });
   const releaseConflict = await run(release, releaseReservation, reservationRow(), [storedDispatch]);
   assert.equal(releaseConflict.result.error.code, 'IDEMPOTENCY_CONFLICT');
   for (const conflict of [otherReservation, otherAttempt, settleConflict, releaseConflict]) {
@@ -260,7 +260,7 @@ test('CI-05A.2/.3 PostgreSQL: a dispatched hold keeps its capacity until final s
     assert.equal(dispatched.ok, true, dispatched.ok ? '' : dispatched.error.code);
 
     for (const proof of ['never_dispatched_fenced', 'final_usage_known']) {
-      const refused = await releaseReservation(releaseCommand(scope, reservationId, 2, { amount: '1.000000', proof }), makePorts(pool, scope));
+      const refused = await releaseReservation(releaseCommand(scope, reservationId, 2, { amount: '1.000000', proof , attemptBinding: ATTEMPT }), makePorts(pool, scope));
       assert.equal(refused.ok, false, proof);
       assert.equal(refused.error.code, 'BUDGET_UNAVAILABLE', proof);
     }
@@ -270,9 +270,9 @@ test('CI-05A.2/.3 PostgreSQL: a dispatched hold keeps its capacity until final s
     assert.equal(second.value.status, 'denied', 'no second worker is authorized against unresolved exposure');
 
     // A later final settlement still succeeds because the reservation was never released.
-    const final = await settleReservation(settleCommand(scope, reservationId, 2, { cumulativeAmount: '0.600000', finality: 'final', sequence: 1 }), makePorts(pool, scope));
+    const final = await settleReservation(settleCommand(scope, reservationId, 2, { cumulativeAmount: '0.600000', finality: 'final', sequence: 1 , attemptBinding: ATTEMPT }), makePorts(pool, scope));
     assert.equal(final.ok, true, final.ok ? '' : final.error.code);
-    const released = await releaseReservation(releaseCommand(scope, reservationId, 3, { amount: '0.400000', proof: 'final_usage_known' }), makePorts(pool, scope));
+    const released = await releaseReservation(releaseCommand(scope, reservationId, 3, { amount: '0.400000', proof: 'final_usage_known' , attemptBinding: ATTEMPT }), makePorts(pool, scope));
     assert.equal(released.ok, true, released.ok ? '' : released.error.code);
 
     // Partial authorization: the hold is created but dispatch stays unavailable and the hold is preserved.
@@ -314,7 +314,7 @@ test('CI-05A.4 a never-acknowledged COMMIT returns unavailable within the deadli
 
   const dispatched = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
   const lifecycle = hanging(sql => (sql.includes('array_agg(event_type ORDER BY event_sequence DESC)') ? [dispatched] : null));
-  const settled = await within(settleReservation(settleCommand(scope, R1, 2, { cumulativeAmount: '0.5', finality: 'final' }), scriptedPorts(scope, async () => lifecycle.client, { authorityWaitMs: 25 })));
+  const settled = await within(settleReservation(settleCommand(scope, R1, 2, { cumulativeAmount: '0.5', finality: 'final' , attemptBinding: ATTEMPT }), scriptedPorts(scope, async () => lifecycle.client, { authorityWaitMs: 25 })));
   assert.notEqual(settled, 'hung', 'a lifecycle command must not wait on an unacknowledged COMMIT');
   assert.equal(settled.ok, false);
   assert.equal(settled.error.code, 'BUDGET_UNAVAILABLE');
@@ -348,6 +348,99 @@ test('CI-05A.2 final settlement with incomplete or unknown usage is not authorit
   }
   // Complete final usage of zero is authoritative and still releases the unused hold.
   const row = reservationRow({ revision: 3, last_type: 'settled', last_finality: 'final', ever_dispatched: true });
-  const ok = await run(releaseCommand(scope, R1, 3, { amount: '1.000000', proof: 'final_usage_known' }), releaseReservation, row);
+  const ok = await run(releaseCommand(scope, R1, 3, { amount: '1.000000', proof: 'final_usage_known' , attemptBinding: ATTEMPT }), releaseReservation, row);
   assert.equal(ok.result.ok, true);
+});
+
+/* Attempt binding for settle/release and canonical settlement agreement. */
+
+const OTHER_ATTEMPT = { ...ATTEMPT, logicalOperationId: 'logical-other', billableAttemptId: 'billable-other' };
+
+test('CI-05A.2 settle and release from an unrelated attempt are rejected without writing', async () => {
+  const scope = scopeFor('unrelated-attempt');
+  const dispatched = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
+  const settle = await run(settleCommand(scope, R1, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: OTHER_ATTEMPT }), settleReservation, dispatched);
+  assert.equal(settle.result.ok, false);
+  assert.equal(settle.result.error.code, 'VALIDATION_ERROR');
+  assert.equal(settle.script.wrote(), false);
+  assert.equal(settle.script.committed(), false);
+
+  const settled = reservationRow({ revision: 3, last_type: 'settled', last_finality: 'final', ever_dispatched: true });
+  const release = await run(releaseCommand(scope, R1, 3, { amount: '1.000000', proof: 'final_usage_known', attemptBinding: OTHER_ATTEMPT }), releaseReservation, settled);
+  assert.equal(release.result.ok, false);
+  assert.equal(release.result.error.code, 'VALIDATION_ERROR');
+  assert.equal(release.script.wrote(), false);
+
+  // The original attempt still settles and releases.
+  const own = await run(settleCommand(scope, R1, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: ATTEMPT }), settleReservation, dispatched);
+  assert.equal(own.result.ok, true);
+});
+
+test('CI-05A.2 a canonical settlement that contradicts the wrapper settlement is rejected before any database work', async () => {
+  const scope = scopeFor('canonical-settle');
+  const dispatched = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
+  const mismatches = {
+    amountAndCurrency: c => { c.canonicalCommand.consumed = { amount: '9', currency: 'EUR', scale: 0 }; },
+    amount: c => { c.canonicalCommand.consumed = { amount: '9', currency: 'USD', scale: 0 }; },
+    currency: c => { c.canonicalCommand.consumed = { amount: '0', currency: 'EUR', scale: 0 }; },
+    envelopeCurrency: c => { c.canonicalCommand.currency = 'EUR'; },
+  };
+  for (const [label, mutate] of Object.entries(mismatches)) {
+    const command = settleCommand(scope, R1, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: ATTEMPT });
+    mutate(command);
+    let connects = 0;
+    const script = scriptedLifecycle(dispatched);
+    const result = await settleReservation(command, scriptedPorts(scope, async () => { connects += 1; return script.client; }));
+    assert.equal(result.ok, false, label);
+    assert.ok(['VALIDATION_ERROR', 'FORBIDDEN_SCOPE'].includes(result.error.code), `${label}: ${result.error.code}`);
+    assert.equal(connects, 0, label);
+    assert.equal(script.wrote(), false, label);
+  }
+});
+
+test('CI-05A.2 PostgreSQL: unrelated-attempt settle/release and a contradictory canonical settlement cannot free exposure', async () => {
+  assert.ok(process.env.CI_TEST_DB_RUNTIME_HOST, 'lifecycle suite requires the restricted disposable PostgreSQL role');
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  const count = async scope => (await pool.query(
+    `SELECT count(*)::int AS total FROM cost_intelligence.budget_reservation_events
+     WHERE tenant_id = $1 AND project_id = $2 AND environment = $3 AND billing_mode = $4`,
+    [scope.tenantId, scope.projectId, scope.environment, scope.billingMode])).rows[0].total;
+  try {
+    const scope = makeScope('db-unrelated-attempt');
+    await setLimit(pool, scope, '1.00');
+    const authorized = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00' }), makePorts(pool, scope));
+    const id = authorized.value.reservationId;
+    const own = authorized.value.attemptBinding;
+    const other = { ...own, logicalOperationId: `logical-${id}`, billableAttemptId: `billable-other-${id}` };
+    const dispatched = await markReservationDispatched(markDispatchedCommand(scope, id, 1, { attemptBinding: own }), makePorts(pool, scope));
+    assert.equal(dispatched.ok, true, dispatched.ok ? '' : dispatched.error.code);
+    const events = await count(scope);
+
+    const unrelatedSettle = await settleReservation(settleCommand(scope, id, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: other }), makePorts(pool, scope));
+    assert.equal(unrelatedSettle.ok, false);
+    assert.equal(unrelatedSettle.error.code, 'VALIDATION_ERROR');
+
+    const contradictory = settleCommand(scope, id, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: own });
+    contradictory.canonicalCommand.consumed = { amount: '9', currency: 'EUR', scale: 0 };
+    const mismatch = await settleReservation(contradictory, makePorts(pool, scope));
+    assert.equal(mismatch.ok, false);
+
+    const unrelatedRelease = await releaseReservation(releaseCommand(scope, id, 2, { amount: '1.000000', proof: 'final_usage_known', attemptBinding: other }), makePorts(pool, scope));
+    assert.equal(unrelatedRelease.ok, false);
+
+    assert.equal(await count(scope), events, 'no event is written by any rejected command');
+    const capacity = await readCapacity(scope, 'USD', 'db-unrelated', makePorts(pool, scope));
+    assert.equal(capacity.value.availableCapacity, '0', 'the dispatched exposure remains held');
+
+    // The original attempt can still settle and release.
+    const settled = await settleReservation(settleCommand(scope, id, 2, { cumulativeAmount: '0.250000', finality: 'final', attemptBinding: own }), makePorts(pool, scope));
+    assert.equal(settled.ok, true, settled.ok ? '' : settled.error.code);
+    const unrelatedAfter = await releaseReservation(releaseCommand(scope, id, 3, { amount: '0.750000', proof: 'final_usage_known', attemptBinding: other }), makePorts(pool, scope));
+    assert.equal(unrelatedAfter.ok, false);
+    const released = await releaseReservation(releaseCommand(scope, id, 3, { amount: '0.750000', proof: 'final_usage_known', attemptBinding: own }), makePorts(pool, scope));
+    assert.equal(released.ok, true, released.ok ? '' : released.error.code);
+  } finally {
+    await pool.end();
+  }
 });
