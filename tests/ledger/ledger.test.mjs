@@ -32,7 +32,10 @@ function test(name,...args){const body=args.pop();return registerTest(name,...ar
  const entry={case:caseName(name),status:'running',sqlStates:[],capabilityMetadata:[]};diagnosticCases.push(entry);
  try{await diagnosticContext.run(entry,()=>body(context));entry.status='passed';}
  catch(error){entry.status='failed';entry.errorCode=diagnosticCodes.has(error?.code)?error.code:'bounded_other';
-   if(typeof error?.actual==='boolean')entry.actualBoolean=error.actual;if(typeof error?.expected==='boolean')entry.expectedBoolean=error.expected;throw error;}
+   if(typeof error?.actual==='boolean')entry.actualBoolean=error.actual;if(typeof error?.expected==='boolean')entry.expectedBoolean=error.expected;
+   if(Number.isSafeInteger(error?.actual)&&Math.abs(error.actual)<=100000)entry.actualCount=error.actual;
+   if(Number.isSafeInteger(error?.expected)&&Math.abs(error.expected)<=100000)entry.expectedCount=error.expected;
+   const location=String(error?.stack??'').match(/ledger\.test\.mjs:(\d+):(\d+)/);if(location)entry.fixtureLocation={file:'tests/ledger/ledger.test.mjs',line:Number(location[1]),column:Number(location[2])};throw error;}
  finally{await mkdir(join(root,'artifacts','test-manifests'),{recursive:true});await writeFile(join(root,'artifacts','test-manifests','ci05b-ledger-static-diagnostics.json'),JSON.stringify({version:'1.0.0',cases:diagnosticCases})+'\n');}
 });}
 function recordCapabilityMetadata(sql,rows){
@@ -401,8 +404,15 @@ test('CI02 ledger persists exact immutable records and rebuilds scoped projectio
     assert.equal(postgresVersion.slice(0, 2), '16', 'ledger acceptance must run on PostgreSQL 16');
     const health = await pool.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
     assert.equal(health.rows[0].migrations_ready, true);
-    assert.equal(Number(health.rows[0].required_migrations_present), 10,
-      'the additive pricing history, accounting projection, CI-05A budget reservation, and usage intake migrations extend the complete foundation set');
+    assert.equal(Number(health.rows[0].required_migrations_present), 11,
+      'the exact additive settlement capability extends the known core foundation to 0011; reporting 0012 remains a separate capability');
+    const installed=await pool.query('SELECT version,checksum_sha256 FROM cost_intelligence.schema_migrations ORDER BY version');
+    const expectedVersions=['0001_foundation','0002_foundation_health','0003_financial_ledger','0004_pricing_catalog',
+      '0005_pricing_valuation_history','0006_finance_security_roles','0007_accounting_projection_snapshots','0008_budget_reservations',
+      '0009_usage_intake','0010_budget_authority_bindings','0011_budget_settlement_reconciliation','0012_reporting_snapshots'];
+    assert.deepEqual(installed.rows.map(row=>row.version),expectedVersions,'only the exact known core11 and independent reporting0012 migrations are installed');
+    for(const row of installed.rows)assert.equal(row.checksum_sha256,createHash('sha256').update(await readFile(join(root,'migrations',`${row.version}.sql`))).digest('hex'),'installed known migration bytes match their source commitments');
+    assert.equal((await pool.query('SELECT migrations_ready FROM cost_intelligence.reporting_health')).rows[0].migrations_ready,true);
 
     const scope = makeScope('union');
     const eventCases = [
