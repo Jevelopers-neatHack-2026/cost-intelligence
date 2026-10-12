@@ -6,7 +6,7 @@ import {
 } from '../../dist/index.js';
 import {
   loadReserveFixture, setBudgetLimit, reservationPool, makePorts, makeScope, policyChange, reservationRequest,
-  markDispatchedCommand, settleCommand, releaseCommand, scriptedClient, scriptedPorts,
+  markDispatchedCommand, settleCommand, releaseCommand, scriptedClient, scriptedPorts, partitionRows, delay,
 } from './reservation-harness.mjs';
 
 const fixturePromise = loadReserveFixture();
@@ -290,4 +290,64 @@ test('CI-05A.2/.3 PostgreSQL: a dispatched hold keeps its capacity until final s
   } finally {
     await pool.end();
   }
+});
+
+/* Re-review regressions: unacknowledged COMMIT and non-authoritative final usage. */
+
+test('CI-05A.4 a never-acknowledged COMMIT returns unavailable within the deadline (authorize and lifecycle)', async () => {
+  const scope = scopeFor('commit-hang');
+  const policy = { contract: 'cost-intelligence.budget-policy', schema_version: '1.0.0', id: '123e4567-e89b-42d3-a456-000000000a01', revision: 1, content_hash: `sha256:${'a'.repeat(64)}` };
+  const reserve = await fixturePromise;
+  const request = reservationRequest(scope, reserve, { amount: '1', policyRef: policy });
+  let commits = 0;
+  const hanging = base => scriptedClient((sql, values) => {
+    if (sql === 'COMMIT') { commits += 1; return new Promise(() => {}); }
+    return base(sql, values);
+  });
+  const within = async promise => Promise.race([promise, delay(1_000).then(() => 'hung')]);
+
+  const auth = hanging(partitionRows(policy, '5'));
+  const decision = await within(authorizeReservation(request, scriptedPorts(scope, async () => auth.client, { authorityWaitMs: 25 })));
+  assert.notEqual(decision, 'hung', 'authorize must not wait on an unacknowledged COMMIT');
+  assert.equal(decision.ok && decision.value.status, 'unavailable');
+  assert.ok(decision.value.retryAfterMs > 0);
+
+  const dispatched = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
+  const lifecycle = hanging(sql => (sql.includes('array_agg(event_type ORDER BY event_sequence DESC)') ? [dispatched] : null));
+  const settled = await within(settleReservation(settleCommand(scope, R1, 2, { cumulativeAmount: '0.5', finality: 'final' }), scriptedPorts(scope, async () => lifecycle.client, { authorityWaitMs: 25 })));
+  assert.notEqual(settled, 'hung', 'a lifecycle command must not wait on an unacknowledged COMMIT');
+  assert.equal(settled.ok, false);
+  assert.equal(settled.error.code, 'BUDGET_UNAVAILABLE');
+  assert.equal(settled.error.retryable, true);
+  assert.ok(commits >= 2);
+});
+
+test('CI-05A.2 final settlement with incomplete or unknown usage is not authoritative and cannot release exposure', async () => {
+  const scope = scopeFor('settle-unknown');
+  for (const [completeness, expected] of [['unknown', 'unknown'], ['incomplete', 'partial']]) {
+    const row = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
+    const script = scriptedClient((sql, values) => {
+      if (sql.includes('array_agg(event_type ORDER BY event_sequence DESC)')) return [{ ...row }];
+      if (sql.includes('INSERT INTO cost_intelligence.budget_reservation_events')) {
+        Object.assign(row, { revision: values[7], last_type: values[8], consumed: values[9], last_finality: values[11] });
+      }
+      return null;
+    });
+    const ports = scriptedPorts(scope, async () => script.client);
+    const command = settleCommand(scope, R1, 2, { cumulativeAmount: '0.000000', finality: 'final', attemptBinding: ATTEMPT });
+    command.settlement.usageCompleteness = completeness;
+    const settlement = await settleReservation(command, ports);
+    assert.equal(settlement.ok, true, completeness);
+    assert.equal(settlement.value.usageFinality, expected, `${completeness}: reported finality is demoted`);
+    assert.equal(settlement.value.state, 'partially_settled');
+    assert.equal(settlement.value.outstandingHold, '1', 'the exposure stays held');
+    const release = await releaseReservation(releaseCommand(scope, R1, 3, { amount: '1.000000', proof: 'final_usage_known', attemptBinding: ATTEMPT }), ports);
+    assert.equal(release.ok, false, completeness);
+    assert.equal(release.error.code, 'BUDGET_UNAVAILABLE');
+    assert.equal(release.error.retryable, false);
+  }
+  // Complete final usage of zero is authoritative and still releases the unused hold.
+  const row = reservationRow({ revision: 3, last_type: 'settled', last_finality: 'final', ever_dispatched: true });
+  const ok = await run(releaseCommand(scope, R1, 3, { amount: '1.000000', proof: 'final_usage_known' }), releaseReservation, row);
+  assert.equal(ok.result.ok, true);
 });

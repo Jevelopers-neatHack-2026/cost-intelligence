@@ -238,7 +238,7 @@ class DeadlineGate {
   constructor(waitMs: number) { this.deadlineAt = Date.now() + waitMs; }
   remainingMs(): number { return Math.max(1, Math.ceil(this.deadlineAt - Date.now())); }
   checkpoint(): void { if (this.expired) throw new DeadlineExceeded('budget deadline exceeded'); }
-  /** The commit is the single point of no return; after it the true outcome is reported. */
+  /** The commit is the point of no return: its outcome is unknown until acknowledged, and the deadline still applies. */
   beginCommit(): void { this.checkpoint(); this.committing = true; }
 }
 
@@ -246,9 +246,10 @@ async function runBounded<T>(waitMs: number, onTimeout: () => T, body: (gate: De
   const gate = new DeadlineGate(waitMs);
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<T>(resolve => {
-    timer = setTimeout(() => {
-      if (!gate.committing) { gate.expired = true; resolve(onTimeout()); }
-    }, waitMs);
+    // The deadline also applies while a COMMIT is unacknowledged. The commit may still land, so the
+    // caller gets the retryable unavailable result; a retry with the same idempotency key replays
+    // (or conflicts with) whatever persisted and never frees or double-books the exposure.
+    timer = setTimeout(() => { gate.expired = true; resolve(onTimeout()); }, waitMs);
   });
   const work = body(gate);
   work.catch(() => undefined);
@@ -1039,12 +1040,23 @@ export async function markReservationDispatched(value: unknown, ports: BudgetRun
   });
 }
 
+/**
+ * Final usage is authoritative only when the usage is also complete. Reported usage that is
+ * incomplete is a lower bound (partial) and unknown usage proves nothing (unknown), so neither can
+ * make a hold releasable or present a zero as settled consumption.
+ */
+function effectiveFinality(finality: 'partial' | 'final', completeness: 'unknown' | 'incomplete' | 'complete'): 'unknown' | 'partial' | 'final' {
+  if (completeness === 'complete') return finality;
+  return completeness === 'incomplete' ? 'partial' : 'unknown';
+}
+
 export async function settleReservation(value: unknown, ports: BudgetRuntimePorts): Promise<ApiResult<ReservationCommandOutcome>> {
   const validated = validateSettleReservationCommandBoundary(value);
   if (!validated.ok) return failure(validated.error);
   const request = validated.value as SettleReservationCommand;
   const currency = request.settlement.currency;
   const cumulative = parseScaledDecimal(request.settlement.cumulativeAmount);
+  const settledFinality = effectiveFinality(request.settlement.finality, request.settlement.usageCompleteness);
   return applyCommand({
     requestId: request.requestId, idempotencyKey: request.idempotencyKey, scope: request.scope as TrustedScope,
     reservationId: request.reservationId, expectedRevision: request.expectedRevision, currency,
@@ -1052,7 +1064,7 @@ export async function settleReservation(value: unknown, ports: BudgetRuntimePort
     attemptBinding: request.attemptBinding as unknown as Record<string, unknown>,
     logicalOperationId: request.attemptBinding.logicalOperationId, billableAttemptId: request.attemptBinding.billableAttemptId,
     kind: 'settle', ports, operation: 'settle', authority: 'budgets.settle',
-    identity: { eventType: 'settled', consumed: cumulative, released: 0n, usageFinality: request.settlement.finality, settlementSequence: request.settlement.sequence },
+    identity: { eventType: 'settled', consumed: cumulative, released: 0n, usageFinality: settledFinality, settlementSequence: request.settlement.sequence },
     compute(state) {
       if (state.lastType === 'released' || state.lastType === 'expired') {
         return { reject: makeError('settle', 'VALIDATION_ERROR', request.requestId, 'A released or expired reservation cannot be settled.') };
@@ -1063,7 +1075,7 @@ export async function settleReservation(value: unknown, ports: BudgetRuntimePort
       // Record the cumulative consumption; never double-count a settled portion.
       return {
         eventType: 'settled', consumed: cumulative, released: 0n,
-        usageFinality: request.settlement.finality, settlementSequence: request.settlement.sequence,
+        usageFinality: settledFinality, settlementSequence: request.settlement.sequence,
       };
     },
   });
