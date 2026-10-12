@@ -9,7 +9,7 @@ export const foundationTestFiles = Object.freeze([
 export const databaseTestFiles = Object.freeze(['tests/migrations/migrations.test.mjs']);
 
 export const requiredDomainSuites = Object.freeze([
-  'accounting', 'adapters', 'budgets', 'ledger', 'metering', 'pricing', 'reconciliation', 'reporting', 'recovery',
+  'accounting', 'adapters', 'budgets', 'evidence', 'ledger', 'metering', 'pricing', 'reconciliation', 'reporting', 'recovery',
 ]);
 export const deferredDomainSuites = Object.freeze([
   Object.freeze({ suite: 'budgets', selector: 'nested-scopes', issue: 17, priority: 'P1', status: 'assigned_not_v1' }),
@@ -20,6 +20,7 @@ const leafPaths = Object.freeze({
   adapters: ['tests/adapters/adapters.test.mjs'],
   budgets: ['tests/budgets/authorization.test.mjs', 'tests/budgets/contention.test.mjs', 'tests/budgets/lifecycle.test.mjs'],
   contracts: ['tests/contracts/shared-contracts.test.mjs', 'tests/contracts/api-contract-shapes.test.mjs'],
+  evidence: ['tests/evidence/evidence.test.mjs'],
   exports: ['tests/exports/public-exports.test.mjs', 'tests/exports/csv-encoding.test.mjs'],
   integration: [...foundationTestFiles, ...databaseTestFiles],
   ledger: ['tests/ledger/ledger.test.mjs'],
@@ -32,7 +33,7 @@ const leafPaths = Object.freeze({
   reporting: ['tests/reporting/reporting.test.mjs'],
   security: ['tests/security/security.test.mjs'],
   smoke: ['tests/smoke/api-boundaries.test.mjs', 'tests/smoke/postgres-cleanup.test.mjs'],
-  traceability: ['tests/traceability/release-gates.test.mjs'],
+  traceability: ['tests/traceability/release-gates.test.mjs', 'tests/evidence/evidence.test.mjs'],
   unit: foundationTestFiles,
 });
 

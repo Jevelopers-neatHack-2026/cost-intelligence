@@ -42,6 +42,10 @@
       "types": "./dist/integrations/index.d.ts",
       "import": "./dist/integrations/index.js"
     },
+    "./evidence": {
+      "types": "./dist/evidence/index.d.ts",
+      "import": "./dist/evidence/index.js"
+    },
     "./reconciliation": {
       "types": "./dist/reconciliation/index.d.ts",
       "import": "./dist/reconciliation/index.js"
@@ -59,6 +63,7 @@
     "test:adapters": "npm run build --silent && node scripts/run-suite.mjs adapters",
     "test:budgets": "npm run build --silent && node scripts/with-postgres.mjs budgets",
     "test:contracts": "npm run build --silent && node scripts/run-suite.mjs contracts",
+    "test:evidence": "npm run build --silent && node scripts/run-suite.mjs evidence",
     "test:exports": "npm run build --silent && node scripts/run-suite.mjs exports",
     "test:integration": "npm run build --silent && node scripts/with-postgres.mjs integration",
     "test:ledger": "npm run build --silent && node scripts/with-postgres.mjs ledger",

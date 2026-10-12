@@ -19,6 +19,7 @@ test('package root and every declared subpath resolve to ESM modules and declara
     ['@jevelopers/cost-intelligence/budgets', ['authorize', 'markDispatched', 'settle', 'BudgetChangeRequestSchema', 'validateReservationRequestBoundary', 'validateSettleReservationCommandBoundary', 'validateReleaseReservationCommandBoundary', 'validateReservationCommandBoundary', 'validateReservationSnapshotBoundary']],
     ['@jevelopers/cost-intelligence/ledger', ['ingestFinancial', 'FinancialEventSchema', 'appendLedgerEvent', 'rebuildLedgerProjection', 'LedgerEventTypeSchema', 'LedgerClassificationSchema', 'LedgerAppendRequestSchema', 'LedgerAppendReceiptSchema', 'LedgerProjectionRequestSchema', 'LedgerProjectionSchema', 'validateLedgerAppendRequestBoundary', 'validateLedgerProjectionRequestBoundary']],
     ['@jevelopers/cost-intelligence/reporting', ['querySummary', 'FinancialSummaryPageSchema', 'validateFinancialSummaryPageBoundary']],
+    ['@jevelopers/cost-intelligence/evidence', ['lookupPostingEvidence', 'lookupByOperationalReference', 'validateEvidenceReference', 'EvidenceReferenceSchema']],
     ['@jevelopers/cost-intelligence/reconciliation', ['startReconciliation', 'getReconciliation']],
     ['@jevelopers/cost-intelligence/integrations', ['exportSummary', 'projectSafeFinancialSummary', 'safeCsvCell', 'serializeSafeFinancialSummaryCsv', 'ExportManifestSchema', 'validateExportRequestBoundary']],
   ];
