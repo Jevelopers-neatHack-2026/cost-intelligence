@@ -38,7 +38,12 @@ import {
  * the single existing hold. Replaying a key is honored only for the identical
  * normalized original request; anything else is a typed IDEMPOTENCY_CONFLICT.
  * Every operation shares one finite end-to-end deadline (authority, connection
- * and statements) and cannot commit after reporting unavailable. Budget authority is NOT product-purchase
+ * and statements). Work that has not reached its COMMIT when the deadline passes
+ * is abandoned and rolled back. A timeout while awaiting COMMIT acknowledgement
+ * returns the retryable unavailable result, but the transaction outcome is
+ * ambiguous: the hold or lifecycle event may have persisted, so the caller must
+ * retry with the same idempotency key (which replays it or reports a conflict).
+ * Budget authority is NOT product-purchase
  * authority: these records only ration spend against a project limit.
  * ------------------------------------------------------------------ */
 
@@ -582,7 +587,12 @@ function policyRefMatches(canonicalRef: { id: string; revision: number; content_
  * Atomically check applicable project capacity and create an idempotent
  * reservation hold before billable dispatch. The whole call, including the
  * host authority, the connection and every database statement, shares one
- * finite deadline and can never commit a hold after reporting `unavailable`.
+ * finite deadline. Work not yet at COMMIT when the deadline passes is rolled
+ * back and cannot create a hold. A timeout while awaiting COMMIT acknowledgement
+ * returns the retryable `unavailable` decision, but the transaction outcome is
+ * ambiguous and the hold may have persisted: the caller must not dispatch and
+ * must retry with the same idempotency key, which replays the hold if it
+ * persisted (or reports a conflict for a different request).
  */
 export async function authorizeReservation(
   value: unknown,
