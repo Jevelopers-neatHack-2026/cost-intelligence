@@ -576,6 +576,16 @@ function financialBindingError(request: ReservationRequest): string | null {
   if (request.estimate.completeness === 'complete' && !sameAmount(requested.amount, request.estimate.knownSubtotal)) {
     return 'The canonical requested amount contradicts the complete estimate.';
   }
+  const maximum = request.estimate.boundedConservativeMaximum;
+  if (request.estimate.completeness === 'complete') {
+    // A reference to a maximum policy has no persisted, replay-bound home and is never authority; refuse it rather than ignore it.
+    if (request.estimate.maximumPolicyRef !== undefined) {
+      return 'A maximum policy reference is not supported on a complete estimate; omit it.';
+    }
+    if (maximum !== undefined && parseScaledDecimal(maximum) < parseScaledDecimal(request.estimate.knownSubtotal)) {
+      return 'The bounded conservative maximum cannot be below the known subtotal.';
+    }
+  }
   return null;
 }
 
@@ -737,11 +747,12 @@ export async function authorizeReservation(
            bounded_maximum, allow_partial, partial_allowed_amount, usage_finality, settlement_sequence, policy_version_id,
            rate_card_ref, policy_ref, idempotency_key, expected_revision, actor_reference, source_authority_ref,
            attempt_binding, logical_operation_id, billable_attempt_id, content_hash)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10::numeric,0,0,$11,$12::numeric,NULL,$13,$14,'unknown',NULL,$15,
-           $16::jsonb,$17::jsonb,$18,NULL,$19,$20::jsonb,$21::jsonb,$22,$23,$24)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10::numeric,0,0,$11,$12::numeric,$13::numeric,$14,$15,'unknown',NULL,$16,
+           $17::jsonb,$18::jsonb,$19,NULL,$20,$21::jsonb,$22::jsonb,$23,$24,$25)`,
         [eventId, scope.tenantId, scope.projectId, scope.environment, scope.billingMode, currency, reservationId,
           status === 'authorized' ? 'authorized' : 'partially_authorized', status,
           formatScaledDecimal(hold), request.estimate.completeness, request.estimate.knownSubtotal,
+          request.estimate.boundedConservativeMaximum === undefined ? null : formatScaledDecimal(parseScaledDecimal(request.estimate.boundedConservativeMaximum)),
           request.allowPartialAuthorization,
           partialAllowed === null ? null : formatScaledDecimal(partialAllowed), capacity.policy.id,
           request.estimate.rateCardRef === null ? null : JSON.stringify(request.estimate.rateCardRef),

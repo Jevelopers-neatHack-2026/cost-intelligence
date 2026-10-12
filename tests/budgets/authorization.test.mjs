@@ -518,3 +518,90 @@ test('CI-05A.4 PostgreSQL: a held partition lock yields unavailable within the b
     await pool.end();
   }
 });
+
+/* Optional bounded conservative maximum on a complete estimate must persist and replay identically. */
+
+function persistingClient(policy) {
+  let persisted;
+  const script = scriptedClient((sql, values) => {
+    if (sql.includes('INSERT INTO cost_intelligence.budget_reservation_events')) {
+      persisted = {
+        reservation_id: values[6], event_type: values[7], event_sequence: 1, currency: values[5], held_amount: values[9],
+        estimate_completeness: values[10], known_subtotal: values[11], bounded_maximum: values[12], allow_partial: values[13],
+        partial_allowed_amount: values[14], policy_version_id: values[15], rate_card_ref: values[16], policy_ref: values[17], attempt_binding: values[21],
+      };
+      return [];
+    }
+    if (sql.includes('ORDER BY event_sequence ASC')) return persisted ? [persisted] : [];
+    return partitionRows(policy, '5', persisted ? '1' : '0')(sql);
+  });
+  return { script, inserts: () => script.statements.filter(sql => sql.startsWith('INSERT')).length };
+}
+
+test('CI-05A.1 a complete estimate with an optional bounded maximum persists it and replays the identical request', async () => {
+  const scope = makeScope('optional-maximum');
+  const request = await scriptedRequest(scope, { amount: '1' });
+  request.estimate.boundedConservativeMaximum = '1.000';
+  const { script, inserts } = persistingClient(POLICY);
+  const ports = scriptedPorts(scope, async () => script.client);
+  const initial = await authorizeReservation(request, ports);
+  assert.equal(initial.ok && initial.value.status, 'authorized');
+  assert.equal(initial.value.heldAmount, '1', 'a complete estimate holds its known subtotal');
+  const retry = await authorizeReservation(request, ports);
+  assert.equal(retry.ok, true, retry.ok ? '' : retry.error.code);
+  assert.equal(retry.value.reservationId, initial.value.reservationId);
+  assert.equal(inserts(), 1, 'the retry creates no second hold');
+
+  // A changed, added or removed maximum is a typed conflict, never a silent replay.
+  for (const maximum of ['2', '1.5', undefined]) {
+    const changed = structuredClone(request);
+    if (maximum === undefined) delete changed.estimate.boundedConservativeMaximum; else changed.estimate.boundedConservativeMaximum = maximum;
+    const result = await authorizeReservation(changed, ports);
+    assert.equal(result.ok, false, String(maximum));
+    assert.equal(result.error.code, 'IDEMPOTENCY_CONFLICT', String(maximum));
+  }
+  assert.equal(inserts(), 1);
+});
+
+test('CI-05A.3 a maximum policy reference on a complete estimate, or a maximum below the subtotal, is rejected before any write', async () => {
+  const scope = makeScope('optional-maximum-reject');
+  const withRef = await scriptedRequest(scope, { amount: '1' });
+  withRef.estimate.boundedConservativeMaximum = '1';
+  withRef.estimate.maximumPolicyRef = POLICY;
+  const below = await scriptedRequest(scope, { amount: '1' });
+  below.estimate.boundedConservativeMaximum = '0.5';
+  for (const [label, request] of Object.entries({ withRef, below })) {
+    let connects = 0;
+    const result = await authorizeReservation(request, scriptedPorts(scope, async () => { connects += 1; return persistingClient(POLICY).script.client; }));
+    assert.equal(result.ok, false, label);
+    assert.equal(result.error.code, 'VALIDATION_ERROR', label);
+    assert.equal(connects, 0, label);
+  }
+});
+
+test('CI-05A.1 PostgreSQL: the exact same request with an optional bounded maximum replays the original hold', async () => {
+  assert.ok(process.env.CI_TEST_DB_RUNTIME_HOST, 'authorization suite requires the restricted disposable PostgreSQL role');
+  const reserve = await fixturePromise;
+  const pool = reservationPool(6);
+  try {
+    const scope = makeScope('db-optional-maximum');
+    await setLimit(pool, scope, '5.00');
+    const request = reservationRequest(scope, reserve, { amount: '1' });
+    request.estimate.boundedConservativeMaximum = '1';
+    const first = await authorizeReservation(request, makePorts(pool, scope));
+    assert.equal(first.ok && first.value.status, 'authorized', first.ok ? '' : first.error.code);
+    const replay = await authorizeReservation(request, makePorts(pool, scope));
+    assert.equal(replay.ok, true, replay.ok ? '' : replay.error.code);
+    assert.equal(replay.value.reservationId, first.value.reservationId);
+    assert.equal(replay.value.boundedConservativeMaximum, '1');
+    assert.equal(await countEvents(pool, scope), 1);
+    const changed = structuredClone(request);
+    changed.estimate.boundedConservativeMaximum = '2';
+    const conflict = await authorizeReservation(changed, makePorts(pool, scope));
+    assert.equal(conflict.ok, false);
+    assert.equal(conflict.error.code, 'IDEMPOTENCY_CONFLICT');
+    assert.equal(await countEvents(pool, scope), 1);
+  } finally {
+    await pool.end();
+  }
+});
