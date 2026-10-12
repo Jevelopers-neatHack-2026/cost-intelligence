@@ -132,6 +132,8 @@ export interface ReservationCommandOutcome {
   readonly consumedAmount: string;
   readonly releasedAmount: string;
   readonly outstandingHold: string;
+  /** Observed consumption above the hold (variance); real spend is recorded in full, never clamped to the hold. */
+  readonly overrunAmount: string;
   readonly currency: string;
   readonly revision: number;
   readonly usageFinality: 'unknown' | 'partial' | 'final';
@@ -885,6 +887,7 @@ function outcomeFrom(requestId: string, status: ReservationCommandOutcome['statu
     heldAmount: formatScaledDecimal(state.held), consumedAmount: formatScaledDecimal(state.consumed),
     releasedAmount: formatScaledDecimal(state.released),
     outstandingHold: formatScaledDecimal(outstanding > 0n ? outstanding : 0n),
+    overrunAmount: formatScaledDecimal(state.consumed > state.held ? state.consumed - state.held : 0n),
     currency: state.currency, revision: state.revision, usageFinality: state.usageFinality,
   };
 }
@@ -1075,6 +1078,14 @@ function effectiveFinality(finality: 'partial' | 'final', completeness: 'unknown
   return completeness === 'incomplete' ? 'partial' : 'unknown';
 }
 
+/**
+ * Record a cumulative settlement observation. The observed cumulative amount is recorded in full:
+ * consumption above the hold is a variance (`overrunAmount`), never truncated to the reservation.
+ *
+ * Local mapping (FC001 proposal only): the canonical SettleRequest `consumed` amount and currency
+ * must equal the wrapper's cumulative observation. This is NOT accepted FC003 producer
+ * delta-vs-cumulative semantics; that broader question remains open under #13.
+ */
 export async function settleReservation(value: unknown, ports: BudgetRuntimePorts): Promise<ApiResult<ReservationCommandOutcome>> {
   const validated = validateSettleReservationCommandBoundary(value);
   if (!validated.ok) return failure(validated.error);
@@ -1118,6 +1129,10 @@ export async function releaseReservation(value: unknown, ports: BudgetRuntimePor
   const request = validated.value as ReleaseReservationCommand;
   const currency = request.release.currency;
   const releaseAmount = parseScaledDecimal(request.release.amount);
+  // The pinned ReleaseRequest carries an economic currency but no amount; that currency must agree with the wrapper.
+  if (request.canonicalCommand.currency !== currency) {
+    return failure(makeError('release', 'VALIDATION_ERROR', request.requestId, 'The canonical release currency contradicts the release.'));
+  }
   return applyCommand({
     requestId: request.requestId, idempotencyKey: request.idempotencyKey, scope: request.scope as TrustedScope,
     reservationId: request.reservationId, expectedRevision: request.expectedRevision, currency,

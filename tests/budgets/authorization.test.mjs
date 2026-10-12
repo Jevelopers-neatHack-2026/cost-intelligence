@@ -605,3 +605,51 @@ test('CI-05A.1 PostgreSQL: the exact same request with an optional bounded maxim
     await pool.end();
   }
 });
+
+test('CI-05A.4 a COMMIT acknowledged only after the deadline leaves one hold that a same-key retry returns', async () => {
+  const scope = makeScope('late-commit');
+  const request = await scriptedRequest(scope, { amount: '1' });
+  let acknowledge;
+  let pending;
+  let persisted;
+  let inserts = 0;
+  let firstCommit = true;
+  const script = scriptedClient((sql, values) => {
+    if (sql.includes('INSERT INTO cost_intelligence.budget_reservation_events')) {
+      inserts += 1;
+      pending = {
+        reservation_id: values[6], event_type: values[7], event_sequence: 1, currency: values[5], held_amount: values[9],
+        estimate_completeness: values[10], known_subtotal: values[11], bounded_maximum: values[12], allow_partial: values[13], partial_allowed_amount: values[14],
+        policy_version_id: values[15], rate_card_ref: values[16], policy_ref: values[17], attempt_binding: values[21],
+      };
+      return [];
+    }
+    if (sql === 'COMMIT' && firstCommit) {
+      firstCommit = false;
+      return new Promise(resolve => { acknowledge = () => { persisted = pending; resolve([]); }; });
+    }
+    if (sql.includes('ORDER BY event_sequence ASC')) return persisted ? [persisted] : [];
+    return partitionRows(POLICY, '5', persisted ? '1' : '0')(sql);
+  });
+  const ports = scriptedPorts(scope, async () => script.client, { authorityWaitMs: 25 });
+
+  // The deadline expires while the COMMIT is unacknowledged: retryable unavailable, outcome ambiguous.
+  const timedOut = await authorizeReservation(request, ports);
+  assert.equal(timedOut.ok, true);
+  assert.equal(timedOut.value.status, 'unavailable');
+  assert.ok(timedOut.value.retryAfterMs > 0);
+  assert.equal(inserts, 1);
+  assert.equal(persisted, undefined, 'nothing is acknowledged yet, and no rollback is promised');
+
+  // The COMMIT later persists; the abandoned work finishes and returns its connection.
+  acknowledge();
+  await delay(10);
+  assert.equal(script.state.released, 1);
+
+  // Retrying with the same idempotency key returns exactly the one persisted reservation, with no second insert.
+  const retry = await authorizeReservation(request, ports);
+  assert.equal(retry.ok, true, retry.ok ? '' : retry.error.code);
+  assert.equal(retry.value.status, 'authorized');
+  assert.equal(retry.value.reservationId, persisted.reservation_id);
+  assert.equal(inserts, 1, 'the same-key retry creates no second hold');
+});

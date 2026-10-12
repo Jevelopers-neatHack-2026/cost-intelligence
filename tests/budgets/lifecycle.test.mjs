@@ -444,3 +444,68 @@ test('CI-05A.2 PostgreSQL: unrelated-attempt settle/release and a contradictory 
     await pool.end();
   }
 });
+
+/* Observed overrun and release currency agreement. */
+
+test('CI-05A.2 an observed overrun above the hold is recorded in full with its variance (scripted)', async () => {
+  const scope = scopeFor('overrun');
+  const row = reservationRow({ revision: 2, last_type: 'dispatched', ever_dispatched: true });
+  const script = scriptedClient((sql, values) => {
+    if (sql.includes('array_agg(event_type ORDER BY event_sequence DESC)')) return [{ ...row }];
+    if (sql.includes('INSERT INTO cost_intelligence.budget_reservation_events')) {
+      Object.assign(row, { revision: values[7], last_type: values[8], consumed: values[9], last_finality: values[11] });
+    }
+    return null;
+  });
+  const result = await settleReservation(settleCommand(scope, R1, 2, { cumulativeAmount: '1.100000', finality: 'final', attemptBinding: ATTEMPT }), scriptedPorts(scope, async () => script.client));
+  assert.equal(result.ok, true, result.ok ? '' : result.error.code);
+  assert.equal(result.value.heldAmount, '1');
+  assert.equal(result.value.consumedAmount, '1.1', 'the full observed spend is recorded, not clamped to the hold');
+  assert.equal(result.value.overrunAmount, '0.1');
+  assert.equal(result.value.outstandingHold, '0');
+  assert.equal(result.value.state, 'settled');
+  assert.equal(script.committed(), true);
+});
+
+test('CI-05A.2 a canonical release currency that contradicts the release is rejected before any database work', async () => {
+  const scope = scopeFor('release-currency');
+  const command = releaseCommand(scope, R1, 3, { amount: '0.5', proof: 'final_usage_known', attemptBinding: ATTEMPT });
+  command.canonicalCommand.currency = 'EUR';
+  let connects = 0;
+  const script = scriptedLifecycle(reservationRow({ revision: 3, last_type: 'settled', last_finality: 'final', ever_dispatched: true }));
+  const result = await releaseReservation(command, scriptedPorts(scope, async () => { connects += 1; return script.client; }));
+  assert.equal(result.ok, false);
+  assert.equal(result.error.code, 'VALIDATION_ERROR');
+  assert.equal(connects, 0);
+});
+
+test('CI-05A.2 PostgreSQL: an observed overrun is recorded in full, charged to capacity, and cannot be released', async () => {
+  assert.ok(process.env.CI_TEST_DB_RUNTIME_HOST, 'lifecycle suite requires the restricted disposable PostgreSQL role');
+  const reserve = await fixturePromise;
+  const pool = reservationPool(8);
+  try {
+    const scope = makeScope('db-overrun');
+    await setLimit(pool, scope, '5.00');
+    const authorized = await authorizeReservation(reservationRequest(scope, reserve, { amount: '1.00' }), makePorts(pool, scope));
+    const id = authorized.value.reservationId;
+    const own = authorized.value.attemptBinding;
+    assert.equal((await markReservationDispatched(markDispatchedCommand(scope, id, 1, { attemptBinding: own }), makePorts(pool, scope))).ok, true);
+    const settled = await settleReservation(settleCommand(scope, id, 2, { cumulativeAmount: '1.100000', finality: 'final', attemptBinding: own }), makePorts(pool, scope));
+    assert.equal(settled.ok, true, settled.ok ? '' : settled.error.code);
+    assert.equal(settled.value.heldAmount, '1');
+    assert.equal(settled.value.consumedAmount, '1.1');
+    assert.equal(settled.value.overrunAmount, '0.1');
+    assert.equal(settled.value.outstandingHold, '0');
+    const capacity = await readCapacity(scope, 'USD', 'db-overrun', makePorts(pool, scope));
+    assert.equal(capacity.value.effectiveConsumedSpend, '1.1');
+    assert.equal(capacity.value.usedCapacity, '1.1');
+    assert.equal(capacity.value.availableCapacity, '3.9');
+    const release = await releaseReservation(releaseCommand(scope, id, 3, { amount: '0.100000', proof: 'final_usage_known', attemptBinding: own }), makePorts(pool, scope));
+    assert.equal(release.ok, false, 'there is no unused hold left to release');
+    const badCurrency = releaseCommand(scope, id, 3, { amount: '0', proof: 'final_usage_known', attemptBinding: own });
+    badCurrency.canonicalCommand.currency = 'EUR';
+    assert.equal((await releaseReservation(badCurrency, makePorts(pool, scope))).ok, false);
+  } finally {
+    await pool.end();
+  }
+});
