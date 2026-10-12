@@ -13,6 +13,7 @@ import './read-renewal.test.mjs';
 import './context-renewal.test.mjs';
 import './disclosure-fence.test.mjs';
 import './public-release.test.mjs';
+import '../contracts/canonical-compatibility.test.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const integrationApi = await import('../../dist/integrations/index.js');
