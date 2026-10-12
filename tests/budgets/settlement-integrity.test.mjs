@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Value} from '@sinclair/typebox/value';
+import pg from 'pg';
+import {databaseConfigFromEnvironment} from '../../scripts/test-db-lifecycle.mjs';
 import * as api from '../../dist/budgets/index.js';
 import {appendLedgerEvent} from '../../dist/ledger/store.js';
 import {loadReserveFixture,setBudgetLimit,reservationPool,makeScope,makePorts,reservationRequest,markDispatchedCommand,settleCommand,releaseCommand,FIXED_TIME} from './reservation-harness.mjs';
@@ -149,6 +151,48 @@ test('CI05B privacy-quarantined scoped financial history refuses admission repla
   const refusedRelease=await api.release(release,f.ports);assert.equal(refusedRelease.ok,false);assert.equal(refusedRelease.error.code,'BUDGET_UNAVAILABLE');
   const held=await f.pool.query('SELECT sum(held_amount)::text AS held,sum(released_amount)::text AS released,count(*)::int AS events FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$1',[f.reservationId]);assert.equal(held.rows[0].held,'1');assert.equal(held.rows[0].released,'0');assert.equal(held.rows[0].events,2);
  }finally{await f.pool.end();}
+});
+test('CI05B quarantine insertion serializes fresh admission and no-bill release before either can mutate financial commitments',{timeout:20000},async()=>{
+ for(const action of ['admission','no_bill_release']){
+  const f=await fixture(`quarantine-race-${action}`),observer=new pg.Pool(databaseConfigFromEnvironment('CI_TEST_DB'));
+  const writer=await observer.connect();let pending;
+  try{
+   const expense=expenseFixture(f.scope,{amount:'0.5',billableAttemptId:f.request.attemptBinding.billableAttemptId,logicalOperationId:f.request.attemptBinding.logicalOperationId});
+   const posted=await appendLedgerEvent(expense,f.ports);assert.equal(posted.ok,true,JSON.stringify(posted));
+   const hash=(await observer.query('SELECT event_hash FROM cost_intelligence.financial_ledger_events WHERE event_id=$1',[expense.eventId])).rows[0].event_hash;
+   const before=(await observer.query('SELECT count(*)::int AS events,sum(held_amount)::text AS held,sum(released_amount)::text AS released FROM cost_intelligence.budget_reservation_events WHERE tenant_id=$1 AND project_id=$2',[f.scope.tenantId,f.scope.projectId])).rows[0];
+   await writer.query('BEGIN');
+   // This INSERT must acquire the same scope lock as admission/release, before becoming visible.
+   await writer.query(`INSERT INTO cost_intelligence.financial_privacy_quarantine(record_kind,record_hash,tenant_id,project_id,environment,billing_mode,reason_code) VALUES('ledger_event',$1,$2,$3,$4,$5,'legacy_sensitive_event_data')`,[hash,f.scope.tenantId,f.scope.projectId,f.scope.environment,f.scope.billingMode]);
+   let runtimePid,notifyConnected;const connected=new Promise(resolve=>{notifyConnected=resolve;});
+   const database={connect:async()=>{const client=await f.ports.database.connect();runtimePid=(await client.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;notifyConnected();return client;}};
+   let request,ports;
+   if(action==='admission'){
+    request=reservationRequest(f.scope,await loadReserveFixture(),{amount:'1'});
+    const low=makePorts(f.pool,f.scope,{clock:f.ports.clock});ports={...low,database,budgets:{database,authorityWaitMs:10000,budgetEvidence:low.budgetEvidence,reservationAuthority:low.reservationAuthority,sourceCollector:low.sourceCollector,reportedCostContractMode:'development_0_10_1'}};
+    assert.equal(api.validateReservationRequestBoundary(request).ok,true);
+    pending=api.authorize(request,ports);
+   }else{
+    const finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_no_bill',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:null,fenceReference:null});
+    request=native(releaseCommand(f.scope,f.reservationId,2,{amount:'1',proof:'final_usage_known',attemptBinding:f.request.attemptBinding}));request.sourceAuthorityRef=finality;request.release.evidenceRefs=[finality];
+    assert.equal(Value.Check(api.VerifiedReleaseRequestSchema,request),true);
+    ports={...f.ports,database,budgets:{...f.ports.budgets,database,authorityWaitMs:10000}};pending=api.release(request,ports);
+   }
+   await connected;
+   const deadline=Date.now()+2000;let blocked=false;
+   while(Date.now()<deadline){
+    const state=await observer.query(`SELECT wait_event_type,wait_event FROM pg_catalog.pg_stat_activity WHERE pid=$1`,[runtimePid]);
+    if(state.rows[0]?.wait_event_type==='Lock'&&state.rows[0]?.wait_event==='advisory'){blocked=true;break;}
+    await new Promise(resolve=>setImmediate(resolve));
+   }
+   assert.equal(blocked,true,`public ${action} must wait on the quarantine scope lock`);
+   const during=(await observer.query('SELECT count(*)::int AS events FROM cost_intelligence.budget_reservation_events WHERE tenant_id=$1 AND project_id=$2',[f.scope.tenantId,f.scope.projectId])).rows[0];assert.equal(during.events,before.events);
+   await writer.query('COMMIT');
+   const refused=await pending;pending=null;assert.equal(refused.ok,false);assert.equal(refused.error.code,'BUDGET_UNAVAILABLE');
+   const after=(await observer.query('SELECT count(*)::int AS events,sum(held_amount)::text AS held,sum(released_amount)::text AS released FROM cost_intelligence.budget_reservation_events WHERE tenant_id=$1 AND project_id=$2',[f.scope.tenantId,f.scope.projectId])).rows[0];assert.deepEqual(after,before);
+   const receipts=await observer.query('SELECT count(*)::int AS n FROM cost_intelligence.budget_command_receipts WHERE tenant_id=$1 AND project_id=$2 AND idempotency_key=$3',[f.scope.tenantId,f.scope.projectId,request.idempotencyKey]);assert.equal(receipts.rows[0].n,0);
+  }finally{await writer.query('ROLLBACK').catch(()=>{});if(pending)await pending.catch(()=>{});writer.release();await observer.end();await f.pool.end();}
+ }
 });
 test('CI05B authenticated no-bill release is terminal against stale unverified timeout, with late authenticated expense still recognized',async()=>{
  const f=await fixture('no-bill-terminal');try{

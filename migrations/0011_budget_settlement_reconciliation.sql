@@ -241,6 +241,19 @@ CREATE TRIGGER budget_reconciliation_exceptions_revision_guard BEFORE INSERT ON 
 CREATE TRIGGER budget_recovery_cursors_revision_guard BEFORE INSERT ON cost_intelligence.budget_recovery_cursors
  FOR EACH ROW EXECUTE FUNCTION cost_intelligence.guard_budget_queue_append();
 
+-- A privileged privacy audit insert follows the same scope lock protocol as expense and budget writers.
+CREATE FUNCTION cost_intelligence.guard_financial_privacy_scope_insert() RETURNS trigger
+ LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,cost_intelligence AS $$
+BEGIN
+ PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(
+  'ci02-ledger:'||NEW.tenant_id||':'||NEW.project_id||':'||NEW.environment||':'||NEW.billing_mode,0));
+ RETURN NEW;
+END $$;
+ALTER FUNCTION cost_intelligence.guard_financial_privacy_scope_insert() OWNER TO ci_finance_owner;
+REVOKE ALL ON FUNCTION cost_intelligence.guard_financial_privacy_scope_insert() FROM PUBLIC;
+CREATE TRIGGER financial_privacy_quarantine_scope_insert_guard BEFORE INSERT ON cost_intelligence.financial_privacy_quarantine
+ FOR EACH ROW EXECUTE FUNCTION cost_intelligence.guard_financial_privacy_scope_insert();
+
 -- Existing events and acknowledgements retain their contracts and share a single revision with new lifecycle observations.
 CREATE OR REPLACE FUNCTION cost_intelligence.guard_budget_revision_append() RETURNS trigger
  LANGUAGE plpgsql SET search_path=pg_catalog,cost_intelligence AS $$

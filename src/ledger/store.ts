@@ -1602,7 +1602,8 @@ async function inspectBudgetSettlementCapability(client:LedgerTransactionPort,mi
       ((conname='financial_ledger_events_valuation_check' AND conrelid=to_regclass('cost_intelligence.financial_ledger_events'))
       OR(conname='usage_intake_inbox_valuation_basis_check' AND conrelid=to_regclass('cost_intelligence.usage_intake_inbox'))
       OR(conname='usage_intake_attempts_valuation_basis_check' AND conrelid=to_regclass('cost_intelligence.usage_intake_attempts')))`);
-  const hasAny=presence.rows.some(row=>row.present===true)||constraints.rows.some(row=>String(row.definition).includes('provider_reported_unsettled'));
+  const privacyGuard=await client.query(`SELECT to_regprocedure('cost_intelligence.guard_financial_privacy_scope_insert()') IS NOT NULL AS present`);
+  const hasAny=privacyGuard.rows[0]?.present===true||presence.rows.some(row=>row.present===true)||constraints.rows.some(row=>String(row.definition).includes('provider_reported_unsettled'));
   if(migrationCount!==11){if(hasAny)throw new Error('Settlement artifacts cannot masquerade as legacy finance health.');return;}
   if(presence.rows.length!==7||presence.rows.some(row=>row.present!==true)||constraints.rows.length!==3)throw new Error('Settlement capability is incomplete.');
   const enumColumns:Record<string,string>={financial_ledger_events_valuation_check:'valuation',
@@ -1637,16 +1638,20 @@ async function inspectBudgetSettlementCapability(client:LedgerTransactionPort,mi
     ['budget_reported_observations','budget_reported_observations_revision_guard','guard_budget_reported_append'],
     ['budget_reconciliation_exceptions','budget_reconciliation_exceptions_revision_guard','guard_budget_queue_append'],
     ['budget_recovery_cursors','budget_recovery_cursors_revision_guard','guard_budget_queue_append'],
+    ['financial_privacy_quarantine','financial_privacy_quarantine_scope_insert_guard','guard_financial_privacy_scope_insert'],
   ];
-  const guards=await client.query(`SELECT c.relname,t.tgname,p.proname,t.tgtype,t.tgenabled,p.prosecdef,t.tgisinternal
+  const guards=await client.query(`SELECT c.relname,t.tgname,p.proname,t.tgtype,t.tgenabled,p.prosecdef,t.tgisinternal,p.proconfig,pg_get_userbyid(p.proowner) AS function_owner
     FROM pg_trigger t JOIN pg_proc p ON p.oid=t.tgfoid JOIN pg_class c ON c.oid=t.tgrelid
     JOIN pg_namespace ns ON ns.oid=c.relnamespace JOIN pg_namespace pn ON pn.oid=p.pronamespace
     WHERE ns.nspname='cost_intelligence' AND pn.nspname='cost_intelligence' AND c.relname=ANY($1::text[])
-      AND p.proname=ANY($2::text[])`,[SETTLEMENT_TABLES,expectedGuards.map(([, ,fn])=>fn)]);
+      AND p.proname=ANY($2::text[])`,[[...SETTLEMENT_TABLES,'financial_privacy_quarantine'],expectedGuards.map(([, ,fn])=>fn)]);
   if(guards.rows.length!==expectedGuards.length||expectedGuards.some(([table,name,fn])=>guards.rows.filter(row=>
     row.relname===table&&row.tgname===name&&row.proname===fn&&Number(row.tgtype)===7
     && ['O','A'].includes(String(row.tgenabled))&&row.prosecdef===false&&row.tgisinternal===false).length!==1))
     throw new Error('Settlement guards are not the exact individual table/function/event bindings.');
+  const privacyInsertGuard=guards.rows.find(row=>row.proname==='guard_financial_privacy_scope_insert');
+  if(privacyInsertGuard?.function_owner!=='ci_finance_owner'||JSON.stringify(privacyInsertGuard.proconfig)!==JSON.stringify(['search_path=pg_catalog, cost_intelligence']))
+    throw new Error('Privacy insert serialization does not use the trusted Finance owner and fixed search path.');
   const requiredUnique:Record<string,readonly string[]>={
     budget_source_observations:['UNIQUE (tenant_id, project_id, environment, billing_mode, record_id, record_revision)'],
     budget_lifecycle_observations:['UNIQUE (tenant_id, project_id, environment, billing_mode, reservation_id, event_sequence)','UNIQUE (tenant_id, project_id, environment, billing_mode, idempotency_key)'],
