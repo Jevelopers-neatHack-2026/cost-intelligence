@@ -6,6 +6,12 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+// Keep the configured-export regression cases in the existing required exports suite.
+import './prepared-exports.test.mjs';
+import './query-export-composition.test.mjs';
+import './read-renewal.test.mjs';
+import './context-renewal.test.mjs';
+import './disclosure-fence.test.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const integrationApi = await import('../../dist/integrations/index.js');
@@ -89,7 +95,7 @@ test('packed tarball installs into a clean consumer, imports every subpath, and 
   function run(command, args, cwd, label) {
     const result = spawnSync(command, args, {
       cwd, encoding: 'utf8', timeout: 120_000,
-      env: { ...process.env, CI: '1', npm_config_update_notifier: 'false', npm_config_fund: 'false', npm_config_audit: 'false' },
+      env: { ...process.env, CI: '1', npm_config_cache: join(temp, 'npm-cache'), npm_config_update_notifier: 'false', npm_config_fund: 'false', npm_config_audit: 'false' },
     });
     assert.equal(result.status, 0, `${label} failed (status=${result.status ?? 'null'}, error=${result.error?.message ?? 'none'}): ${(result.stderr || result.stdout || 'no output').slice(0, 1600)}`);
     return result.stdout;

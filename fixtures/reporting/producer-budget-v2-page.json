@@ -1,0 +1,194 @@
+{
+  "schemaVersion": "2.0.0",
+  "requestId": "synthetic-query",
+  "snapshotId": "sha256:b60487afeaef292d9aee40011593ec576aedcd1bbf31184c65eae828e080551d",
+  "queryContentHash": "sha256:3908a953d1c91e2a2c0ca02b1dae49f5a628b6c66168cefadd4736094e0da513",
+  "summaryContentHash": "sha256:465a19d07c338e37896299ba28a6cab05d417a9492cf125d4d40f2fabf24397d",
+  "asOf": "2026-10-12T22:00:01.000Z",
+  "timezone": "America/New_York",
+  "period": {
+    "start": "2026-10-10T00:00:00.000Z",
+    "end": "2026-10-11T00:00:00.000Z"
+  },
+  "scope": {
+    "tenantId": "3c53f92f-ea82-44e4-b64d-fcf75d335102",
+    "projectId": "f5fc6460-cb02-4fde-a136-e02070c68125",
+    "actorId": "synthetic-reporting-service",
+    "environment": "test",
+    "billingMode": "live"
+  },
+  "filters": {
+    "environments": [
+      "test"
+    ],
+    "billingModes": [
+      "live"
+    ],
+    "currency": "USD"
+  },
+  "watermark": {
+    "watermarkId": "sha256:d095b6a96f588510d05c3f3bddc2af922b80c0b18e9da32b31897fd2953893bc",
+    "capturedAt": "2026-10-12T22:00:01.000Z",
+    "sources": [
+      {
+        "source": "immutable_finance_inputs",
+        "revision": "ci08-reporting-policy-2.0.0",
+        "observedThrough": "2026-10-12T22:00:01.000Z",
+        "contentHash": "sha256:14e2b234d770d3877af75f73dd5ee55927a4c4ca3d04e86e8f89965242a3b2ed",
+        "completeness": "unknown"
+      }
+    ]
+  },
+  "summary": {
+    "policyVersion": "ci08-reporting-policy-2.0.0",
+    "accountingPolicyVersion": "ci06-accounting-policy-1.0.0",
+    "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+    "currencies": [
+      {
+        "currency": "USD",
+        "scale": 18,
+        "metrics": {
+          "expense": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "grossSales": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "netSales": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "directCosts": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "contribution": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "cashReceipts": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "cashPayouts": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          }
+        },
+        "valuation": {
+          "estimated": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "confirmed": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "unknownCount": 0
+        },
+        "reconciliation": {
+          "matchedCount": 0,
+          "unmatchedCount": 0,
+          "exceptionCount": 0
+        },
+        "simulated": {
+          "expense": "0",
+          "grossSales": "0",
+          "netSales": "0",
+          "directCosts": "0"
+        },
+        "groups": []
+      }
+    ],
+    "coverage": {
+      "status": "unknown",
+      "observed": 0,
+      "expected": null,
+      "unknownAmountCount": 0,
+      "unpostedAttemptCount": 0,
+      "awaitingEvidenceAttemptCount": 0,
+      "quarantinedObservationCount": 0,
+      "unsupportedEventCount": 0,
+      "missingSources": [
+        "expense",
+        "revenue",
+        "cash",
+        "approved_product_denominators"
+      ]
+    },
+    "budgets": [
+      {
+        "currency": "USD",
+        "window": "project_lifetime",
+        "policyReference": {
+          "id": "1c8cf6a6-3961-403a-8cf7-393974a4c06e",
+          "revision": 1,
+          "contentHash": "sha256:35915bcc1a721af618d8ddfa83dbd267417ee65607d9e161404a28d325920266"
+        },
+        "limit": "1",
+        "ledgerExpense": "0",
+        "lifecycleConsumed": "0",
+        "held": "0.75",
+        "remainingAuthorizedCapacity": "0.25",
+        "unresolvedExposure": false,
+        "advisoryOnly": true
+      }
+    ],
+    "unitCosts": [
+      {
+        "kind": "design",
+        "currency": "USD",
+        "status": "unknown",
+        "numerator": null,
+        "denominator": null,
+        "approvalReference": null,
+        "allocationPolicyVersion": "ci06-allocation-policy-1.0.0"
+      },
+      {
+        "kind": "workflow",
+        "currency": "USD",
+        "status": "unknown",
+        "numerator": null,
+        "denominator": null,
+        "approvalReference": null,
+        "allocationPolicyVersion": "ci06-allocation-policy-1.0.0"
+      },
+      {
+        "kind": "order",
+        "currency": "USD",
+        "status": "unknown",
+        "numerator": null,
+        "denominator": null,
+        "approvalReference": null,
+        "allocationPolicyVersion": "ci06-allocation-policy-1.0.0"
+      }
+    ],
+    "allocations": []
+  },
+  "details": [],
+  "detailCount": 0,
+  "hasMore": false,
+  "nextCursor": null,
+  "canonicalSummaries": [],
+  "canonicalMappingStatus": "proposal_only_owner_ack_pending"
+}

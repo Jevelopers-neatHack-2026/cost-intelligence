@@ -1,0 +1,181 @@
+{
+  "schemaVersion": "1.0.0",
+  "requestId": "synthetic-query",
+  "snapshotId": "sha256:918ad1d0c943373ae53b5164c95458daa2fcf8e39958a65ba8736ec63858728c",
+  "queryContentHash": "sha256:d1b013516fef5faf8e4f0e4ba77aa7b1765b4a50e71d13f43027748b43d376fd",
+  "asOf": "2026-10-12T22:00:00.000Z",
+  "timezone": "America/New_York",
+  "watermark": {
+    "watermarkId": "sha256:8a55c87ca586430ef9421582ea58e2291ef3d1c9b7b69497ca1a9aff3fea2bc9",
+    "capturedAt": "2026-10-12T22:00:00.000Z",
+    "sources": [
+      {
+        "source": "immutable_finance_inputs",
+        "revision": "ci08-reporting-policy-2.0.0",
+        "observedThrough": "2026-10-12T22:00:00.000Z",
+        "contentHash": "sha256:25cb92f33d6344c5d18df4da7542b7df06fd3c60090c9a0ad1cc430bfd556314",
+        "completeness": "partial"
+      }
+    ]
+  },
+  "filters": {
+    "environments": [
+      "test"
+    ],
+    "billingModes": [
+      "live"
+    ],
+    "currency": "USD"
+  },
+  "summaryContentHash": "sha256:2e45eba6775d6fd37a10955f477adcd56c21d83389845f98167519c5eb7bfaeb",
+  "summary": {
+    "contract": "FinancialSummary",
+    "schema_version": "1.0.0",
+    "policy_version": "1.0.0",
+    "event_id": "318fbe14-78bb-444a-8935-2019a6836ef2",
+    "tenant_id": "11111111-1111-4111-8111-111111111111",
+    "project_id": "22222222-2222-4222-8222-222222222222",
+    "correlation_id": "318fbe14-78bb-444a-8935-2019a6836ef2",
+    "producer": {
+      "module": "cost-intelligence",
+      "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "build_revision": "ci08-synthetic-oracle-1"
+    },
+    "occurred_at": "2026-10-12T22:00:00.000Z",
+    "observed_at": "2026-10-12T22:00:00.000Z",
+    "ingested_at": "2026-10-12T22:00:00.000Z",
+    "environment": "test",
+    "billing_mode": "live",
+    "source_refs": [],
+    "summary_id": "318fbe14-78bb-444a-8935-2019a6836ef2",
+    "revision": 1,
+    "period": {
+      "start": "2026-10-10T00:00:00.000Z",
+      "end": "2026-10-11T00:00:00.000Z"
+    },
+    "currency": "USD",
+    "scale": 18,
+    "rounding": "none",
+    "rounding_boundary": "none",
+    "valuation_basis": "estimated",
+    "settlement": "unpaid",
+    "reconciliation": "unmatched",
+    "reservation_state": "none",
+    "completeness": "incomplete",
+    "included_environments": [
+      "test"
+    ],
+    "included_billing_modes": [
+      "live"
+    ],
+    "coverage": {
+      "observed": 5,
+      "expected": null,
+      "missing_sources": [
+        "expense",
+        "revenue",
+        "cash",
+        "approved_product_denominators"
+      ]
+    },
+    "metrics": {
+      "expense": {
+        "status": "unknown",
+        "definition_ref": {
+          "contract": "cost-intelligence.reporting.metric-definition",
+          "schema_version": "1.0.0",
+          "id": "cbcd953b-be1a-449b-8fd1-74d1ec19871a",
+          "revision": 1,
+          "content_hash": "sha256:88c64fd36b4958bebb504c576a751952d75ffe2ac878bf5f29d286700727c378"
+        },
+        "value": null,
+        "source_refs": []
+      },
+      "gross_sales": {
+        "status": "unknown",
+        "definition_ref": {
+          "contract": "cost-intelligence.reporting.metric-definition",
+          "schema_version": "1.0.0",
+          "id": "5f9d45ac-faf5-4fd1-87bd-68ac5fc0c8c1",
+          "revision": 1,
+          "content_hash": "sha256:9c457c0b8728708d52477cc719a1ad2d156736382956a68b9654d1a466a669e4"
+        },
+        "value": null,
+        "source_refs": []
+      },
+      "net_sales": {
+        "status": "unknown",
+        "definition_ref": {
+          "contract": "cost-intelligence.reporting.metric-definition",
+          "schema_version": "1.0.0",
+          "id": "97f350b7-8f55-4e67-8409-595b9400ed18",
+          "revision": 1,
+          "content_hash": "sha256:ab3dfd0832296ba49c49c3c3d4b017c13b45cfe9e04479c532ac7f3a31da5352"
+        },
+        "value": null,
+        "source_refs": []
+      },
+      "direct_costs": {
+        "status": "unknown",
+        "definition_ref": {
+          "contract": "cost-intelligence.reporting.metric-definition",
+          "schema_version": "1.0.0",
+          "id": "139c4a14-81d9-418c-8e29-0550b55f4708",
+          "revision": 1,
+          "content_hash": "sha256:07bbdeed6d0262316fed38ca4c4913f17fecc431c043298f945a3f9b5f300295"
+        },
+        "value": null,
+        "source_refs": []
+      },
+      "contribution": {
+        "status": "unknown",
+        "definition_ref": {
+          "contract": "cost-intelligence.reporting.metric-definition",
+          "schema_version": "1.0.0",
+          "id": "5c1de47c-d602-4226-8211-559d1a304313",
+          "revision": 1,
+          "content_hash": "sha256:83c479253ff348ce30c06951eee5a759ca535aaa1fb34c5c77bc1ddc62dadf16"
+        },
+        "value": null,
+        "source_refs": []
+      },
+      "cash_receipts": {
+        "status": "unknown",
+        "definition_ref": {
+          "contract": "cost-intelligence.reporting.metric-definition",
+          "schema_version": "1.0.0",
+          "id": "7581d475-2800-4b56-828d-c6d1d732e11f",
+          "revision": 1,
+          "content_hash": "sha256:57dcba2d9dc6d144772bdabe415cc40f9daa61c4df13d4be51cc119be189af4c"
+        },
+        "value": null,
+        "source_refs": []
+      },
+      "cash_payouts": {
+        "status": "unknown",
+        "definition_ref": {
+          "contract": "cost-intelligence.reporting.metric-definition",
+          "schema_version": "1.0.0",
+          "id": "1c47084c-ce19-4cea-8c22-2df4e15e9196",
+          "revision": 1,
+          "content_hash": "sha256:8958d658e3fb0df2e22f238fe757000ef76b2f5965e3ce6ac7fa41d6f84e8eb3"
+        },
+        "value": null,
+        "source_refs": []
+      }
+    },
+    "original_amounts": [],
+    "conversion_ref": null,
+    "policy_ref": {
+      "contract": "cost-intelligence.reporting.policy-definition",
+      "schema_version": "1.0.0",
+      "id": "cdcbcf8d-56e4-4a57-8528-991ae8d74c49",
+      "revision": 1,
+      "content_hash": "sha256:62ffb8e5e2723cde437e9fd3fe1e69c5383fe62874635afce6496c10982c47a0"
+    },
+    "rate_card_refs": [],
+    "financial_event_refs": []
+  },
+  "hasMore": true,
+  "nextCursor": "eyJjb250ZW50SGFzaCI6InNoYTI1NjplNDljZjA5MDQ2YjFkZGMzMjRlZjA5Yzk1ZTZkMjUwOTczOTIzNzA4Nzg4MzYxOGQyMDVmM2MxYmY5MjFlN2IxIiwib2Zmc2V0IjoyLCJwYWdlU2l6ZSI6MiwicXVlcnlIYXNoIjoic2hhMjU2OmQxYjAxMzUxNmZlZjVmYWY4ZTRmMGU0YmE3N2FhN2IxNzY1YjRhNTBlNzFkMTNmNDMwMjc3NDhiNDNkMzc2ZmQiLCJzbmFwc2hvdElkIjoic2hhMjU2OjkxOGFkMWQwYzk0MzM3M2FlNTNiNTE2NGM5NTQ1OGRhYTJmY2Y4ZTM5OTU4YTY1YmE4NzM2ZWM2Mzg1ODcyOGMiLCJ2ZXJzaW9uIjoyfQ"
+}

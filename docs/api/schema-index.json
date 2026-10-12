@@ -4,6 +4,14 @@
     "pricing": [
       "1.0.0",
       "2.0.0"
+    ],
+    "reporting": [
+      "1.0.0",
+      "2.0.0"
+    ],
+    "integrations": [
+      "1.0.0",
+      "2.0.0"
     ]
   },
   "package": "@jevelopers/cost-intelligence",
@@ -338,6 +346,33 @@
     },
     {
       "module": "reporting",
+      "name": "ReportingMetricDefinitionSchema",
+      "schema_version": "1.0.0",
+      "export_name": "ReportingMetricDefinitionSchema",
+      "path": "schemas/cost-intelligence/1.0.0/reporting/ReportingMetricDefinitionSchema.json",
+      "completeness": "complete",
+      "sha256": "cf6c6d929e36cf1e40ffeebcc04142b97b47466d848ca26a82b69d15b7a556e9"
+    },
+    {
+      "module": "reporting",
+      "name": "ReportingPolicyDefinitionSchema",
+      "schema_version": "1.0.0",
+      "export_name": "ReportingPolicyDefinitionSchema",
+      "path": "schemas/cost-intelligence/1.0.0/reporting/ReportingPolicyDefinitionSchema.json",
+      "completeness": "complete",
+      "sha256": "665b9aa62f9a259b93f5dd97bfad7a1acc5feea0556bea56d14cbede8bc92d07"
+    },
+    {
+      "module": "reporting",
+      "name": "ReportingSnapshotReadRequestSchema",
+      "schema_version": "1.0.0",
+      "export_name": "ReportingSnapshotReadRequestSchema",
+      "path": "schemas/cost-intelligence/1.0.0/reporting/ReportingSnapshotReadRequestSchema.json",
+      "completeness": "complete",
+      "sha256": "271e43a8ddd8623e6a48210956ac7d4e48bc9c89653a21b36cc4ff1abf9d8087"
+    },
+    {
+      "module": "reporting",
       "name": "SummarySourceWatermarkSchema",
       "schema_version": "1.0.0",
       "export_name": "SummarySourceWatermarkSchema",
@@ -530,6 +565,116 @@
       "path": "schemas/cost-intelligence/2.0.0/pricing/PricingPartitionGroupSchema.json",
       "completeness": "complete",
       "sha256": "06e14940451ddc69a66b8e61d5293a21d6cd3117f5942a8d991baf8c0564fa69"
+    },
+    {
+      "module": "integrations",
+      "name": "ReportingExportRequestSchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingExportRequestSchema",
+      "path": "schemas/cost-intelligence/2.0.0/integrations/ReportingExportRequestSchema.json",
+      "completeness": "partial_wrapper_requires_combined_validation",
+      "combined_validator": "validateReportingExportRequestBoundary",
+      "sha256": "1c97ba0d69cd0e5d18baa4b2490e87be2ea57e16a4784e54ec34497dd4989a23"
+    },
+    {
+      "module": "integrations",
+      "name": "ReportingExportManifestSchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingExportManifestSchema",
+      "path": "schemas/cost-intelligence/2.0.0/integrations/ReportingExportManifestSchema.json",
+      "completeness": "complete",
+      "sha256": "7b101a9f29a6945f7ee86406ed9da4045e50de938420d6f22f1cb1b657cc3fb8"
+    },
+    {
+      "module": "integrations",
+      "name": "ReportingExportReceiptSchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingExportReceiptSchema",
+      "path": "schemas/cost-intelligence/2.0.0/integrations/ReportingExportReceiptSchema.json",
+      "completeness": "complete",
+      "sha256": "703d3b7501084c88bd5db16a99ed4a044f10f0325d29054b77504d717ce0f92f"
+    },
+    {
+      "module": "reporting",
+      "name": "FinancialSummaryFiltersSchema",
+      "schema_version": "2.0.0",
+      "export_name": "FinancialSummaryFiltersV2Schema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/FinancialSummaryFiltersSchema.json",
+      "completeness": "complete",
+      "sha256": "3e0b2e71fcda248e6781afd79303567f062a40684eeaaceec32202908a087250"
+    },
+    {
+      "module": "reporting",
+      "name": "FinancialSummaryQuerySchema",
+      "schema_version": "2.0.0",
+      "export_name": "FinancialSummaryQueryV2Schema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/FinancialSummaryQuerySchema.json",
+      "completeness": "complete",
+      "sha256": "1d1474860ab8bbabff123c2c93db022844a3408d86e1a22fe17ded096de657d9"
+    },
+    {
+      "module": "reporting",
+      "name": "ReportingDimensionSchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingDimensionSchema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingDimensionSchema.json",
+      "completeness": "complete",
+      "sha256": "df9a867ff45d71830ec04d10236b15adf2ebe691030281ad0d0f02c24a0b2765"
+    },
+    {
+      "module": "reporting",
+      "name": "ReportingAmountSchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingAmountSchema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingAmountSchema.json",
+      "completeness": "complete",
+      "sha256": "1ac450db443e8cd3d1fc073660e52ed923bf233b03d380a2f8532c9e88b5023e"
+    },
+    {
+      "module": "reporting",
+      "name": "ReportingDetailSchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingDetailSchema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingDetailSchema.json",
+      "completeness": "complete",
+      "sha256": "1ea9a50e51ff9ea11690f38b7adf70d91151007e01028f2089421e37f99f1e13"
+    },
+    {
+      "module": "reporting",
+      "name": "ReportingCurrencySummarySchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingCurrencySummarySchema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingCurrencySummarySchema.json",
+      "completeness": "complete",
+      "sha256": "717278fb4b9517d75c8d9df417d69f89b735d203b3a97f1a9e8e35e6f841f4eb"
+    },
+    {
+      "module": "reporting",
+      "name": "ReportingProductEvidenceSchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingProductEvidenceSchema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingProductEvidenceSchema.json",
+      "completeness": "complete",
+      "sha256": "9069f73f2f1dae1c5dadc8a460433a47aa254821aedfe8107ee6b8c0a95ae469"
+    },
+    {
+      "module": "reporting",
+      "name": "ReportingProjectionSchema",
+      "schema_version": "2.0.0",
+      "export_name": "ReportingProjectionSchema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingProjectionSchema.json",
+      "completeness": "complete",
+      "sha256": "91a87a6bc3cb9afdd07be6b38234c33d4135b07e788465f4b6f71bac6967f712"
+    },
+    {
+      "module": "reporting",
+      "name": "FinancialSummaryPageSchema",
+      "schema_version": "2.0.0",
+      "export_name": "FinancialSummaryPageV2Schema",
+      "path": "schemas/cost-intelligence/2.0.0/reporting/FinancialSummaryPageSchema.json",
+      "completeness": "partial_wrapper_requires_combined_validation",
+      "combined_validator": "validateFinancialSummaryPageV2Boundary",
+      "sha256": "862900ad30b1e5684c98852cb93f0010eb73504d2fd9f58018673c9334ddf814"
     }
   ]
 }

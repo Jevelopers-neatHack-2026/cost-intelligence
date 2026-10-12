@@ -12,6 +12,79 @@ import { assertDisposableMarker, databaseConfigFromEnvironment, migratorDatabase
 const { Client, Pool } = pg;
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
+// Reporting 0012 is a separate feature capability; it does not add a core-health requirement.
+const FINANCE_CORE_MIGRATIONS = Object.freeze([
+  '0001_foundation.sql', '0002_foundation_health.sql', '0003_financial_ledger.sql',
+  '0004_pricing_catalog.sql', '0005_pricing_valuation_history.sql',
+  '0006_finance_security_roles.sql', '0007_accounting_projection_snapshots.sql',
+  '0008_budget_reservations.sql', '0009_usage_intake.sql', '0010_budget_authority_bindings.sql',
+  '0011_budget_settlement_reconciliation.sql',
+]);
+const EXPECTED_MIGRATIONS = Object.freeze([...FINANCE_CORE_MIGRATIONS, '0012_reporting_snapshots.sql']);
+function assertKnownMigrationSet(names) {
+  assert.deepEqual(names, EXPECTED_MIGRATIONS,
+    'only the exact reviewed Finance core and independent reporting migration are accepted');
+}
+async function assertReportingCapability(client) {
+  const health = await client.query('SELECT migrations_ready FROM cost_intelligence.reporting_health');
+  assert.deepEqual(health.rows, [{ migrations_ready: true }], 'reporting has its own migration capability');
+  const table = await client.query(`SELECT c.relrowsecurity, c.relforcerowsecurity, r.rolname AS owner
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_roles r ON r.oid=c.relowner
+    WHERE n.nspname='cost_intelligence' AND c.relname='reporting_snapshots' AND c.relkind='r'`);
+  assert.deepEqual(table.rows, [{ relrowsecurity: true, relforcerowsecurity: true, owner: 'ci_finance_owner' }],
+    'the actual reporting snapshot table retains forced tenant scope and the non-login Finance owner');
+  const triggers = await client.query(`SELECT t.tgname::text AS name, t.tgtype::int AS type
+    FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='cost_intelligence' AND c.relname='reporting_snapshots' AND NOT t.tgisinternal
+      AND t.tgenabled IN ('O','A') AND t.tgfoid='cost_intelligence.reject_ledger_projection_mutation()'::regprocedure
+    ORDER BY t.tgname`);
+  assert.deepEqual(triggers.rows, [
+    { name: 'reporting_snapshots_append_only', type: 27 },
+    { name: 'reporting_snapshots_no_truncate', type: 34 },
+  ], 'the independent reporting capability preserves both immutable snapshot guards');
+}
+
+const FINANCE_CORE_SCOPE_POLICIES=Object.freeze([
+  ['financial_ledger_events','financial_ledger_events_scope_policy'],
+  ['financial_ledger_identity_bindings','financial_ledger_identity_bindings_scope_policy'],
+  ['financial_ledger_quarantine','financial_ledger_quarantine_scope_policy'],
+  ['financial_posting_attempt_mappings','financial_posting_attempt_mappings_scope_policy'],
+  ['financial_privacy_quarantine','financial_privacy_quarantine_scope_policy'],
+  ['financial_projection_amounts','financial_projection_amounts_scope_policy'],
+  ['financial_projection_quantities','financial_projection_quantities_scope_policy'],
+  ['financial_projection_snapshots','financial_projection_snapshots_scope_policy'],
+  ['financial_source_revision_heads','financial_source_revision_heads_scope_policy'],
+  ['pricing_estimate_snapshots','pricing_estimate_snapshots_scope_policy'],
+  ['pricing_fx_rate_versions','pricing_fx_rate_versions_scope_policy'],
+  ['pricing_operation_idempotency','pricing_operation_idempotency_scope_policy'],
+  ['pricing_rate_card_versions','pricing_rate_card_versions_scope_policy'],
+  ['pricing_rule_versions','pricing_rule_versions_scope_policy'],
+  ['usage_intake_attempts','usage_intake_attempts_scope_policy'],
+  ['usage_intake_inbox','usage_intake_inbox_scope_policy'],
+  ['usage_intake_outbox','usage_intake_outbox_scope_policy'],
+  ['usage_intake_quarantine','usage_intake_quarantine_scope_policy'],
+]);
+function normalizeScopePolicyExpression(value) {
+  // All operators in this reviewed expression are AND and NOT EXISTS. Formatting parentheses
+  // and the known schema qualification do not change it; extra tokens/operators are refused.
+  return String(value).replace(/\bcost_intelligence\./g,'').replace(/[\s()]/g,'');
+}
+function assertKnownScopedPolicies(rows) {
+  const expected=[...FINANCE_CORE_SCOPE_POLICIES,['reporting_snapshots','reporting_snapshots_scope_policy']]
+    .map(([table,name])=>({schema:'cost_intelligence',table,name})).sort((a,b)=>a.name.localeCompare(b.name));
+  assert.deepEqual(rows.map(({schema,table,name})=>({schema,table,name})),expected,
+    'the exact eighteen core policies and independent reporting policy must exist without substitutes');
+  const reporting=rows.find(row=>row.name==='reporting_snapshots_scope_policy');
+  assert.deepEqual({roles:reporting.roles,cmd:reporting.cmd,permissive:reporting.permissive},
+    {roles:['ci_finance_runtime'],cmd:'ALL',permissive:'PERMISSIVE'},'reporting policy belongs only to the restricted runtime role');
+  const expression=`finance_scope_matches(tenant_id,project_id,environment,billing_mode)
+    AND NOT EXISTS(SELECT 1 FROM financial_privacy_quarantine q
+      WHERE q.tenant_id=reporting_snapshots.tenant_id AND q.project_id=reporting_snapshots.project_id
+        AND q.environment=reporting_snapshots.environment AND q.billing_mode=reporting_snapshots.billing_mode)`;
+  for(const field of ['qual','with_check'])assert.equal(normalizeScopePolicyExpression(reporting[field]),normalizeScopePolicyExpression(expression),
+    `reporting ${field} preserves exact tenant/project/environment/billing scope and quarantine refusal`);
+}
+
 function hasDestructiveMigrationStatement(sql, allowedConstraintReplacements = []) {
   const tokens = [];
   let index = 0;
@@ -139,7 +212,8 @@ async function verifyDurability(prefix) {
     assertDisposableMarker(marker.rows);
     const health = await client.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
     assert.equal(health.rows[0].migrations_ready, true);
-    assert.equal(Number(health.rows[0].required_migrations_present), 11);
+    assert.equal(Number(health.rows[0].required_migrations_present), FINANCE_CORE_MIGRATIONS.length);
+    await assertReportingCapability(client);
     await client.query('CREATE TABLE IF NOT EXISTS ci_test.foundation_durable_probe (probe_id uuid PRIMARY KEY, payload text NOT NULL)');
     await client.query('INSERT INTO ci_test.foundation_durable_probe(probe_id, payload) VALUES ($1, $2)', [probeId, `verified:${prefix}`]);
   } finally {
@@ -566,16 +640,11 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
     { version: '0009_usage_intake', status: 'applied' },
     { version: '0010_budget_authority_bindings', status: 'applied' },
     { version: '0011_budget_settlement_reconciliation', status: 'applied' },
+    { version: '0012_reporting_snapshots', status: 'applied' },
   ]);
 
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.deepEqual(names, [
-    '0001_foundation.sql', '0002_foundation_health.sql', '0003_financial_ledger.sql',
-    '0004_pricing_catalog.sql', '0005_pricing_valuation_history.sql',
-    '0006_finance_security_roles.sql', '0007_accounting_projection_snapshots.sql',
-    '0008_budget_reservations.sql', '0009_usage_intake.sql', '0010_budget_authority_bindings.sql', '0011_budget_settlement_reconciliation.sql',
-  ], 'the current migration set is additive through accounting projections, budget reservations, and usage intake and preserves every earlier migration');
-  assert.equal(names.length, 11, 'foundation migration suite must exercise fresh creation, an additive security upgrade, the additive accounting projection and CI-05A budget reservation migrations, and usage intake');
+  assertKnownMigrationSet(names);
   for (const prefix of ['CI_TEST_DB', 'CI_TEST_PREVIOUS_DB']) {
     const client = new Client(databaseConfigFromEnvironment(prefix));
     await client.connect();
@@ -695,7 +764,9 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
         'intake observations and quarantines stay append-only while attempt and outbox identity remain immutable');
       const health = await client.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
       assert.equal(health.rows[0].migrations_ready, true);
-      assert.equal(Number(health.rows[0].required_migrations_present), names.length);
+      assert.equal(Number(health.rows[0].required_migrations_present), FINANCE_CORE_MIGRATIONS.length,
+        'reporting migration count cannot widen the exact Finance core capability');
+      await assertReportingCapability(client);
 
       const roleGroups = await client.query(
         `SELECT rolname, rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls
@@ -719,11 +790,13 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
       assert.ok(scopedOwners.rows.length >= 14);
       assert.ok(scopedOwners.rows.every(row => row.owner === 'ci_finance_owner'),
         'runtime ledger and pricing tables are owned by the distinct non-login finance owner');
-      const policyCount = await client.query(
-        `SELECT count(*)::integer AS total FROM pg_policies WHERE schemaname = 'cost_intelligence'
-           AND policyname LIKE '%_scope_policy'`,
+      const scopedPolicies = await client.query(
+        `SELECT schemaname::text AS schema, tablename::text AS "table", policyname::text AS name,
+                roles::text[] AS roles, cmd, permissive, qual, with_check
+         FROM pg_policies WHERE schemaname='cost_intelligence' AND policyname LIKE '%_scope_policy'
+         ORDER BY policyname`,
       );
-      assert.equal(policyCount.rows[0].total, 18, 'each scoped runtime table has an explicit RLS policy');
+      assertKnownScopedPolicies(scopedPolicies.rows);
       const runtimePrivileges = await client.query(
         `SELECT has_table_privilege('ci_finance_runtime', 'cost_intelligence.financial_ledger_events', 'SELECT') AS can_read,
                 has_table_privilege('ci_finance_runtime', 'cost_intelligence.financial_ledger_events', 'UPDATE') AS can_update,
@@ -921,7 +994,7 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
 test('0006 rejects pre-existing runtime role graphs and ACL escalation before a restricted-login upgrade', async () => {
   assert.ok(process.env.CI_TEST_DB_HOST, 'role-upgrade audit requires the disposable PostgreSQL harness');
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(names.length, 10);
+  assertKnownMigrationSet(names);
   const migrationName = names[5];
   assert.equal(migrationName, '0006_finance_security_roles.sql', 'the security preflight continues to target the frozen 0006 migration');
   const { name, base, config } = await createPre0006Database();
@@ -2150,7 +2223,8 @@ test('separate migration login applies 0007 accounting, 0008 budget reservations
     const health = await migrator.query(
       'SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health',
     );
-    assert.deepEqual(health.rows[0], { migrations_ready: true, required_migrations_present: 11 });
+    assert.deepEqual(health.rows[0], { migrations_ready: true, required_migrations_present: FINANCE_CORE_MIGRATIONS.length });
+    await assertReportingCapability(migrator);
     const intakeProjectionColumns = await migrator.query(
       `SELECT table_name, column_name FROM information_schema.columns
        WHERE table_schema='cost_intelligence' AND (
@@ -2202,7 +2276,7 @@ test('separate migration login applies 0007 accounting, 0008 budget reservations
 
 test('legacy financial privacy upgrade preserves immutable economics and fails affected scopes closed', async () => {
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(names.length, 10);
+  assertKnownMigrationSet(names);
   assert.equal(names[5], '0006_finance_security_roles.sql', 'privacy and role-boundary upgrade remains explicitly fixed at 0006');
   const { name, base, config } = await createPre0006Database();
   let admin;

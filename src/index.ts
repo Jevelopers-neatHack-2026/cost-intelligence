@@ -60,10 +60,11 @@ export type {
 } from './pricing/index.js';
 export * from './budgets/index.js';
 export * from './ledger/index.js';
-export { querySummary, validateFinancialSummaryPageBoundary, FinancialSummaryFiltersSchema, FinancialSummaryQuerySchema, SummarySourceWatermarkSchema, FinancialSummaryPageSchema } from './reporting/index.js';
-export type { FinancialSummaryFilters, FinancialSummaryQuery, FinancialSummaryPage } from './reporting/index.js';
+export * from './reporting/index.js';
 export { startReconciliation, getReconciliation, ReconciliationRequestSchema, ReconciliationRunSchema, ReconciliationResultSchema } from './reconciliation/index.js';
 export type { ReconciliationRequest, ReconciliationRun, ReconciliationResult } from './reconciliation/index.js';
-export { exportSummary, validateExportRequestBoundary, projectSafeFinancialSummary, safeCsvCell, serializeSafeFinancialSummaryCsv, ExportRequestSchema, ExportManifestSchema } from './integrations/index.js';
-export type { ExportRequest, ExportManifest, SafeFinancialMetricRow, SafeFinancialSummaryProjection } from './integrations/index.js';
+export { exportSummary, exportSummaryV2, getPreparedExportArtifacts, hashExportCanonical, createFileExportArtifactStore, createFileReportingExportArtifactStore, createReportingExportRuntimePorts, REPORTING_EXPORT_REGISTRY_PIN, validateReportingExportRequestBoundary, ReportingExportRequestSchema, ReportingExportManifestSchema, ReportingExportReceiptSchema, ExportArtifactManifestV2Schema, validateExportRequestBoundary, projectSafeFinancialSummary, safeCsvCell, serializeSafeFinancialSummaryCsv, ExportRequestSchema, ExportManifestSchema } from './integrations/index.js';
+export type { ExportRequest, ExportManifest, SafeFinancialMetricRow, SafeFinancialSummaryProjection, ExportRuntimePorts, ExportSnapshotReaderPort, ExportArtifactStorePort, ExportArtifact, ExportArtifactManifestV2, PreparedExportArtifacts, StoredExportArtifacts, ReportingExportRequest, ReportingExportManifest, ReportingPreparedExportArtifacts, ReportingStoredExportArtifacts, ReportingExportArtifactStorePort } from './integrations/index.js';
 export * from './evidence/index.js';
+
+export type { ExportDisclosureFencePort, ExportDisclosureFenceRequest, ExportDisclosureFenceResult, ExportAccessPermit, CurrentExportAccessSnapshot } from './integrations/index.js';

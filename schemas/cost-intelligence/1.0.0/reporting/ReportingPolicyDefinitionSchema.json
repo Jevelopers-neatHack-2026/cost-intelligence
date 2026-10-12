@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/ReportingPolicyDefinitionSchema/1.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "contract",
+    "schemaVersion",
+    "definitionId",
+    "revision",
+    "reportingPolicyVersion",
+    "accountingPolicyVersion",
+    "allocationPolicyVersion",
+    "definitionsStatus",
+    "signMatrix",
+    "recognition",
+    "currency",
+    "period",
+    "coverage",
+    "denominator",
+    "allocation"
+  ],
+  "properties": {
+    "contract": {
+      "const": "cost-intelligence.reporting.policy-definition",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "definitionId": {
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-8[a-f0-9]{3}-[a-f0-9]{12}$",
+      "type": "string"
+    },
+    "revision": {
+      "const": 1,
+      "type": "number"
+    },
+    "reportingPolicyVersion": {
+      "const": "ci08-reporting-policy-2.0.0",
+      "type": "string"
+    },
+    "accountingPolicyVersion": {
+      "const": "ci06-accounting-policy-1.0.0",
+      "type": "string"
+    },
+    "allocationPolicyVersion": {
+      "const": "ci06-allocation-policy-1.0.0",
+      "type": "string"
+    },
+    "definitionsStatus": {
+      "const": "PENDING FINANCE-OWNER SIGN-OFF",
+      "type": "string"
+    },
+    "signMatrix": {
+      "type": "object",
+      "patternProperties": {
+        "^(.*)$": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "grossSalesSign",
+            "netSalesSign",
+            "directCostsSign",
+            "cash",
+            "recovery",
+            "note"
+          ],
+          "properties": {
+            "grossSalesSign": {
+              "minimum": -1,
+              "maximum": 1,
+              "type": "integer"
+            },
+            "netSalesSign": {
+              "minimum": -1,
+              "maximum": 1,
+              "type": "integer"
+            },
+            "directCostsSign": {
+              "minimum": -1,
+              "maximum": 1,
+              "type": "integer"
+            },
+            "cash": {
+              "anyOf": [
+                {
+                  "const": "none",
+                  "type": "string"
+                },
+                {
+                  "const": "receipt",
+                  "type": "string"
+                },
+                {
+                  "const": "payout",
+                  "type": "string"
+                },
+                {
+                  "const": "directional",
+                  "type": "string"
+                }
+              ]
+            },
+            "recovery": {
+              "type": "boolean"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "recognition": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string"
+    },
+    "period": {
+      "type": "string"
+    },
+    "coverage": {
+      "type": "string"
+    },
+    "denominator": {
+      "type": "string"
+    },
+    "allocation": {
+      "type": "string"
+    }
+  }
+}

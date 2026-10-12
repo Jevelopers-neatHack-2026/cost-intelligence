@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/ReportingAmountSchema/2.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "status",
+    "knownSubtotal",
+    "total",
+    "unknownCount"
+  ],
+  "properties": {
+    "status": {
+      "anyOf": [
+        {
+          "const": "known",
+          "type": "string"
+        },
+        {
+          "const": "partial",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "type": "string"
+        }
+      ]
+    },
+    "knownSubtotal": {
+      "anyOf": [
+        {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "total": {
+      "anyOf": [
+        {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "unknownCount": {
+      "minimum": 0,
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,99 @@
+{
+  "fixtureVersion": "1.0.0",
+  "evidenceMode": "mocked",
+  "environment": "test",
+  "billingMode": "live",
+  "verificationStatus": "synthetic_current_host_issuer",
+  "realProviderActivity": false,
+  "period": {
+    "start": "2026-10-10T00:00:00.000Z",
+    "end": "2026-10-11T00:00:00.000Z"
+  },
+  "postings": [
+    {
+      "id": "sale",
+      "eventType": "revenue",
+      "classification": "sale",
+      "amount": "20",
+      "dimensions": {
+        "orderId": "order-a",
+        "channel": "web"
+      }
+    },
+    {
+      "id": "discount",
+      "eventType": "discount",
+      "classification": "discount",
+      "amount": "2",
+      "dimensions": {
+        "orderId": "order-a",
+        "channel": "web"
+      }
+    },
+    {
+      "id": "refund",
+      "eventType": "refund",
+      "classification": "sale_refund",
+      "amount": "3",
+      "dimensions": {
+        "orderId": "order-a",
+        "channel": "web"
+      }
+    },
+    {
+      "id": "research",
+      "eventType": "expense",
+      "classification": "direct_cost",
+      "amount": "1",
+      "dimensions": {
+        "provider": "provider-a",
+        "model": "model-a",
+        "feature": "research",
+        "repo": "repo-a",
+        "workflowId": "workflow-a"
+      },
+      "valuation": "estimated"
+    },
+    {
+      "id": "tiny",
+      "eventType": "expense",
+      "classification": "direct_cost",
+      "amount": "0.000000000000000001",
+      "dimensions": {}
+    },
+    {
+      "id": "eur",
+      "eventType": "expense",
+      "classification": "direct_cost",
+      "amount": "2",
+      "currency": "EUR",
+      "dimensions": {
+        "provider": "provider-b",
+        "model": "model-b"
+      }
+    }
+  ],
+  "manualExpected": {
+    "USD": {
+      "grossSales": "20",
+      "netSales": "15",
+      "directCosts": "1.000000000000000001",
+      "contribution": "13.999999999999999999"
+    },
+    "EUR": {
+      "directCosts": "2"
+    },
+    "cashStatusWithoutSource": "unknown",
+    "researchAllocation": {
+      "source": "1",
+      "targets": [
+        "0.33",
+        "0.33",
+        "0.33"
+      ],
+      "residual": "0.01"
+    }
+  },
+  "ownerApprovalStatus": "pending",
+  "consumerAcknowledgement": "pending"
+}

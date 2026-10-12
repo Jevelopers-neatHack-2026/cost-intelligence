@@ -1,0 +1,2523 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/FinancialSummaryPageSchema/2.0.0",
+  "x-schema-completeness": "partial_wrapper_requires_combined_validation",
+  "x-combined-validator": "validateFinancialSummaryPageV2Boundary",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "snapshotId",
+    "queryContentHash",
+    "summaryContentHash",
+    "asOf",
+    "timezone",
+    "period",
+    "scope",
+    "filters",
+    "watermark",
+    "summary",
+    "details",
+    "detailCount",
+    "hasMore",
+    "nextCursor",
+    "canonicalSummaries",
+    "canonicalMappingStatus"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "maxLength": 256,
+      "type": "string"
+    },
+    "snapshotId": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "queryContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "summaryContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "asOf": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "timezone": {
+      "minLength": 1,
+      "maxLength": 64,
+      "type": "string"
+    },
+    "period": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "end": {
+          "format": "date-time",
+          "type": "string"
+        }
+      }
+    },
+    "scope": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tenantId",
+        "projectId",
+        "environment",
+        "billingMode",
+        "actorId"
+      ],
+      "properties": {
+        "tenantId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "const": "development",
+              "type": "string"
+            },
+            {
+              "const": "test",
+              "type": "string"
+            },
+            {
+              "const": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "billingMode": {
+          "anyOf": [
+            {
+              "const": "live",
+              "type": "string"
+            },
+            {
+              "const": "sandbox",
+              "type": "string"
+            },
+            {
+              "const": "simulated",
+              "type": "string"
+            }
+          ]
+        },
+        "actorId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        }
+      }
+    },
+    "filters": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "environments",
+        "billingModes"
+      ],
+      "properties": {
+        "environments": {
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "const": "development",
+                "type": "string"
+              },
+              {
+                "const": "test",
+                "type": "string"
+              },
+              {
+                "const": "production",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "billingModes": {
+          "minItems": 1,
+          "maxItems": 3,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "const": "live",
+                "type": "string"
+              },
+              {
+                "const": "sandbox",
+                "type": "string"
+              },
+              {
+                "const": "simulated",
+                "type": "string"
+              }
+            ]
+          }
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "type": "string"
+        },
+        "repositories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "workstreams": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "providers": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "models": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "workflowIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "jobIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "featureCategories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "orderIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "customerIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 200,
+            "type": "string"
+          }
+        },
+        "products": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 256,
+            "type": "string"
+          }
+        },
+        "channels": {
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "type": "array",
+          "items": {
+            "minLength": 1,
+            "maxLength": 256,
+            "type": "string"
+          }
+        }
+      }
+    },
+    "watermark": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "watermarkId",
+        "capturedAt",
+        "sources"
+      ],
+      "properties": {
+        "watermarkId": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        },
+        "capturedAt": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "sources": {
+          "minItems": 1,
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "source",
+              "revision",
+              "observedThrough",
+              "contentHash",
+              "completeness"
+            ],
+            "properties": {
+              "source": {
+                "minLength": 1,
+                "maxLength": 120,
+                "type": "string"
+              },
+              "revision": {
+                "minLength": 1,
+                "maxLength": 128,
+                "type": "string"
+              },
+              "observedThrough": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "contentHash": {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "completeness": {
+                "anyOf": [
+                  {
+                    "const": "complete",
+                    "type": "string"
+                  },
+                  {
+                    "const": "partial",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unknown",
+                    "type": "string"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "policyVersion",
+        "accountingPolicyVersion",
+        "definitionsStatus",
+        "currencies",
+        "coverage",
+        "budgets",
+        "unitCosts",
+        "allocations"
+      ],
+      "properties": {
+        "policyVersion": {
+          "const": "ci08-reporting-policy-2.0.0",
+          "type": "string"
+        },
+        "accountingPolicyVersion": {
+          "minLength": 1,
+          "maxLength": 256,
+          "type": "string"
+        },
+        "definitionsStatus": {
+          "minLength": 1,
+          "maxLength": 256,
+          "type": "string"
+        },
+        "currencies": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "currency",
+              "scale",
+              "metrics",
+              "valuation",
+              "reconciliation",
+              "simulated",
+              "groups"
+            ],
+            "properties": {
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "scale": {
+                "const": 18,
+                "type": "number"
+              },
+              "metrics": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "expense",
+                  "grossSales",
+                  "netSales",
+                  "directCosts",
+                  "contribution",
+                  "cashReceipts",
+                  "cashPayouts"
+                ],
+                "properties": {
+                  "expense": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "grossSales": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "netSales": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "directCosts": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "contribution": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "cashReceipts": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "cashPayouts": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              "valuation": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "estimated",
+                  "confirmed",
+                  "unknownCount"
+                ],
+                "properties": {
+                  "estimated": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "confirmed": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "unknownCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              },
+              "reconciliation": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "matchedCount",
+                  "unmatchedCount",
+                  "exceptionCount"
+                ],
+                "properties": {
+                  "matchedCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "unmatchedCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "exceptionCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              },
+              "simulated": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "expense",
+                  "grossSales",
+                  "netSales",
+                  "directCosts"
+                ],
+                "properties": {
+                  "expense": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "grossSales": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "netSales": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "directCosts": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "knownSubtotal",
+                      "total",
+                      "unknownCount"
+                    ],
+                    "properties": {
+                      "status": {
+                        "anyOf": [
+                          {
+                            "const": "known",
+                            "type": "string"
+                          },
+                          {
+                            "const": "partial",
+                            "type": "string"
+                          },
+                          {
+                            "const": "unknown",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "knownSubtotal": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "total": {
+                        "anyOf": [
+                          {
+                            "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                            "maxLength": 40,
+                            "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "unknownCount": {
+                        "minimum": 0,
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              },
+              "groups": {
+                "maxItems": 400000,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "dimension",
+                    "value",
+                    "bucket",
+                    "eventCount",
+                    "metrics"
+                  ],
+                  "properties": {
+                    "dimension": {
+                      "anyOf": [
+                        {
+                          "const": "provider",
+                          "type": "string"
+                        },
+                        {
+                          "const": "model",
+                          "type": "string"
+                        },
+                        {
+                          "const": "feature",
+                          "type": "string"
+                        },
+                        {
+                          "const": "repo",
+                          "type": "string"
+                        },
+                        {
+                          "const": "workflowId",
+                          "type": "string"
+                        },
+                        {
+                          "const": "productId",
+                          "type": "string"
+                        },
+                        {
+                          "const": "orderId",
+                          "type": "string"
+                        },
+                        {
+                          "const": "channel",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "bucket": {
+                      "anyOf": [
+                        {
+                          "const": "known",
+                          "type": "string"
+                        },
+                        {
+                          "const": "unknown_unallocated",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "eventCount": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "metrics": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "expense",
+                        "grossSales",
+                        "netSales",
+                        "directCosts",
+                        "contribution",
+                        "cashReceipts",
+                        "cashPayouts"
+                      ],
+                      "properties": {
+                        "expense": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "status",
+                            "knownSubtotal",
+                            "total",
+                            "unknownCount"
+                          ],
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "known",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "partial",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unknown",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "knownSubtotal": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "total": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unknownCount": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "grossSales": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "status",
+                            "knownSubtotal",
+                            "total",
+                            "unknownCount"
+                          ],
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "known",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "partial",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unknown",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "knownSubtotal": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "total": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unknownCount": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "netSales": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "status",
+                            "knownSubtotal",
+                            "total",
+                            "unknownCount"
+                          ],
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "known",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "partial",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unknown",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "knownSubtotal": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "total": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unknownCount": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "directCosts": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "status",
+                            "knownSubtotal",
+                            "total",
+                            "unknownCount"
+                          ],
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "known",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "partial",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unknown",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "knownSubtotal": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "total": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unknownCount": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "contribution": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "status",
+                            "knownSubtotal",
+                            "total",
+                            "unknownCount"
+                          ],
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "known",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "partial",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unknown",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "knownSubtotal": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "total": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unknownCount": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "cashReceipts": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "status",
+                            "knownSubtotal",
+                            "total",
+                            "unknownCount"
+                          ],
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "known",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "partial",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unknown",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "knownSubtotal": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "total": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unknownCount": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "cashPayouts": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "status",
+                            "knownSubtotal",
+                            "total",
+                            "unknownCount"
+                          ],
+                          "properties": {
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "const": "known",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "partial",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "unknown",
+                                  "type": "string"
+                                }
+                              ]
+                            },
+                            "knownSubtotal": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "total": {
+                              "anyOf": [
+                                {
+                                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                                  "maxLength": 40,
+                                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "unknownCount": {
+                              "minimum": 0,
+                              "type": "integer"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "coverage": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "observed",
+            "expected",
+            "unknownAmountCount",
+            "unpostedAttemptCount",
+            "awaitingEvidenceAttemptCount",
+            "quarantinedObservationCount",
+            "unsupportedEventCount",
+            "missingSources"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "complete",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "observed": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "expected": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "maximum": 1000000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownAmountCount": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unpostedAttemptCount": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "awaitingEvidenceAttemptCount": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "quarantinedObservationCount": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "unsupportedEventCount": {
+              "minimum": 0,
+              "type": "integer"
+            },
+            "missingSources": {
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "minLength": 1,
+                "maxLength": 256,
+                "type": "string"
+              }
+            }
+          }
+        },
+        "budgets": {
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "currency",
+              "window",
+              "policyReference",
+              "limit",
+              "ledgerExpense",
+              "lifecycleConsumed",
+              "held",
+              "remainingAuthorizedCapacity",
+              "unresolvedExposure",
+              "advisoryOnly"
+            ],
+            "properties": {
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "window": {
+                "const": "project_lifetime",
+                "type": "string"
+              },
+              "policyReference": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "revision",
+                      "contentHash"
+                    ],
+                    "properties": {
+                      "id": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      },
+                      "revision": {
+                        "minimum": 1,
+                        "maximum": 2147483647,
+                        "type": "integer"
+                      },
+                      "contentHash": {
+                        "pattern": "^sha256:[a-f0-9]{64}$",
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "limit": {
+                "anyOf": [
+                  {
+                    "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                    "maxLength": 40,
+                    "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ledgerExpense": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "lifecycleConsumed": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "held": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "remainingAuthorizedCapacity": {
+                "anyOf": [
+                  {
+                    "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                    "maxLength": 40,
+                    "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "unresolvedExposure": {
+                "type": "boolean"
+              },
+              "advisoryOnly": {
+                "const": true,
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "unitCosts": {
+          "maxItems": 300,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "kind",
+              "currency",
+              "status",
+              "numerator",
+              "denominator",
+              "approvalReference",
+              "allocationPolicyVersion"
+            ],
+            "properties": {
+              "kind": {
+                "anyOf": [
+                  {
+                    "const": "design",
+                    "type": "string"
+                  },
+                  {
+                    "const": "workflow",
+                    "type": "string"
+                  },
+                  {
+                    "const": "order",
+                    "type": "string"
+                  }
+                ]
+              },
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "const": "known",
+                    "type": "string"
+                  },
+                  {
+                    "const": "unknown",
+                    "type": "string"
+                  },
+                  {
+                    "const": "zero_denominator",
+                    "type": "string"
+                  }
+                ]
+              },
+              "numerator": {
+                "anyOf": [
+                  {
+                    "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                    "maxLength": 40,
+                    "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "denominator": {
+                "anyOf": [
+                  {
+                    "pattern": "^(?:0|[1-9][0-9]*)$",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "approvalReference": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "revision",
+                      "contentHash"
+                    ],
+                    "properties": {
+                      "id": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      },
+                      "revision": {
+                        "minimum": 1,
+                        "maximum": 2147483647,
+                        "type": "integer"
+                      },
+                      "contentHash": {
+                        "pattern": "^sha256:[a-f0-9]{64}$",
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "allocationPolicyVersion": {
+                "minLength": 1,
+                "maxLength": 256,
+                "type": "string"
+              }
+            }
+          }
+        },
+        "allocations": {
+          "maxItems": 50000,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sourceDetailId",
+              "policyReference",
+              "currency",
+              "sourceAmount",
+              "allocatedTotal",
+              "residual",
+              "allocations"
+            ],
+            "properties": {
+              "sourceDetailId": {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              },
+              "policyReference": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "id",
+                  "revision",
+                  "contentHash"
+                ],
+                "properties": {
+                  "id": {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  "revision": {
+                    "minimum": 1,
+                    "maximum": 2147483647,
+                    "type": "integer"
+                  },
+                  "contentHash": {
+                    "pattern": "^sha256:[a-f0-9]{64}$",
+                    "type": "string"
+                  }
+                }
+              },
+              "currency": {
+                "pattern": "^[A-Z]{3}$",
+                "type": "string"
+              },
+              "sourceAmount": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "allocatedTotal": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "residual": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "allocations": {
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "key",
+                    "amount"
+                  ],
+                  "properties": {
+                    "key": {
+                      "minLength": 1,
+                      "maxLength": 256,
+                      "type": "string"
+                    },
+                    "amount": {
+                      "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                      "maxLength": 40,
+                      "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "details": {
+      "maxItems": 500,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "detailId",
+          "currency",
+          "eventType",
+          "classification",
+          "occurredAt",
+          "valuation",
+          "reconciliation",
+          "settlement",
+          "dimensions",
+          "amount",
+          "metrics",
+          "status"
+        ],
+        "properties": {
+          "detailId": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "currency": {
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "eventType": {
+            "minLength": 1,
+            "maxLength": 256,
+            "type": "string"
+          },
+          "classification": {
+            "minLength": 1,
+            "maxLength": 256,
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "valuation": {
+            "anyOf": [
+              {
+                "const": "estimated",
+                "type": "string"
+              },
+              {
+                "const": "provider_confirmed",
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ]
+          },
+          "reconciliation": {
+            "anyOf": [
+              {
+                "const": "unmatched",
+                "type": "string"
+              },
+              {
+                "const": "matched",
+                "type": "string"
+              },
+              {
+                "const": "exception",
+                "type": "string"
+              }
+            ]
+          },
+          "settlement": {
+            "anyOf": [
+              {
+                "const": "unpaid",
+                "type": "string"
+              },
+              {
+                "const": "partly_paid",
+                "type": "string"
+              },
+              {
+                "const": "paid",
+                "type": "string"
+              }
+            ]
+          },
+          "dimensions": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "provider",
+              "model",
+              "feature",
+              "repo",
+              "workflowId",
+              "productId",
+              "orderId",
+              "channel"
+            ],
+            "properties": {
+              "provider": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "model": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "feature": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "repo": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "workflowId": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "productId": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "orderId": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "channel": {
+                "anyOf": [
+                  {
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "amount": {
+            "anyOf": [
+              {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "metrics": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "expense",
+              "grossSales",
+              "netSales",
+              "directCosts",
+              "contribution",
+              "cashReceipts",
+              "cashPayouts",
+              "simulatedGrossSales",
+              "simulatedNetSales",
+              "simulatedDirectCosts",
+              "simulatedExpense"
+            ],
+            "properties": {
+              "expense": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "grossSales": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "netSales": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "directCosts": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "contribution": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "cashReceipts": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "cashPayouts": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "simulatedGrossSales": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "simulatedNetSales": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "simulatedDirectCosts": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              },
+              "simulatedExpense": {
+                "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                "maxLength": 40,
+                "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                "type": "string"
+              }
+            }
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "recognized",
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              },
+              {
+                "const": "unsupported",
+                "type": "string"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "detailCount": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "hasMore": {
+      "type": "boolean"
+    },
+    "nextCursor": {
+      "anyOf": [
+        {
+          "maxLength": 2048,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "canonicalSummaries": {
+      "maxItems": 100,
+      "type": "array",
+      "items": {}
+    },
+    "canonicalMappingStatus": {
+      "anyOf": [
+        {
+          "const": "proposal_only_owner_ack_pending",
+          "type": "string"
+        },
+        {
+          "const": "unsupported_opaque_scope",
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

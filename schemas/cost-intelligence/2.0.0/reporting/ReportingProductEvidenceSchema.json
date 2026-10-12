@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/ReportingProductEvidenceSchema/2.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "version",
+    "queryContentHash",
+    "scope",
+    "period",
+    "asOf",
+    "denominators",
+    "sourceCoverage",
+    "reference"
+  ],
+  "properties": {
+    "version": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "queryContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tenantId",
+        "projectId",
+        "environment",
+        "billingMode",
+        "actorId"
+      ],
+      "properties": {
+        "tenantId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "const": "development",
+              "type": "string"
+            },
+            {
+              "const": "test",
+              "type": "string"
+            },
+            {
+              "const": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "billingMode": {
+          "anyOf": [
+            {
+              "const": "live",
+              "type": "string"
+            },
+            {
+              "const": "sandbox",
+              "type": "string"
+            },
+            {
+              "const": "simulated",
+              "type": "string"
+            }
+          ]
+        },
+        "actorId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        }
+      }
+    },
+    "period": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "end": {
+          "format": "date-time",
+          "type": "string"
+        }
+      }
+    },
+    "asOf": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "denominators": {
+      "maxItems": 3,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "status",
+          "count",
+          "approvalReference"
+        ],
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "const": "design",
+                "type": "string"
+              },
+              {
+                "const": "workflow",
+                "type": "string"
+              },
+              {
+                "const": "order",
+                "type": "string"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "complete",
+                "type": "string"
+              },
+              {
+                "const": "partial",
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ]
+          },
+          "count": {
+            "anyOf": [
+              {
+                "pattern": "^(?:0|[1-9][0-9]*)$",
+                "maxLength": 30,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "approvalReference": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "revision",
+              "contentHash"
+            ],
+            "properties": {
+              "id": {
+                "minLength": 1,
+                "maxLength": 256,
+                "type": "string"
+              },
+              "revision": {
+                "minimum": 1,
+                "maximum": 2147483647,
+                "type": "integer"
+              },
+              "contentHash": {
+                "pattern": "^sha256:[a-f0-9]{64}$",
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "sourceCoverage": {
+      "maxItems": 300,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "currency",
+          "source",
+          "status",
+          "expected"
+        ],
+        "properties": {
+          "currency": {
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "const": "expense",
+                "type": "string"
+              },
+              {
+                "const": "revenue",
+                "type": "string"
+              },
+              {
+                "const": "cash",
+                "type": "string"
+              }
+            ]
+          },
+          "status": {
+            "anyOf": [
+              {
+                "const": "complete",
+                "type": "string"
+              },
+              {
+                "const": "partial",
+                "type": "string"
+              },
+              {
+                "const": "unknown",
+                "type": "string"
+              }
+            ]
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "maximum": 1000000,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "reference": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "id",
+        "revision",
+        "contentHash"
+      ],
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "maxLength": 256,
+          "type": "string"
+        },
+        "revision": {
+          "minimum": 1,
+          "maximum": 2147483647,
+          "type": "integer"
+        },
+        "contentHash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

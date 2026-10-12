@@ -1,0 +1,119 @@
+{
+  "packetVersion": "1.1.0",
+  "status": "REPAIRED_SOURCE_PROPOSAL_PENDING_HOSTED_PG_CAPTURE_AND_REVIEW",
+  "baseRevision": "a08760e9ea65bda1e116867ac00b3e03d737bb7e",
+  "supersededProducerRevision": "54f24055b608432d6fe5fdd7284ffff6bd2f2011",
+  "consumerRevision": "840231c1753157bac309cb8f8d2c4b3d26690747",
+  "ownerAcknowledgement": null,
+  "consumerAcknowledgement": null,
+  "realProviderActivity": false,
+  "realPurchases": false,
+  "legacyFixtureStatus": "SUPERSEDED frozen54 actual PostgreSQL captures retained byte-for-byte; they do not conform to revised simulated amount shape and must not be relabeled revised producer output",
+  "legacyFixtureHashes": {
+    "fixtures/reporting/ci08-manual-oracle.json": "418f17c9987abfadbf0d1c53a29c2326f013d785cb9d47c7139477d6845d881d",
+    "fixtures/reporting/definition-registry.json": "577ce8801855db08ba393f115c00ac670df3a47a5cc9e9a5a78f8b0132cb34e1",
+    "fixtures/reporting/ie-ci06-pg-page.json": "4e93e1e9676da22fd1678934f626621ad1c68346f70c67bc866e180722f3f14f",
+    "fixtures/reporting/prepared-export-request.json": "c6a0c5729519bee7f977a78b3e229719aa1e9eb295fc68a9eadec572c5d30979",
+    "fixtures/reporting/producer-budget-v2-page.json": "5c716508840035b201863fb2da8c227a8202a39cb93789cfb4e367062ce07014",
+    "fixtures/reporting/producer-v1-page.json": "5fb1a5efecc692c6effce33c74e0e8f56bdbd3b470be9cad65febebbdd2b62e2",
+    "fixtures/reporting/producer-v2-page.json": "5a41cb5732005558d51d6d363e388dc6157a49029a8dac7bcc9149727505bc87",
+    "fixtures/reporting/query-export-handoff.json": "eca74fe6fd34b9631fcb3022f3417425ef94580043a67fce4832b52fa6993da9"
+  },
+  "wireDelta": {
+    "schemaVersion": "2.0.0 unaccepted Finance-owned wrapper proposal",
+    "fields": [
+      "summary.currencies[].simulated.expense",
+      "summary.currencies[].simulated.grossSales",
+      "summary.currencies[].simulated.netSales",
+      "summary.currencies[].simulated.directCosts"
+    ],
+    "old": "DecimalAmount string",
+    "new": "ReportingAmount {status:known|partial|unknown,knownSubtotal:decimal|null,total:decimal|null,unknownCount:integer}",
+    "unknown": "null subtotal/total, status unknown; mixed known/unknown partial knownSubtotal; explicit complete-zero only under independently scoped evidence"
+  },
+  "sourceHashes": {
+    "migrations/0012_reporting_snapshots.sql": "a4c6f5aaa5338fd3ff835e08f2cbd8f7a6e9f4f31ca7dac87bdb3a1afffb195a",
+    "package.json": "63fe3bafa72745aac7a5ea384046742ac1a07ec90a25d5488439c6eddfca93ce",
+    "scripts/export-schemas.mjs": "a574207de89058cbee4bf1d538121c8d55e4ef838f37cf35a3ef0dd7aebacd19",
+    "src/index.ts": "9bbac212c2fc1c57ca48313cffa5adcf51034da49cf46336abcd7ce4ba392934",
+    "src/reporting/canonical-mapping.ts": "b4ab1d0df4582940fe643d275e9c7b4468dbd1793764843d1386317283d85486",
+    "src/reporting/definitions.ts": "ff485817886a8849d734b5af453027f496e4f8438ccb0ac4239f03bdb92a59ce",
+    "src/reporting/host-authority.ts": "4f781461f9afc89434c6dd99b31d6bf90530d41c6d315e73b992d6bf6b1ae92e",
+    "src/reporting/index.ts": "3d080b7b0f035dc7e4a60615c6e3d710ac69ffb8706fcf37d8bffa9d4fa8e8ac",
+    "src/reporting/node-crypto.d.ts": "43fd2cf3083f1c8bcf146d012b550158b02fdeaf99fdb92b71a50e7ee042eada",
+    "src/reporting/projection.ts": "123ceb8e793b4ca11b44bc66fdc15f3735486eba29d02747bf47a50186cb9187",
+    "src/reporting/reader.ts": "e80c5b3fe60fe8f40e7a31c0d61ccff6cc73370295f2e9112836c8ef0a87bc0d",
+    "src/reporting/runtime.ts": "11c2dfdf71d4f20ea2877f9f7687fa48f7235b16c09b1d413b9c9ef72ef3d871",
+    "src/reporting/schema-v1.ts": "9ff3f4a0aca9b81fb00ad79a399c84df07237ab3947ea8f832f7a156a66d79e2",
+    "src/reporting/schema-v2.ts": "0400a033d1bf13cf047cda507639126b362e99c1bb26348ad3b233758aa38fdb",
+    "src/reporting/snapshots.ts": "75eedc5ca2bc4c057f1895ee130db70abe7ce9ab646ca97943c5ca0f8ff07a64",
+    "tests/reporting/reporting.test.mjs": "388dbc5dba1588474db98d79662f7c290c3f33edeca73db95f0c41bff05319bb",
+    "tests/reporting/semantic-regressions.test.mjs": "9c8191e6546b8060ee102063434e4f4b6b8349254a1c3b704b10a84b08503fb1",
+    ".github/workflows/ci.yml": "a0b4c5a14796ea333bbc47e7d9ca245915255686dcedb64aab827d5e787fbbf0"
+  },
+  "schemaHashes": {
+    "schemas/cost-intelligence/2.0.0/reporting/FinancialSummaryFiltersSchema.json": "3e0b2e71fcda248e6781afd79303567f062a40684eeaaceec32202908a087250",
+    "schemas/cost-intelligence/2.0.0/reporting/FinancialSummaryPageSchema.json": "862900ad30b1e5684c98852cb93f0010eb73504d2fd9f58018673c9334ddf814",
+    "schemas/cost-intelligence/2.0.0/reporting/FinancialSummaryQuerySchema.json": "1d1474860ab8bbabff123c2c93db022844a3408d86e1a22fe17ded096de657d9",
+    "schemas/cost-intelligence/2.0.0/reporting/ReportingAmountSchema.json": "1ac450db443e8cd3d1fc073660e52ed923bf233b03d380a2f8532c9e88b5023e",
+    "schemas/cost-intelligence/2.0.0/reporting/ReportingCurrencySummarySchema.json": "717278fb4b9517d75c8d9df417d69f89b735d203b3a97f1a9e8e35e6f841f4eb",
+    "schemas/cost-intelligence/2.0.0/reporting/ReportingDetailSchema.json": "1ea9a50e51ff9ea11690f38b7adf70d91151007e01028f2089421e37f99f1e13",
+    "schemas/cost-intelligence/2.0.0/reporting/ReportingDimensionSchema.json": "df9a867ff45d71830ec04d10236b15adf2ebe691030281ad0d0f02c24a0b2765",
+    "schemas/cost-intelligence/2.0.0/reporting/ReportingProductEvidenceSchema.json": "9069f73f2f1dae1c5dadc8a460433a47aa254821aedfe8107ee6b8c0a95ae469",
+    "schemas/cost-intelligence/2.0.0/reporting/ReportingProjectionSchema.json": "91a87a6bc3cb9afdd07be6b38234c33d4135b07e788465f4b6f71bac6967f712"
+  },
+  "validation": {
+    "build": "passed",
+    "provisionalPublicSourcePortProbes": {
+      "registered": 8,
+      "passed": 8,
+      "failed": 0,
+      "independentReview": false,
+      "qualification": "8 author source-port tests; final mutated payloads validated first, negative mismatch control; not PG or independent review"
+    },
+    "newPostgreSQLControls": "five new domain subtests pending hosted PostgreSQL;28domain+1parent=29expectedregistered, not yet executed",
+    "localPostgres": "Docker daemon metadata read-only, no retry",
+    "contracts": {
+      "registered": 13,
+      "passed": 13,
+      "failed": 0,
+      "exitCode": 0
+    },
+    "d43HostedPostgres": {
+      "runId": "38241277916",
+      "registered": 29,
+      "passed": 27,
+      "failed": 2,
+      "skipped": 0,
+      "failure": "one reversal fixture domain subtest plus enclosing parent; final identity mapping mismatch rejected by immutable public ledger boundary"
+    }
+  },
+  "missingSources": [
+    "accepted actual issuer scope/action/mode mapping",
+    "Product approval denominators",
+    "complete provider/revenue/cash coverage",
+    "source reconciliation/aggregate invoice implementation",
+    "owner accounting policy sign-off"
+  ],
+  "queryImports": {
+    "root": "@jevelopers/cost-intelligence",
+    "subpath": "@jevelopers/cost-intelligence/reporting",
+    "functions": [
+      "querySummary",
+      "querySummaryV2",
+      "readVerifiedSummarySnapshot",
+      "readVerifiedSummarySnapshotV2",
+      "createReportingSnapshotReader"
+    ],
+    "registry": "REPORTING_CANONICAL_REFERENCE_REGISTRY"
+  },
+  "referenceResolver": "Host independently loads definition-registry.json at its pinned digest; maps metrics/<name>/definition_ref and policy_ref to registry reference values. Never derive expected references from the incoming summary. Validate each definition body against declared Finance-owned schema and its content hash.",
+  "lineageResolution": {
+    "maximumLinks": 32,
+    "maximumNodes": 33,
+    "invalidLineage": "SOURCE_UNAVAILABLE",
+    "axis": "immutable terminal original economic type and signed polarity; reversal-of-reversal retains receipt/payout axis"
+  },
+  "supersededFixtureValidationRevision": "d43b336abc7267a8bb34ca9d3dc344f863d01bf4",
+  "fixtureRepair": "Reversal sourceIdentity.revisionSubjectId and postingMapping.sourceLineId changed together; final payload validated before public PG append and provisional source-event construction/hash. Negative mismatch control retained."
+}

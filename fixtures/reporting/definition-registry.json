@@ -1,0 +1,259 @@
+{
+  "metrics": {
+    "expense": {
+      "definition": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schemaVersion": "1.0.0",
+        "definitionId": "cbcd953b-be1a-449b-8fd1-74d1ec19871a",
+        "revision": 1,
+        "policyVersion": "ci06-accounting-policy-1.0.0",
+        "metric": "expense",
+        "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+        "formula": "actual direct, supplier, operating and payable-labor expense plus fees, less supplier credits and reimbursements; excludes simulation, tax, financing and cash movements",
+        "source": "expense"
+      },
+      "reference": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schema_version": "1.0.0",
+        "id": "cbcd953b-be1a-449b-8fd1-74d1ec19871a",
+        "revision": 1,
+        "content_hash": "sha256:88c64fd36b4958bebb504c576a751952d75ffe2ac878bf5f29d286700727c378"
+      }
+    },
+    "gross_sales": {
+      "definition": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schemaVersion": "1.0.0",
+        "definitionId": "5f9d45ac-faf5-4fd1-87bd-68ac5fc0c8c1",
+        "revision": 1,
+        "policyVersion": "ci06-accounting-policy-1.0.0",
+        "metric": "gross_sales",
+        "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+        "formula": "recognized actual sale magnitudes before discount and refund, excluding tax",
+        "source": "revenue"
+      },
+      "reference": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schema_version": "1.0.0",
+        "id": "5f9d45ac-faf5-4fd1-87bd-68ac5fc0c8c1",
+        "revision": 1,
+        "content_hash": "sha256:9c457c0b8728708d52477cc719a1ad2d156736382956a68b9654d1a466a669e4"
+      }
+    },
+    "net_sales": {
+      "definition": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schemaVersion": "1.0.0",
+        "definitionId": "97f350b7-8f55-4e67-8409-595b9400ed18",
+        "revision": 1,
+        "policyVersion": "ci06-accounting-policy-1.0.0",
+        "metric": "net_sales",
+        "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+        "formula": "gross_sales - actual discounts - actual sale refunds",
+        "source": "revenue"
+      },
+      "reference": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schema_version": "1.0.0",
+        "id": "97f350b7-8f55-4e67-8409-595b9400ed18",
+        "revision": 1,
+        "content_hash": "sha256:ab3dfd0832296ba49c49c3c3d4b017c13b45cfe9e04479c532ac7f3a31da5352"
+      }
+    },
+    "direct_costs": {
+      "definition": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schemaVersion": "1.0.0",
+        "definitionId": "139c4a14-81d9-418c-8e29-0550b55f4708",
+        "revision": 1,
+        "policyVersion": "ci06-accounting-policy-1.0.0",
+        "metric": "direct_costs",
+        "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+        "formula": "actual attributed AI and supplier direct expense plus fees, less supplier credits and reimbursements; excludes separately classified operating expense and payable labor",
+        "source": "expense"
+      },
+      "reference": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schema_version": "1.0.0",
+        "id": "139c4a14-81d9-418c-8e29-0550b55f4708",
+        "revision": 1,
+        "content_hash": "sha256:07bbdeed6d0262316fed38ca4c4913f17fecc431c043298f945a3f9b5f300295"
+      }
+    },
+    "contribution": {
+      "definition": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schemaVersion": "1.0.0",
+        "definitionId": "5c1de47c-d602-4226-8211-559d1a304313",
+        "revision": 1,
+        "policyVersion": "ci06-accounting-policy-1.0.0",
+        "metric": "contribution",
+        "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+        "formula": "net_sales - direct_costs",
+        "source": "revenue_and_expense"
+      },
+      "reference": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schema_version": "1.0.0",
+        "id": "5c1de47c-d602-4226-8211-559d1a304313",
+        "revision": 1,
+        "content_hash": "sha256:83c479253ff348ce30c06951eee5a759ca535aaa1fb34c5c77bc1ddc62dadf16"
+      }
+    },
+    "cash_receipts": {
+      "definition": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schemaVersion": "1.0.0",
+        "definitionId": "7581d475-2800-4b56-828d-c6d1d732e11f",
+        "revision": 1,
+        "policyVersion": "ci06-accounting-policy-1.0.0",
+        "metric": "cash_receipts",
+        "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+        "formula": "observed actual cash-movement receipts, separate from recognized sales",
+        "source": "cash"
+      },
+      "reference": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schema_version": "1.0.0",
+        "id": "7581d475-2800-4b56-828d-c6d1d732e11f",
+        "revision": 1,
+        "content_hash": "sha256:57dcba2d9dc6d144772bdabe415cc40f9daa61c4df13d4be51cc119be189af4c"
+      }
+    },
+    "cash_payouts": {
+      "definition": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schemaVersion": "1.0.0",
+        "definitionId": "1c47084c-ce19-4cea-8c22-2df4e15e9196",
+        "revision": 1,
+        "policyVersion": "ci06-accounting-policy-1.0.0",
+        "metric": "cash_payouts",
+        "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+        "formula": "observed actual cash-movement payouts and payout transfers, never new sales or expense",
+        "source": "cash"
+      },
+      "reference": {
+        "contract": "cost-intelligence.reporting.metric-definition",
+        "schema_version": "1.0.0",
+        "id": "1c47084c-ce19-4cea-8c22-2df4e15e9196",
+        "revision": 1,
+        "content_hash": "sha256:8958d658e3fb0df2e22f238fe757000ef76b2f5965e3ce6ac7fa41d6f84e8eb3"
+      }
+    }
+  },
+  "policy": {
+    "definition": {
+      "contract": "cost-intelligence.reporting.policy-definition",
+      "schemaVersion": "1.0.0",
+      "definitionId": "cdcbcf8d-56e4-4a57-8528-991ae8d74c49",
+      "revision": 1,
+      "reportingPolicyVersion": "ci08-reporting-policy-2.0.0",
+      "accountingPolicyVersion": "ci06-accounting-policy-1.0.0",
+      "allocationPolicyVersion": "ci06-allocation-policy-1.0.0",
+      "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+      "signMatrix": {
+        "sale": {
+          "grossSalesSign": 1,
+          "netSalesSign": 1,
+          "directCostsSign": 0,
+          "cash": "none",
+          "recovery": false,
+          "note": "Recognized sale line; before discounts/refunds; excludes pass-through tax."
+        },
+        "discount": {
+          "grossSalesSign": 0,
+          "netSalesSign": -1,
+          "directCostsSign": 0,
+          "cash": "none",
+          "recovery": false,
+          "note": "Contra-revenue; reduces net sales only."
+        },
+        "refund:sale": {
+          "grossSalesSign": 0,
+          "netSalesSign": -1,
+          "directCostsSign": 0,
+          "cash": "none",
+          "recovery": true,
+          "note": "Sales refund linked to original sale; reduces net sales."
+        },
+        "refund:fee": {
+          "grossSalesSign": 0,
+          "netSalesSign": 0,
+          "directCostsSign": -1,
+          "cash": "none",
+          "recovery": true,
+          "note": "Fee refund; recovery linked to the original fee; reduces direct costs."
+        },
+        "credit": {
+          "grossSalesSign": 0,
+          "netSalesSign": 0,
+          "directCostsSign": -1,
+          "cash": "none",
+          "recovery": true,
+          "note": "Supplier/fee credit; recovery linked to its original cost category; reduces direct costs."
+        },
+        "reimbursement": {
+          "grossSalesSign": 0,
+          "netSalesSign": 0,
+          "directCostsSign": -1,
+          "cash": "none",
+          "recovery": true,
+          "note": "Reimbursement; recovery linked to its original cost category; reduces direct costs."
+        },
+        "tax": {
+          "grossSalesSign": 0,
+          "netSalesSign": 0,
+          "directCostsSign": 0,
+          "cash": "none",
+          "recovery": false,
+          "note": "Pass-through tax; excluded from gross and net sales."
+        },
+        "fee": {
+          "grossSalesSign": 0,
+          "netSalesSign": 0,
+          "directCostsSign": 1,
+          "cash": "none",
+          "recovery": false,
+          "note": "Applicable fee recognized as a direct cost under the documented policy."
+        },
+        "direct_cost": {
+          "grossSalesSign": 0,
+          "netSalesSign": 0,
+          "directCostsSign": 1,
+          "cash": "none",
+          "recovery": false,
+          "note": "Attributed AI / fulfillment / other direct expense."
+        },
+        "payout": {
+          "grossSalesSign": 0,
+          "netSalesSign": 0,
+          "directCostsSign": 0,
+          "cash": "payout",
+          "recovery": false,
+          "note": "Settlement transfer; cash only; never a new sale or expense."
+        },
+        "cash_movement": {
+          "grossSalesSign": 0,
+          "netSalesSign": 0,
+          "directCostsSign": 0,
+          "cash": "directional",
+          "recovery": false,
+          "note": "Cash receipt or payout; kept separate from accounting totals."
+        }
+      },
+      "recognition": "live billing is actual even in test; sandbox and simulated billing remains separate simulation",
+      "currency": "no cross-currency addition or unsourced conversion",
+      "period": "economic root occurredAt in [start,end); ingestedAt and successors <= asOf",
+      "coverage": "missing source is unknown; complete-zero requires scoped pinned evidence with expected zero observations",
+      "denominator": "exact numerator/count ratio; current source-approved complete approval snapshot required; zero denominator is distinct from unknown",
+      "allocation": "analytical only; source expense posted once; allocatedTotal plus residual equals source amount"
+    },
+    "reference": {
+      "contract": "cost-intelligence.reporting.policy-definition",
+      "schema_version": "1.0.0",
+      "id": "cdcbcf8d-56e4-4a57-8528-991ae8d74c49",
+      "revision": 1,
+      "content_hash": "sha256:62ffb8e5e2723cde437e9fd3fe1e69c5383fe62874635afce6496c10982c47a0"
+    }
+  }
+}

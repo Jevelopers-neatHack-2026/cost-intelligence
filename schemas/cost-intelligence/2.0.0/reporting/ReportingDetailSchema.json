@@ -1,0 +1,319 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/ReportingDetailSchema/2.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "detailId",
+    "currency",
+    "eventType",
+    "classification",
+    "occurredAt",
+    "valuation",
+    "reconciliation",
+    "settlement",
+    "dimensions",
+    "amount",
+    "metrics",
+    "status"
+  ],
+  "properties": {
+    "detailId": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "eventType": {
+      "minLength": 1,
+      "maxLength": 256,
+      "type": "string"
+    },
+    "classification": {
+      "minLength": 1,
+      "maxLength": 256,
+      "type": "string"
+    },
+    "occurredAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "valuation": {
+      "anyOf": [
+        {
+          "const": "estimated",
+          "type": "string"
+        },
+        {
+          "const": "provider_confirmed",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "type": "string"
+        }
+      ]
+    },
+    "reconciliation": {
+      "anyOf": [
+        {
+          "const": "unmatched",
+          "type": "string"
+        },
+        {
+          "const": "matched",
+          "type": "string"
+        },
+        {
+          "const": "exception",
+          "type": "string"
+        }
+      ]
+    },
+    "settlement": {
+      "anyOf": [
+        {
+          "const": "unpaid",
+          "type": "string"
+        },
+        {
+          "const": "partly_paid",
+          "type": "string"
+        },
+        {
+          "const": "paid",
+          "type": "string"
+        }
+      ]
+    },
+    "dimensions": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "provider",
+        "model",
+        "feature",
+        "repo",
+        "workflowId",
+        "productId",
+        "orderId",
+        "channel"
+      ],
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "feature": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "repo": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "workflowId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "productId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "orderId": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "maxLength": 256,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "amount": {
+      "anyOf": [
+        {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "metrics": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "expense",
+        "grossSales",
+        "netSales",
+        "directCosts",
+        "contribution",
+        "cashReceipts",
+        "cashPayouts",
+        "simulatedGrossSales",
+        "simulatedNetSales",
+        "simulatedDirectCosts",
+        "simulatedExpense"
+      ],
+      "properties": {
+        "expense": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "grossSales": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "netSales": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "directCosts": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "contribution": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "cashReceipts": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "cashPayouts": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "simulatedGrossSales": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "simulatedNetSales": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "simulatedDirectCosts": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        },
+        "simulatedExpense": {
+          "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+          "maxLength": 40,
+          "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+          "type": "string"
+        }
+      }
+    },
+    "status": {
+      "anyOf": [
+        {
+          "const": "recognized",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

@@ -29,3 +29,22 @@ The finance API therefore wraps the proposal's generated schemas/types and rejec
 ## Upgrade gate
 
 Upgrade only after the producer publishes an immutable corrected artifact; finance verifies its source revision, package integrity, schema and fixture digests, and package behavior; all required consumer rows have exact pins, test results, and acknowledgements; and a fresh review accepts the cross-repository mapping. Keep this proposal archive, its hash, and current fixtures available as the rollback baseline. Do not replace the lock with an unreviewed merge candidate or mutable branch/tag.
+
+### Reporting version migration
+
+The exact 1.0.0 query/page encoding remains available and now executes against
+scoped PostgreSQL for a representable UUID/single-observed-currency result.
+The additive Finance-owned 2.0.0 wrapper carries supplemental breakdown,
+coverage, exact approval ratios, budget and safe detail data; its
+`canonicalSummaries` retain the unchanged installed shared FinancialSummary.
+The independently compared FinancialSummary/CommonEnvelope/ErrorEnvelope
+schema bytes match Dashboard's 0.9.7 pin. Package-version difference alone is
+not a wire blocker; issuer mapping, independently resolved reference bodies,
+selected metric names, exact semantic fixtures and owner/consumer ACK remain
+pending. No dependency archive or canonical schema was changed by CI-08.
+
+See [reporting.md](./reporting.md) for the precise version/hash/cursor/snapshot
+contract, declared Finance-owned definition registry, optional proposed
+READ/EXPORT action adapter and remaining owner decisions. Existing v1 export
+consumers receive only a verified legacy first page; v2 supplemental facts are
+not silently attached to a canonical shared object.

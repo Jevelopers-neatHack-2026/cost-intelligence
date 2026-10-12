@@ -1,0 +1,74 @@
+{
+  "packetVersion": "1.0.0",
+  "status": "WIP_SYNTHETIC_PROPOSAL_OWNER_ACK_PENDING",
+  "baseRevision": "a08760e9ea65bda1e116867ac00b3e03d737bb7e",
+  "consumerRevision": "8c4fda46016b0457b3f7b2511a068eb8fb8de36a",
+  "environment": "test",
+  "economicBillingMode": "live_and_separate_simulated_scopes",
+  "evidenceMode": "mocked",
+  "realProviderActivity": false,
+  "realPurchases": false,
+  "ownerAcknowledgement": null,
+  "consumerAcknowledgement": null,
+  "actualProducerPayloadRevision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "producerPayloadRevisionMeaning": "explicitly synthetic placeholder; actual tested implementation is pinned by source hashes and subsequent supervisor commit receipt",
+  "queryImports": {
+    "root": "@jevelopers/cost-intelligence",
+    "subpath": "@jevelopers/cost-intelligence/reporting",
+    "functions": [
+      "querySummary",
+      "querySummaryV2",
+      "readVerifiedSummarySnapshot",
+      "readVerifiedSummarySnapshotV2",
+      "createReportingSnapshotReader"
+    ],
+    "registry": "REPORTING_CANONICAL_REFERENCE_REGISTRY"
+  },
+  "latestReportingEvidence": "reporting-2026-10-12T104904943Z-56645.json",
+  "executedReportingTests": 24,
+  "passedReportingTests": 24,
+  "skippedReportingTests": 0,
+  "sourceHashes": {
+    "migrations/0012_reporting_snapshots.sql": "a4c6f5aaa5338fd3ff835e08f2cbd8f7a6e9f4f31ca7dac87bdb3a1afffb195a",
+    "package.json": "63fe3bafa72745aac7a5ea384046742ac1a07ec90a25d5488439c6eddfca93ce",
+    "scripts/export-schemas.mjs": "a574207de89058cbee4bf1d538121c8d55e4ef838f37cf35a3ef0dd7aebacd19",
+    "src/index.ts": "9bbac212c2fc1c57ca48313cffa5adcf51034da49cf46336abcd7ce4ba392934",
+    "src/reporting/canonical-mapping.ts": "430c4dd32fa72a9c4bc09a884bc939aca5ddd6299533343d5101e85a0020acca",
+    "src/reporting/definitions.ts": "adfb4d5132349878a25673455fb2f8898bdde674c7fe2369516b6c11daa85e8f",
+    "src/reporting/host-authority.ts": "4f781461f9afc89434c6dd99b31d6bf90530d41c6d315e73b992d6bf6b1ae92e",
+    "src/reporting/index.ts": "3d080b7b0f035dc7e4a60615c6e3d710ac69ffb8706fcf37d8bffa9d4fa8e8ac",
+    "src/reporting/node-crypto.d.ts": "43fd2cf3083f1c8bcf146d012b550158b02fdeaf99fdb92b71a50e7ee042eada",
+    "src/reporting/projection.ts": "8b748c041301d3cf13c077531c8fb76e3f532e6d0d03b5af38f16d7e6c3ff20b",
+    "src/reporting/reader.ts": "501d71ed97b28b9f755c32710b925984ab99ca070add33a27dce60fa3aca2b4b",
+    "src/reporting/runtime.ts": "11c2dfdf71d4f20ea2877f9f7687fa48f7235b16c09b1d413b9c9ef72ef3d871",
+    "src/reporting/schema-v1.ts": "9ff3f4a0aca9b81fb00ad79a399c84df07237ab3947ea8f832f7a156a66d79e2",
+    "src/reporting/schema-v2.ts": "467f46768cb80912ccc82ad4d0003d9987726333b1680c7e8ef98ef425719c7f",
+    "src/reporting/snapshots.ts": "75eedc5ca2bc4c057f1895ee130db70abe7ce9ab646ca97943c5ca0f8ff07a64",
+    "tests/reporting/reporting.test.mjs": "f9f0610b5d8df3dcbbca2396f596ba0b0bf0866cd90584962b89d27bb213d49e"
+  },
+  "fixtureHashes": {
+    "fixtures/reporting/ci08-manual-oracle.json": "418f17c9987abfadbf0d1c53a29c2326f013d785cb9d47c7139477d6845d881d",
+    "fixtures/reporting/definition-registry.json": "577ce8801855db08ba393f115c00ac670df3a47a5cc9e9a5a78f8b0132cb34e1",
+    "fixtures/reporting/ie-ci06-pg-page.json": "4e93e1e9676da22fd1678934f626621ad1c68346f70c67bc866e180722f3f14f",
+    "fixtures/reporting/prepared-export-request.json": "c6a0c5729519bee7f977a78b3e229719aa1e9eb295fc68a9eadec572c5d30979",
+    "fixtures/reporting/producer-budget-v2-page.json": "5c716508840035b201863fb2da8c227a8202a39cb93789cfb4e367062ce07014",
+    "fixtures/reporting/producer-v1-page.json": "5fb1a5efecc692c6effce33c74e0e8f56bdbd3b470be9cad65febebbdd2b62e2",
+    "fixtures/reporting/producer-v2-page.json": "5a41cb5732005558d51d6d363e388dc6157a49029a8dac7bcc9149727505bc87",
+    "fixtures/reporting/query-export-handoff.json": "eca74fe6fd34b9631fcb3022f3417425ef94580043a67fce4832b52fa6993da9"
+  },
+  "preparedExportStatus": "request shape verified; export execution remains separate author-owned integration stage",
+  "referenceResolver": "Host independently loads definition-registry.json at its pinned digest; maps metrics/<name>/definition_ref and policy_ref to registry reference values. Never derive expected references from the incoming summary. Validate each definition body against declared Finance-owned schema and its content hash.",
+  "missingSources": [
+    "accepted actual issuer scope/action/mode mapping",
+    "Product approval denominators",
+    "complete provider/revenue/cash coverage",
+    "source reconciliation/aggregate invoice implementation",
+    "owner accounting policy sign-off"
+  ],
+  "globalReleaseStatus": "pending independent exact-candidate review, ordinary broad regression, hosted security and consumer ACK; partial/final/unused release lifecycle remains CI05B-owned",
+  "ieProposalHashes": {
+    "manifest": "f798d047b995924fc07cb681f136b1359f22c5d6d8ce4cf2e7edb27e7c1e3b24",
+    "vectors": "fcfe6f53408f476b26080e250a656ad89779c6237af70021dbc76482dd84722c",
+    "coverage": "1b2d0a21107db49c6c0eaea72a80c5a6cf1240fce47cf6aa1e22bee95114302a"
+  }
+}

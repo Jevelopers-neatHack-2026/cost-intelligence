@@ -1,0 +1,18 @@
+{
+  "handoffVersion": "1.0.0",
+  "status": "implementation_in_progress_owner_ack_pending",
+  "producerIssue": 2,
+  "legacyQuery": "querySummary(FinancialSummaryQuery@1.0.0, ReportingPorts) -> ApiResult<FinancialSummaryPage@1.0.0>",
+  "snapshotReader": "readVerifiedSummarySnapshot({schemaVersion:'1.0.0',requestId,scope,snapshotId,queryContentHash,summaryContentHash}, ReportingPorts) -> ApiResult<FinancialSummaryPage@1.0.0>",
+  "exportAdapter": "createReportingSnapshotReader(ReportingPorts).readVerifiedSnapshot({scope,snapshotId,queryContentHash,summaryContentHash}) -> Promise<FinancialSummaryPage|null>",
+  "adapterErrors": "null on denied, revoked, privacy-restricted, missing, wrong encoding, query/hash mismatch, or corrupt snapshot; no disclosure of existence",
+  "normalization": "sha256 of recursive sorted object keys; arrays retain normalized query order; decimal strings remain strings; requestId/idempotencyKey excluded from query and snapshot identity",
+  "summaryHash": "sha256 canonical JSON of pinned shared FinancialSummary only, not wrapper or detail page",
+  "queryHash": "full normalized scoped query, schema encoding, period, IANA timezone, environment/billing filters, currency/dimension filters, groupings, pageSize, effective asOf and reporting policy",
+  "snapshotHash": "immutable full document binds normalized query, safe complete detail contributions, supplemental projection, canonical per-currency mapping, immutable input references, source coverage, producer revision and watermark",
+  "pageSemantics": "snapshotReader returns authoritative FIRST page using stored pageSize; rejects snapshot originally created via v2. A submitted continuation page is not byte-identical to first page and must be rejected by v1 export envelope comparison, or caller resubmits first page. Aggregate canonical summary/hash is constant across pages.",
+  "freshAuthority": "current reporting.querySummary / finance.summary.read before lookup and after DB waits/result; export must independently authorize integrations.exportSummary / finance.summary.export",
+  "requiredPermissions": ["finance.summary.read", "finance.summary.export"],
+  "versions": { "financeWrapper": "1.0.0", "expandedFinanceWrapper": "2.0.0", "installedSharedPackage": "0.3.0", "sharedAdoption": "proposal_only" },
+  "limitations": ["UUID scope and exactly one observed currency for legacy reader", "Accounting definitions pending Finance-owner sign-off", "Product approvals, complete billing/revenue/cash sources and production host adapter remain externally pending", "No conversion of opaque authority IDs", "HMAC key rotation changes cursor bytes and invalidates old cursors; export caller obtains a refreshed first page"]
+}

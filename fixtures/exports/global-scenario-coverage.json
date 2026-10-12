@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "1.0.0",
+  "fixtureMode": "synthetic_only",
+  "producerRevision": "22a3237dd44f376017969ac881586ff396f19cf8",
+  "migrationPrerequisiteRevision": "3920a4689b076fd9bdf5ed3aa71764016c1da33d",
+  "exportAcceptance": "pending_genuine_composed_postgres_and_independent_review_and_consumer_ack",
+  "consumerRevision": "840231c1753157bac309cb8f8d2c4b3d26690747",
+  "consumerAcknowledgement": "pending",
+  "billingEvidence": "not_exposed_by_query",
+  "scenarios": [
+    {
+      "id": 1,
+      "requiredScenario": "Two concurrent project reservations competing for capacity",
+      "sourceCatalogPath": "tests/budgets/contention.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Budget owner; export consumes held/advisory amounts only."
+    },
+    {
+      "id": 2,
+      "requiredScenario": "Distinct billed retries",
+      "sourceCatalogPath": "tests/ledger/ledger.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Ledger/intake owners; export never invents provider/attempt identities."
+    },
+    {
+      "id": 3,
+      "requiredScenario": "Duplicate usage observations",
+      "sourceCatalogPath": "tests/metering/metering.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Intake owner; no second deduplication ledger is added by export."
+    },
+    {
+      "id": 4,
+      "requiredScenario": "Provider timeout after dispatch",
+      "sourceCatalogPath": "tests/recovery/recovery.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Budget/intake recovery owners; query unposted/awaiting-evidence coverage copied."
+    },
+    {
+      "id": 5,
+      "requiredScenario": "Conservative outstanding hold",
+      "sourceCatalogPath": "tests/budgets/lifecycle.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Budget owner; export copies separate held/advisory budget projection."
+    },
+    {
+      "id": 6,
+      "requiredScenario": "Partial and final settlement",
+      "sourceCatalogPath": "tests/budgets/lifecycle.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Budget owner; export does not settle or acknowledge writes."
+    },
+    {
+      "id": 7,
+      "requiredScenario": "Correct unused-reservation release",
+      "sourceCatalogPath": "tests/budgets/lifecycle.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Budget owner; export does not release reservations."
+    },
+    {
+      "id": 8,
+      "requiredScenario": "Estimated amount corrected by a confirmed amount",
+      "sourceCatalogPath": "tests/exports/query-export-pg.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Producer source test catalog; composed PG export currently tests cash correction, not a substitute for estimate\u2192confirmed coverage."
+    },
+    {
+      "id": 9,
+      "requiredScenario": "Simulated sales isolated from real billing",
+      "sourceCatalogPath": "tests/exports/query-export-pg.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Direct composed oracle includes Q2 unknown simulation/sale and live test cost in same project separate billing scopes."
+    },
+    {
+      "id": 10,
+      "requiredScenario": "No double counting of shared research expense",
+      "sourceCatalogPath": "tests/accounting/accounting.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Accounting/query allocation owners; exporter copies allocations without recomputing balances."
+    },
+    {
+      "id": 11,
+      "requiredScenario": "Reproducible financial summary projections",
+      "sourceCatalogPath": "tests/exports/query-export-pg.test.mjs",
+      "authoritativeReceipt": null,
+      "receiptStatus": "pending_exact_candidate_receipt_not_claimed_by_export_worker",
+      "exportRole": "Direct original first-page hash/envelope/query/export oracle, frozen snapshot after correction, exact bytes and adapter restart."
+    }
+  ]
+}

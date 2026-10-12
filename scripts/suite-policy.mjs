@@ -38,6 +38,7 @@ const leafPaths = Object.freeze({
 });
 
 const documentedSelectors = Object.freeze({
+  exports: Object.freeze({ postgres: ['tests/exports/query-export-pg.test.mjs'] }),
   budgets: Object.freeze({
     authorization: ['tests/budgets/authorization.test.mjs'],
     contention: ['tests/budgets/contention.test.mjs'],

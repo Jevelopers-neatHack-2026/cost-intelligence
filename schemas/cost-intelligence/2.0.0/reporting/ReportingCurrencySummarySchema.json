@@ -1,0 +1,1347 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/ReportingCurrencySummarySchema/2.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "currency",
+    "scale",
+    "metrics",
+    "valuation",
+    "reconciliation",
+    "simulated",
+    "groups"
+  ],
+  "properties": {
+    "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "scale": {
+      "const": 18,
+      "type": "number"
+    },
+    "metrics": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "expense",
+        "grossSales",
+        "netSales",
+        "directCosts",
+        "contribution",
+        "cashReceipts",
+        "cashPayouts"
+      ],
+      "properties": {
+        "expense": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "grossSales": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "netSales": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "directCosts": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "contribution": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "cashReceipts": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "cashPayouts": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "valuation": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "estimated",
+        "confirmed",
+        "unknownCount"
+      ],
+      "properties": {
+        "estimated": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "confirmed": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "unknownCount": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      }
+    },
+    "reconciliation": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "matchedCount",
+        "unmatchedCount",
+        "exceptionCount"
+      ],
+      "properties": {
+        "matchedCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unmatchedCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "exceptionCount": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      }
+    },
+    "simulated": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "expense",
+        "grossSales",
+        "netSales",
+        "directCosts"
+      ],
+      "properties": {
+        "expense": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "grossSales": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "netSales": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        },
+        "directCosts": {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "knownSubtotal",
+            "total",
+            "unknownCount"
+          ],
+          "properties": {
+            "status": {
+              "anyOf": [
+                {
+                  "const": "known",
+                  "type": "string"
+                },
+                {
+                  "const": "partial",
+                  "type": "string"
+                },
+                {
+                  "const": "unknown",
+                  "type": "string"
+                }
+              ]
+            },
+            "knownSubtotal": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "total": {
+              "anyOf": [
+                {
+                  "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                  "maxLength": 40,
+                  "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "unknownCount": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        }
+      }
+    },
+    "groups": {
+      "maxItems": 400000,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dimension",
+          "value",
+          "bucket",
+          "eventCount",
+          "metrics"
+        ],
+        "properties": {
+          "dimension": {
+            "anyOf": [
+              {
+                "const": "provider",
+                "type": "string"
+              },
+              {
+                "const": "model",
+                "type": "string"
+              },
+              {
+                "const": "feature",
+                "type": "string"
+              },
+              {
+                "const": "repo",
+                "type": "string"
+              },
+              {
+                "const": "workflowId",
+                "type": "string"
+              },
+              {
+                "const": "productId",
+                "type": "string"
+              },
+              {
+                "const": "orderId",
+                "type": "string"
+              },
+              {
+                "const": "channel",
+                "type": "string"
+              }
+            ]
+          },
+          "value": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "maxLength": 256,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "bucket": {
+            "anyOf": [
+              {
+                "const": "known",
+                "type": "string"
+              },
+              {
+                "const": "unknown_unallocated",
+                "type": "string"
+              }
+            ]
+          },
+          "eventCount": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "metrics": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "expense",
+              "grossSales",
+              "netSales",
+              "directCosts",
+              "contribution",
+              "cashReceipts",
+              "cashPayouts"
+            ],
+            "properties": {
+              "expense": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "status",
+                  "knownSubtotal",
+                  "total",
+                  "unknownCount"
+                ],
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "known",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "knownSubtotal": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "total": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unknownCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              },
+              "grossSales": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "status",
+                  "knownSubtotal",
+                  "total",
+                  "unknownCount"
+                ],
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "known",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "knownSubtotal": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "total": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unknownCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              },
+              "netSales": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "status",
+                  "knownSubtotal",
+                  "total",
+                  "unknownCount"
+                ],
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "known",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "knownSubtotal": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "total": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unknownCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              },
+              "directCosts": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "status",
+                  "knownSubtotal",
+                  "total",
+                  "unknownCount"
+                ],
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "known",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "knownSubtotal": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "total": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unknownCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              },
+              "contribution": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "status",
+                  "knownSubtotal",
+                  "total",
+                  "unknownCount"
+                ],
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "known",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "knownSubtotal": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "total": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unknownCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              },
+              "cashReceipts": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "status",
+                  "knownSubtotal",
+                  "total",
+                  "unknownCount"
+                ],
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "known",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "knownSubtotal": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "total": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unknownCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              },
+              "cashPayouts": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "status",
+                  "knownSubtotal",
+                  "total",
+                  "unknownCount"
+                ],
+                "properties": {
+                  "status": {
+                    "anyOf": [
+                      {
+                        "const": "known",
+                        "type": "string"
+                      },
+                      {
+                        "const": "partial",
+                        "type": "string"
+                      },
+                      {
+                        "const": "unknown",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "knownSubtotal": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "total": {
+                    "anyOf": [
+                      {
+                        "pattern": "^-?(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,18})?$",
+                        "maxLength": 40,
+                        "description": "Base-10 decimal string with at most 18 fractional digits; never use binary floating point for money.",
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "unknownCount": {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

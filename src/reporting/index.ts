@@ -1,81 +1,8 @@
-import { Type, type Static } from '@sinclair/typebox';
-import { blockedBoundary, CurrencySchema, TrustedScopeSchema, errorEnvelope, failure, validateRequest, type ApiResult, type RuntimePorts, type Validation } from '../shared/contracts.js';
-import { validateCanonical, type SharedFinancialSummary } from '../shared/canonical.js';
+import {  errorEnvelope, failure, validateRequest, type ApiResult, type RuntimePorts, type Validation } from '../shared/contracts.js';
+import { validateCanonical } from '../shared/canonical.js';
 
-const EnvironmentFilterSchema = Type.Array(Type.Union([
-  Type.Literal('development'), Type.Literal('test'), Type.Literal('production'),
-]), { minItems: 1, maxItems: 3, uniqueItems: true });
-const BillingModeFilterSchema = Type.Array(Type.Union([
-  Type.Literal('live'), Type.Literal('sandbox'), Type.Literal('simulated'),
-]), { minItems: 1, maxItems: 3, uniqueItems: true });
-const StringFilterSchema = Type.Array(Type.String({ minLength: 1, maxLength: 200 }), { minItems: 1, maxItems: 100, uniqueItems: true });
-
-/**
- * Finance-owned query wrapper. The pinned shared FinancialSummary is the
- * canonical economic payload; this wrapper carries reproducible query identity
- * that the current proposal does not model.
- */
-export const FinancialSummaryFiltersSchema = Type.Object({
-  environments: EnvironmentFilterSchema,
-  billingModes: BillingModeFilterSchema,
-  currency: Type.Optional(CurrencySchema),
-  repositories: Type.Optional(StringFilterSchema),
-  workstreams: Type.Optional(StringFilterSchema),
-  providers: Type.Optional(StringFilterSchema),
-  models: Type.Optional(StringFilterSchema),
-  workflowIds: Type.Optional(StringFilterSchema),
-  jobIds: Type.Optional(StringFilterSchema),
-  featureCategories: Type.Optional(StringFilterSchema),
-  orderIds: Type.Optional(StringFilterSchema),
-  customerIds: Type.Optional(StringFilterSchema),
-}, { additionalProperties: false });
-export type FinancialSummaryFilters = Static<typeof FinancialSummaryFiltersSchema>;
-
-export const FinancialSummaryQuerySchema = Type.Object({
-  schemaVersion: Type.Literal('1.0.0'),
-  requestId: Type.String({ minLength: 1, maxLength: 128 }),
-  idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
-  scope: TrustedScopeSchema,
-  period: Type.Object({
-    start: Type.String({ format: 'date-time' }),
-    end: Type.String({ format: 'date-time' }),
-  }, { additionalProperties: false }),
-  timezone: Type.String({ minLength: 1, maxLength: 64, pattern: '^[A-Za-z_+-]+(?:/[A-Za-z0-9_+.-]+)*$' }),
-  requestedAsOf: Type.Optional(Type.String({ format: 'date-time' })),
-  snapshotId: Type.Optional(Type.String({ minLength: 1, maxLength: 200 })),
-  cursor: Type.Optional(Type.String({ minLength: 1, maxLength: 2048 })),
-  pageSize: Type.Integer({ minimum: 1, maximum: 500 }),
-  filters: FinancialSummaryFiltersSchema,
-}, { additionalProperties: false });
-export type FinancialSummaryQuery = Static<typeof FinancialSummaryQuerySchema>;
-
-export const SummarySourceWatermarkSchema = Type.Object({
-  source: Type.String({ minLength: 1, maxLength: 120 }),
-  revision: Type.String({ minLength: 1, maxLength: 128 }),
-  observedThrough: Type.String({ format: 'date-time' }),
-  contentHash: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }),
-  completeness: Type.Union([Type.Literal('complete'), Type.Literal('partial'), Type.Literal('unknown')]),
-}, { additionalProperties: false });
-
-export const FinancialSummaryPageSchema = Type.Object({
-  schemaVersion: Type.Literal('1.0.0'),
-  requestId: Type.String({ minLength: 1 }),
-  snapshotId: Type.String({ minLength: 1, maxLength: 200 }),
-  queryContentHash: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }),
-  asOf: Type.String({ format: 'date-time' }),
-  timezone: Type.String({ minLength: 1, maxLength: 64, pattern: '^[A-Za-z_+-]+(?:/[A-Za-z0-9_+.-]+)*$' }),
-  watermark: Type.Object({
-    watermarkId: Type.String({ minLength: 1, maxLength: 200 }),
-    capturedAt: Type.String({ format: 'date-time' }),
-    sources: Type.Array(SummarySourceWatermarkSchema, { minItems: 1, maxItems: 500 }),
-  }, { additionalProperties: false }),
-  filters: FinancialSummaryFiltersSchema,
-  summaryContentHash: Type.String({ pattern: '^sha256:[a-f0-9]{64}$' }),
-  summary: Type.Unknown(),
-  hasMore: Type.Boolean(),
-  nextCursor: Type.Union([Type.String({ minLength: 1, maxLength: 2048 }), Type.Null()]),
-}, { additionalProperties: false });
-export type FinancialSummaryPage = Omit<Static<typeof FinancialSummaryPageSchema>, 'summary'> & { readonly summary: SharedFinancialSummary };
+export * from './schema-v1.js';
+import { FinancialSummaryPageSchema, FinancialSummaryQuerySchema, type FinancialSummaryPage, type FinancialSummaryQuery } from './schema-v1.js';
 
 /** Validate the page wrapper and its nested pinned FinancialSummary as one public boundary. */
 export function validateFinancialSummaryPageBoundary(
@@ -91,7 +18,22 @@ export function validateFinancialSummaryPageBoundary(
   return { ok: true, value: { ...outer.value, summary: canonical.value } as FinancialSummaryPage };
 }
 
-export async function querySummary(request: FinancialSummaryQuery, ports: RuntimePorts): Promise<ApiResult<FinancialSummaryPage>> {
+export * from './schema-v2.js';
+export * from './definitions.js';
+export * from './host-authority.js';
+export { readVerifiedSummarySnapshot, readVerifiedSummarySnapshotV2, createReportingSnapshotReader, ReportingSnapshotReadRequestSchema } from './snapshots.js';
+export type { ReportingSnapshotReadRequest } from './snapshots.js';
+export { querySummaryV2, reportingEvidenceQueryHash, validateFinancialSummaryPageV2Boundary } from './reader.js';
+export type { ReportingPorts, ReportingRuntimePorts, ReportingTransactionPort } from './runtime.js';
+import { executeSummary, querySummaryV2 } from './reader.js';
+import { REPORTING_POLICY_VERSION, REPORTING_DIMENSIONS, type FinancialSummaryQueryV2, type FinancialSummaryPageV2 } from './schema-v2.js';
+import type { ReportingPorts } from './runtime.js';
+import { hash } from './projection.js';
+
+export function querySummary(request: FinancialSummaryQueryV2, ports: ReportingPorts): Promise<ApiResult<FinancialSummaryPageV2>>;
+export function querySummary(request: FinancialSummaryQuery, ports: RuntimePorts): Promise<ApiResult<FinancialSummaryPage>>;
+export async function querySummary(request: FinancialSummaryQuery | FinancialSummaryQueryV2, ports: ReportingPorts): Promise<ApiResult<FinancialSummaryPage | FinancialSummaryPageV2>> {
+  if (request?.schemaVersion === '2.0.0') return querySummaryV2(request, ports);
   const validation = validateRequest(FinancialSummaryQuerySchema, request, 'reporting', 'querySummary');
   if (!validation.ok) return failure(validation.error);
   const parsed = validation.value as FinancialSummaryQuery;
@@ -108,12 +50,16 @@ export async function querySummary(request: FinancialSummaryQuery, ports: Runtim
       || parsed.filters.billingModes.some(value => value !== parsed.scope.billingMode)) {
     return failure(errorEnvelope('reporting', 'querySummary', 'FORBIDDEN_SCOPE', requestId, 'The requested filters exceed the authenticated environment or billing-mode scope.'));
   }
-  return blockedBoundary<FinancialSummaryQuery, FinancialSummaryPage>({
-    module: 'reporting', operation: 'querySummary', authorityOperation: 'reporting.querySummary', schema: FinancialSummaryQuerySchema, request: parsed, ports,
-    unavailableCode: 'SOURCE_UNAVAILABLE',
-    safeMessage: 'Summary query execution is unavailable until the reporting and accounting leaves are delivered.',
-    retryable: true,
-  });
+  const result = await executeSummary({ ...parsed, schemaVersion: '2.0.0', policyVersion: REPORTING_POLICY_VERSION, groupings: [...REPORTING_DIMENSIONS] }, ports, '1.0.0');
+  if (!result.ok) return result;
+  const page = result.value;
+  if (page.canonicalSummaries.length !== 1) return failure(errorEnvelope('reporting', 'querySummary', 'SOURCE_UNAVAILABLE', requestId,
+    'The legacy encoding requires an observed single currency and UUID scope; use the proposed reporting v2 wrapper.'));
+  const legacy = { schemaVersion: '1.0.0' as const, requestId, snapshotId: page.snapshotId, queryContentHash: page.queryContentHash,
+    asOf: page.asOf, timezone: page.timezone, watermark: page.watermark, filters: page.filters, summaryContentHash: hash(page.canonicalSummaries[0]),
+    summary: page.canonicalSummaries[0]!, hasMore: page.hasMore, nextCursor: page.nextCursor };
+  const checked = validateFinancialSummaryPageBoundary(legacy);
+  return checked.ok ? { ok: true, value: checked.value } : failure(checked.error);
 }
 
 /** Validate an inner canonical summary before a wrapper is exported or archived. */

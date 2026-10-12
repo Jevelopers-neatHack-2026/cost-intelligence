@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/FinancialSummaryFiltersSchema/2.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "environments",
+    "billingModes"
+  ],
+  "properties": {
+    "environments": {
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "const": "development",
+            "type": "string"
+          },
+          {
+            "const": "test",
+            "type": "string"
+          },
+          {
+            "const": "production",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "billingModes": {
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "const": "live",
+            "type": "string"
+          },
+          {
+            "const": "sandbox",
+            "type": "string"
+          },
+          {
+            "const": "simulated",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    "currency": {
+      "pattern": "^[A-Z]{3}$",
+      "type": "string"
+    },
+    "repositories": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "workstreams": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "providers": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "models": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "workflowIds": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "jobIds": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "featureCategories": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "orderIds": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "customerIds": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 200,
+        "type": "string"
+      }
+    },
+    "products": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 256,
+        "type": "string"
+      }
+    },
+    "channels": {
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "minLength": 1,
+        "maxLength": 256,
+        "type": "string"
+      }
+    }
+  }
+}

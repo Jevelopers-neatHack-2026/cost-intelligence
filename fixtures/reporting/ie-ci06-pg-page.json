@@ -1,0 +1,1210 @@
+{
+  "schemaVersion": "2.0.0",
+  "requestId": "synthetic-query",
+  "snapshotId": "sha256:0acfd011ef3e7c59962ffe6680d6336da41e2e1a31122e56a1c981254f23ca69",
+  "queryContentHash": "sha256:75eb3d2d788514299ef6e8503ff43ff7228b5ad8976fa6650aff5eabf49dd626",
+  "summaryContentHash": "sha256:84ee2f5a341c25b1a2519ebb2f030ee45330a59f261fd71c4583bc0a6a8a99f8",
+  "asOf": "2026-10-12T22:00:01.000Z",
+  "timezone": "America/New_York",
+  "period": {
+    "start": "2026-10-10T00:00:00.000Z",
+    "end": "2026-10-11T00:00:00.000Z"
+  },
+  "scope": {
+    "tenantId": "73f83a24-3bfa-4adf-98bf-97c4ec2b9951",
+    "projectId": "f01afa90-70af-4c6c-8d0f-a32531174465",
+    "actorId": "synthetic-reporting-service",
+    "environment": "test",
+    "billingMode": "live"
+  },
+  "filters": {
+    "environments": [
+      "test"
+    ],
+    "billingModes": [
+      "live"
+    ]
+  },
+  "watermark": {
+    "watermarkId": "sha256:e68780f097d54cc47a9ab6cc788f13dd921320337c4106dd6582915d32908b85",
+    "capturedAt": "2026-10-12T22:00:01.000Z",
+    "sources": [
+      {
+        "source": "immutable_finance_inputs",
+        "revision": "ci08-reporting-policy-2.0.0",
+        "observedThrough": "2026-10-12T22:00:01.000Z",
+        "contentHash": "sha256:7bbd894931f00f16117722ab0bf75a9152960b2ae06c4f0c9f9a27991dda71ba",
+        "completeness": "partial"
+      }
+    ]
+  },
+  "summary": {
+    "policyVersion": "ci08-reporting-policy-2.0.0",
+    "accountingPolicyVersion": "ci06-accounting-policy-1.0.0",
+    "definitionsStatus": "PENDING FINANCE-OWNER SIGN-OFF",
+    "currencies": [
+      {
+        "currency": "USD",
+        "scale": 18,
+        "metrics": {
+          "expense": {
+            "status": "partial",
+            "knownSubtotal": "38",
+            "total": null,
+            "unknownCount": 0
+          },
+          "grossSales": {
+            "status": "partial",
+            "knownSubtotal": "150",
+            "total": null,
+            "unknownCount": 0
+          },
+          "netSales": {
+            "status": "partial",
+            "knownSubtotal": "120",
+            "total": null,
+            "unknownCount": 0
+          },
+          "directCosts": {
+            "status": "partial",
+            "knownSubtotal": "38",
+            "total": null,
+            "unknownCount": 0
+          },
+          "contribution": {
+            "status": "partial",
+            "knownSubtotal": "82",
+            "total": null,
+            "unknownCount": 0
+          },
+          "cashReceipts": {
+            "status": "partial",
+            "knownSubtotal": "140",
+            "total": null,
+            "unknownCount": 0
+          },
+          "cashPayouts": {
+            "status": "partial",
+            "knownSubtotal": "90",
+            "total": null,
+            "unknownCount": 0
+          }
+        },
+        "valuation": {
+          "estimated": {
+            "status": "unknown",
+            "knownSubtotal": null,
+            "total": null,
+            "unknownCount": 0
+          },
+          "confirmed": {
+            "status": "known",
+            "knownSubtotal": "38",
+            "total": "38",
+            "unknownCount": 0
+          },
+          "unknownCount": 0
+        },
+        "reconciliation": {
+          "matchedCount": 0,
+          "unmatchedCount": 13,
+          "exceptionCount": 0
+        },
+        "simulated": {
+          "expense": "0",
+          "grossSales": "0",
+          "netSales": "0",
+          "directCosts": "0"
+        },
+        "groups": [
+          {
+            "dimension": "channel",
+            "value": null,
+            "bucket": "unknown_unallocated",
+            "eventCount": 11,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "38",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "0",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "-30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "38",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "-68",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "partial",
+                "knownSubtotal": "140",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "channel",
+            "value": "web",
+            "bucket": "known",
+            "eventCount": 2,
+            "metrics": {
+              "expense": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "feature",
+            "value": null,
+            "bucket": "unknown_unallocated",
+            "eventCount": 11,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "120",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "partial",
+                "knownSubtotal": "140",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "feature",
+            "value": "fulfillment",
+            "bucket": "known",
+            "eventCount": 1,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "7",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "7",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "-7",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "feature",
+            "value": "shared-research",
+            "bucket": "known",
+            "eventCount": 1,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "1",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "1",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "-1",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "model",
+            "value": null,
+            "bucket": "unknown_unallocated",
+            "eventCount": 12,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "8",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "120",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "8",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "112",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "partial",
+                "knownSubtotal": "140",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "model",
+            "value": "claude",
+            "bucket": "known",
+            "eventCount": 1,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "-30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "orderId",
+            "value": null,
+            "bucket": "unknown_unallocated",
+            "eventCount": 6,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "35",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "35",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "-35",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "partial",
+                "knownSubtotal": "140",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "orderId",
+            "value": "O1",
+            "bucket": "known",
+            "eventCount": 6,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "3",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "100",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "70",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "3",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "67",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "orderId",
+            "value": "O2",
+            "bucket": "known",
+            "eventCount": 1,
+            "metrics": {
+              "expense": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "50",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "50",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "50",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "productId",
+            "value": null,
+            "bucket": "unknown_unallocated",
+            "eventCount": 13,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "38",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "120",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "38",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "82",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "partial",
+                "knownSubtotal": "140",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "provider",
+            "value": null,
+            "bucket": "unknown_unallocated",
+            "eventCount": 12,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "8",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "120",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "8",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "112",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "partial",
+                "knownSubtotal": "140",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "provider",
+            "value": "anthropic",
+            "bucket": "known",
+            "eventCount": 1,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "-30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "repo",
+            "value": null,
+            "bucket": "unknown_unallocated",
+            "eventCount": 13,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "38",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "120",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "38",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "82",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "partial",
+                "knownSubtotal": "140",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "workflowId",
+            "value": null,
+            "bucket": "unknown_unallocated",
+            "eventCount": 12,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "8",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "partial",
+                "knownSubtotal": "150",
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "partial",
+                "knownSubtotal": "120",
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "8",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "112",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "partial",
+                "knownSubtotal": "140",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "partial",
+                "knownSubtotal": "90",
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          },
+          {
+            "dimension": "workflowId",
+            "value": "wf-1",
+            "bucket": "known",
+            "eventCount": 1,
+            "metrics": {
+              "expense": {
+                "status": "partial",
+                "knownSubtotal": "30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "grossSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "netSales": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "directCosts": {
+                "status": "partial",
+                "knownSubtotal": "30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "contribution": {
+                "status": "partial",
+                "knownSubtotal": "-30",
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashReceipts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              },
+              "cashPayouts": {
+                "status": "unknown",
+                "knownSubtotal": null,
+                "total": null,
+                "unknownCount": 0
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "coverage": {
+      "status": "partial",
+      "observed": 13,
+      "expected": null,
+      "unknownAmountCount": 0,
+      "unpostedAttemptCount": 0,
+      "awaitingEvidenceAttemptCount": 0,
+      "quarantinedObservationCount": 0,
+      "unsupportedEventCount": 0,
+      "missingSources": [
+        "expense",
+        "revenue",
+        "cash",
+        "approved_product_denominators"
+      ]
+    },
+    "budgets": [
+      {
+        "currency": "USD",
+        "window": "project_lifetime",
+        "policyReference": null,
+        "limit": null,
+        "ledgerExpense": "38",
+        "lifecycleConsumed": "0",
+        "held": "0",
+        "remainingAuthorizedCapacity": null,
+        "unresolvedExposure": false,
+        "advisoryOnly": true
+      }
+    ],
+    "unitCosts": [
+      {
+        "kind": "design",
+        "currency": "USD",
+        "status": "unknown",
+        "numerator": null,
+        "denominator": null,
+        "approvalReference": null,
+        "allocationPolicyVersion": "ci06-allocation-policy-1.0.0"
+      },
+      {
+        "kind": "workflow",
+        "currency": "USD",
+        "status": "unknown",
+        "numerator": null,
+        "denominator": null,
+        "approvalReference": null,
+        "allocationPolicyVersion": "ci06-allocation-policy-1.0.0"
+      },
+      {
+        "kind": "order",
+        "currency": "USD",
+        "status": "unknown",
+        "numerator": null,
+        "denominator": null,
+        "approvalReference": null,
+        "allocationPolicyVersion": "ci06-allocation-policy-1.0.0"
+      }
+    ],
+    "allocations": []
+  },
+  "details": [
+    {
+      "detailId": "sha256:0d7eeb7cdfe499b865d88acd45d17c395a1478293e75cd5c72a506067ea0454a",
+      "currency": "USD",
+      "eventType": "tax",
+      "classification": "pass_through_tax",
+      "occurredAt": "2026-10-10T12:00:00.000Z",
+      "valuation": "provider_confirmed",
+      "reconciliation": "unmatched",
+      "settlement": "unpaid",
+      "dimensions": {
+        "provider": null,
+        "model": null,
+        "feature": null,
+        "repo": null,
+        "workflowId": null,
+        "productId": null,
+        "orderId": "O1",
+        "channel": null
+      },
+      "amount": "12.00",
+      "status": "recognized",
+      "metrics": {
+        "expense": "0",
+        "simulatedExpense": "0",
+        "grossSales": "0",
+        "netSales": "0",
+        "directCosts": "0",
+        "contribution": "0",
+        "cashReceipts": "0",
+        "cashPayouts": "0",
+        "simulatedGrossSales": "0",
+        "simulatedNetSales": "0",
+        "simulatedDirectCosts": "0"
+      }
+    },
+    {
+      "detailId": "sha256:104b20d2759f786b584e0d64aefc3c70e7696c3c162e89cf9e3ff8958842800f",
+      "currency": "USD",
+      "eventType": "fee",
+      "classification": "direct_cost",
+      "occurredAt": "2026-10-10T12:00:00.000Z",
+      "valuation": "provider_confirmed",
+      "reconciliation": "unmatched",
+      "settlement": "unpaid",
+      "dimensions": {
+        "provider": null,
+        "model": null,
+        "feature": null,
+        "repo": null,
+        "workflowId": null,
+        "productId": null,
+        "orderId": "O1",
+        "channel": null
+      },
+      "amount": "5.00",
+      "status": "recognized",
+      "metrics": {
+        "expense": "5",
+        "simulatedExpense": "0",
+        "grossSales": "0",
+        "netSales": "0",
+        "directCosts": "5",
+        "contribution": "-5",
+        "cashReceipts": "0",
+        "cashPayouts": "0",
+        "simulatedGrossSales": "0",
+        "simulatedNetSales": "0",
+        "simulatedDirectCosts": "0"
+      }
+    }
+  ],
+  "detailCount": 13,
+  "hasMore": true,
+  "nextCursor": "eyJjb250ZW50SGFzaCI6InNoYTI1NjphN2FlNTc3NTUyYjkxM2JiOGFkMjM0MjQwN2Q1OWM5YWY4NTRjYWQyNWQxYTY4NjM2YmM1ZDA3MWE3NGQwOGRjIiwib2Zmc2V0IjoyLCJwYWdlU2l6ZSI6MiwicXVlcnlIYXNoIjoic2hhMjU2Ojc1ZWIzZDJkNzg4NTE0Mjk5ZWY2ZTg1MDNmZjQzZmY3MjI4YjVhZDg5NzZmYTY2NTBhZmY1ZWFiZjQ5ZGQ2MjYiLCJzbmFwc2hvdElkIjoic2hhMjU2OjBhY2ZkMDExZWYzZTdjNTk5NjJmZmU2NjgwZDYzMzZkYTQxZTJlMWEzMTEyMmU1NmExYzk4MTI1NGYyM2NhNjkiLCJ2ZXJzaW9uIjoyfQ",
+  "canonicalSummaries": [
+    {
+      "contract": "FinancialSummary",
+      "schema_version": "1.0.0",
+      "policy_version": "1.0.0",
+      "event_id": "18073c10-6dae-448d-8f13-6244bcfd351e",
+      "tenant_id": "73f83a24-3bfa-4adf-98bf-97c4ec2b9951",
+      "project_id": "f01afa90-70af-4c6c-8d0f-a32531174465",
+      "correlation_id": "18073c10-6dae-448d-8f13-6244bcfd351e",
+      "producer": {
+        "module": "cost-intelligence",
+        "source_revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "build_revision": "ci08-synthetic-oracle-1"
+      },
+      "occurred_at": "2026-10-12T22:00:01.000Z",
+      "observed_at": "2026-10-12T22:00:01.000Z",
+      "ingested_at": "2026-10-12T22:00:01.000Z",
+      "environment": "test",
+      "billing_mode": "live",
+      "source_refs": [],
+      "summary_id": "18073c10-6dae-448d-8f13-6244bcfd351e",
+      "revision": 1,
+      "period": {
+        "start": "2026-10-10T00:00:00.000Z",
+        "end": "2026-10-11T00:00:00.000Z"
+      },
+      "currency": "USD",
+      "scale": 18,
+      "rounding": "none",
+      "rounding_boundary": "none",
+      "valuation_basis": "provider_confirmed",
+      "settlement": "unpaid",
+      "reconciliation": "unmatched",
+      "reservation_state": "none",
+      "completeness": "incomplete",
+      "included_environments": [
+        "test"
+      ],
+      "included_billing_modes": [
+        "live"
+      ],
+      "coverage": {
+        "observed": 13,
+        "expected": null,
+        "missing_sources": [
+          "expense",
+          "revenue",
+          "cash",
+          "approved_product_denominators"
+        ]
+      },
+      "metrics": {
+        "expense": {
+          "status": "unknown",
+          "definition_ref": {
+            "contract": "cost-intelligence.reporting.metric-definition",
+            "schema_version": "1.0.0",
+            "id": "cbcd953b-be1a-449b-8fd1-74d1ec19871a",
+            "revision": 1,
+            "content_hash": "sha256:88c64fd36b4958bebb504c576a751952d75ffe2ac878bf5f29d286700727c378"
+          },
+          "value": null,
+          "source_refs": []
+        },
+        "gross_sales": {
+          "status": "unknown",
+          "definition_ref": {
+            "contract": "cost-intelligence.reporting.metric-definition",
+            "schema_version": "1.0.0",
+            "id": "5f9d45ac-faf5-4fd1-87bd-68ac5fc0c8c1",
+            "revision": 1,
+            "content_hash": "sha256:9c457c0b8728708d52477cc719a1ad2d156736382956a68b9654d1a466a669e4"
+          },
+          "value": null,
+          "source_refs": []
+        },
+        "net_sales": {
+          "status": "unknown",
+          "definition_ref": {
+            "contract": "cost-intelligence.reporting.metric-definition",
+            "schema_version": "1.0.0",
+            "id": "97f350b7-8f55-4e67-8409-595b9400ed18",
+            "revision": 1,
+            "content_hash": "sha256:ab3dfd0832296ba49c49c3c3d4b017c13b45cfe9e04479c532ac7f3a31da5352"
+          },
+          "value": null,
+          "source_refs": []
+        },
+        "direct_costs": {
+          "status": "unknown",
+          "definition_ref": {
+            "contract": "cost-intelligence.reporting.metric-definition",
+            "schema_version": "1.0.0",
+            "id": "139c4a14-81d9-418c-8e29-0550b55f4708",
+            "revision": 1,
+            "content_hash": "sha256:07bbdeed6d0262316fed38ca4c4913f17fecc431c043298f945a3f9b5f300295"
+          },
+          "value": null,
+          "source_refs": []
+        },
+        "contribution": {
+          "status": "unknown",
+          "definition_ref": {
+            "contract": "cost-intelligence.reporting.metric-definition",
+            "schema_version": "1.0.0",
+            "id": "5c1de47c-d602-4226-8211-559d1a304313",
+            "revision": 1,
+            "content_hash": "sha256:83c479253ff348ce30c06951eee5a759ca535aaa1fb34c5c77bc1ddc62dadf16"
+          },
+          "value": null,
+          "source_refs": []
+        },
+        "cash_receipts": {
+          "status": "unknown",
+          "definition_ref": {
+            "contract": "cost-intelligence.reporting.metric-definition",
+            "schema_version": "1.0.0",
+            "id": "7581d475-2800-4b56-828d-c6d1d732e11f",
+            "revision": 1,
+            "content_hash": "sha256:57dcba2d9dc6d144772bdabe415cc40f9daa61c4df13d4be51cc119be189af4c"
+          },
+          "value": null,
+          "source_refs": []
+        },
+        "cash_payouts": {
+          "status": "unknown",
+          "definition_ref": {
+            "contract": "cost-intelligence.reporting.metric-definition",
+            "schema_version": "1.0.0",
+            "id": "1c47084c-ce19-4cea-8c22-2df4e15e9196",
+            "revision": 1,
+            "content_hash": "sha256:8958d658e3fb0df2e22f238fe757000ef76b2f5965e3ce6ac7fa41d6f84e8eb3"
+          },
+          "value": null,
+          "source_refs": []
+        }
+      },
+      "original_amounts": [],
+      "conversion_ref": null,
+      "policy_ref": {
+        "contract": "cost-intelligence.reporting.policy-definition",
+        "schema_version": "1.0.0",
+        "id": "cdcbcf8d-56e4-4a57-8528-991ae8d74c49",
+        "revision": 1,
+        "content_hash": "sha256:62ffb8e5e2723cde437e9fd3fe1e69c5383fe62874635afce6496c10982c47a0"
+      },
+      "rate_card_refs": [],
+      "financial_event_refs": []
+    }
+  ],
+  "canonicalMappingStatus": "proposal_only_owner_ack_pending"
+}

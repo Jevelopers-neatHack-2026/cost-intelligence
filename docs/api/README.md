@@ -49,3 +49,9 @@ The checked-in archive under `vendor/` is exactly pinned by SHA-256 and installe
 - FC-004: `held_for_reconciliation` is rejected in the uncertain state it is meant to express.
 
 Finance-owned wrappers preserve the needed boundary information while those producer fixes and consumer acknowledgements remain pending. They are not alternate canonical shared schemas.
+
+Reporting now executes through the authoritative scoped PostgreSQL reader for
+representable legacy pages and the explicit Finance-owned 2.0.0 supplemental
+wrapper. See [reporting.md](./reporting.md) for source coverage, exact-money
+semantics, current authority, pagination and query-to-export composition. The
+production host and consumer owner acknowledgements remain pending.

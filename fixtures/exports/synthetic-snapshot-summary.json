@@ -1,0 +1,151 @@
+{
+  "fixtureMode": "synthetic_only",
+  "producerIntegration": "pending_query_snapshot_handshake",
+  "summary": {
+    "contract": "FinancialSummary",
+    "schema_version": "1.0.0",
+    "policy_version": "1.0.0",
+    "event_id": "123e4567-e89b-42d3-a456-000000000100",
+    "tenant_id": "123e4567-e89b-42d3-a456-426614174000",
+    "project_id": "123e4567-e89b-42d3-a456-426614174000",
+    "correlation_id": "123e4567-e89b-42d3-a456-426614174000",
+    "producer": {
+      "module": "cost-intelligence",
+      "source_revision": "c4caaccc2ea63b273eeac17ed89af8ac64f6bbde",
+      "build_revision": "fixture-1"
+    },
+    "occurred_at": "2026-10-10T12:00:00Z",
+    "observed_at": "2026-10-10T12:00:01Z",
+    "ingested_at": "2026-10-10T12:00:02Z",
+    "environment": "test",
+    "billing_mode": "simulated",
+    "source_refs": [],
+    "summary_id": "123e4567-e89b-42d3-a456-000000000024",
+    "revision": 1,
+    "period": {
+      "start": "2026-10-09T00:00:00Z",
+      "end": "2026-10-10T00:00:00Z"
+    },
+    "currency": "USD",
+    "scale": 6,
+    "rounding": "none",
+    "rounding_boundary": "none",
+    "valuation_basis": "estimated",
+    "settlement": "unpaid",
+    "reconciliation": "unmatched",
+    "reservation_state": "held",
+    "completeness": "incomplete",
+    "included_environments": [
+      "test"
+    ],
+    "included_billing_modes": [
+      "simulated"
+    ],
+    "coverage": {
+      "observed": 2,
+      "expected": null,
+      "missing_sources": [
+        "PRIVATE_PROVIDER_CANARY",
+        "cash"
+      ]
+    },
+    "metrics": {
+      "expense": {
+        "status": "known",
+        "definition_ref": {
+          "contract": "MetricDefinition",
+          "schema_version": "1.0.0",
+          "id": "123e4567-e89b-42d3-a456-000000000025",
+          "revision": 1,
+          "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "value": {
+          "amount": "1.234567",
+          "currency": "USD",
+          "scale": 6
+        },
+        "source_refs": [
+          {
+            "contract": "UsageEvent",
+            "schema_version": "1.0.0",
+            "id": "123e4567-e89b-42d3-a456-000000000999",
+            "revision": 1,
+            "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      },
+      "cash_net": {
+        "status": "unknown",
+        "definition_ref": {
+          "contract": "MetricDefinition",
+          "schema_version": "1.0.0",
+          "id": "123e4567-e89b-42d3-a456-000000000025",
+          "revision": 1,
+          "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "value": null,
+        "source_refs": []
+      },
+      "contribution": {
+        "status": "known",
+        "definition_ref": {
+          "contract": "MetricDefinition",
+          "schema_version": "1.0.0",
+          "id": "123e4567-e89b-42d3-a456-000000000025",
+          "revision": 1,
+          "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "value": {
+          "amount": "-0.250000",
+          "currency": "USD",
+          "scale": 6
+        },
+        "source_refs": [
+          {
+            "contract": "UsageEvent",
+            "schema_version": "1.0.0",
+            "id": "123e4567-e89b-42d3-a456-000000000999",
+            "revision": 1,
+            "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ]
+      }
+    },
+    "original_amounts": [
+      {
+        "amount": "0.000003",
+        "currency": "USD",
+        "scale": 6
+      }
+    ],
+    "conversion_ref": null,
+    "policy_ref": {
+      "contract": "policy",
+      "schema_version": "1.0.0",
+      "id": "123e4567-e89b-42d3-a456-000000000015",
+      "revision": 1,
+      "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "rate_card_refs": [
+      {
+        "contract": "RateCard",
+        "schema_version": "1.0.0",
+        "id": "123e4567-e89b-42d3-a456-000000000022",
+        "revision": 1,
+        "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    ],
+    "financial_event_refs": [
+      {
+        "kind": "usage",
+        "reference": {
+          "contract": "UsageEvent",
+          "schema_version": "1.0.0",
+          "id": "123e4567-e89b-42d3-a456-000000000017",
+          "revision": 1,
+          "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+        }
+      }
+    ]
+  }
+}

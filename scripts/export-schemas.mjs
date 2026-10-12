@@ -20,9 +20,11 @@ const combinedValidators = Object.freeze({
   ReservationCommandSchema: 'validateReservationCommandBoundary',
   ReservationSnapshotSchema: 'validateReservationSnapshotBoundary',
   FinancialSummaryPageSchema: 'validateFinancialSummaryPageBoundary',
+  FinancialSummaryPageV2Schema: 'validateFinancialSummaryPageV2Boundary',
   LedgerAppendRequestSchema: 'validateLedgerAppendRequestBoundary',
   LedgerProjectionRequestSchema: 'validateLedgerProjectionRequestBoundary',
   ExportRequestSchema: 'validateExportRequestBoundary',
+  ReportingExportRequestSchema: 'validateReportingExportRequestBoundary',
 });
 const entries = [
   ['shared', 'ErrorEnvelopeSchema'], ['shared', 'TrustedScopeSchema'],
@@ -37,7 +39,7 @@ const entries = [
   ['ledger', 'FinancialEventSchema'], ['ledger', 'LedgerEventTypeSchema'], ['ledger', 'LedgerClassificationSchema'],
   ['ledger', 'LedgerAppendRequestSchema'], ['ledger', 'LedgerAppendReceiptSchema'], ['ledger', 'LedgerProjectionRequestSchema'],
   ['ledger', 'LedgerProjectionSchema'], ['reporting', 'FinancialSummaryFiltersSchema'], ['reporting', 'FinancialSummaryQuerySchema'],
-  ['reporting', 'SummarySourceWatermarkSchema'], ['reporting', 'FinancialSummaryPageSchema'],
+  ['reporting', 'ReportingMetricDefinitionSchema'], ['reporting', 'ReportingPolicyDefinitionSchema'], ['reporting', 'ReportingSnapshotReadRequestSchema'], ['reporting', 'SummarySourceWatermarkSchema'], ['reporting', 'FinancialSummaryPageSchema'],
   ['reconciliation', 'ReconciliationRequestSchema'], ['reconciliation', 'ReconciliationRunSchema'], ['reconciliation', 'ReconciliationResultSchema'],
   ['integrations', 'ExportRequestSchema'], ['integrations', 'ExportManifestSchema'],
 ].map(([module, name]) => ({ module, name, exportName: name, schema: api[name], version }));
@@ -52,6 +54,12 @@ const pricingV2Names = [
   ['SourceReferenceSchema', 'SourceReferenceSchema'], ['PricingPartitionGroupSchema', 'PricingPartitionGroupSchema'],
 ].map(([name, exportName]) => ({ module: 'pricing', name, exportName, schema: api[exportName], version: pricingV2Version }));
 entries.push(...pricingV2Names);
+for (const name of ['ReportingExportRequestSchema', 'ReportingExportManifestSchema', 'ReportingExportReceiptSchema']) {
+  entries.push({ module: 'integrations', name, exportName: name, schema: api[name], version: '2.0.0' });
+}
+for (const exportName of ['FinancialSummaryFiltersV2Schema', 'FinancialSummaryQueryV2Schema', 'ReportingDimensionSchema', 'ReportingAmountSchema', 'ReportingDetailSchema', 'ReportingCurrencySummarySchema', 'ReportingProductEvidenceSchema', 'ReportingProjectionSchema', 'FinancialSummaryPageV2Schema']) {
+  entries.push({ module: 'reporting', name: exportName.replace('V2Schema', 'Schema'), exportName, schema: api[exportName], version: '2.0.0' });
+}
 
 const outputs = [];
 for (const entry of entries) {
@@ -76,7 +84,7 @@ for (const entry of entries) {
 const contractLock = JSON.parse(await readFile(join(root, 'contracts.lock.json'), 'utf8'));
 const manifest = {
   schema_version: version,
-  schema_versions: { pricing: [version, pricingV2Version] },
+  schema_versions: { pricing: [version, pricingV2Version], reporting: [version, '2.0.0'], integrations: [version, '2.0.0'] },
   package: '@jevelopers/cost-intelligence',
   shared_contracts: {
     package: contractLock.producer.package,

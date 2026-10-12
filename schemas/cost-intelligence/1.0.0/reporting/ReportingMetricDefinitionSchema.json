@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/ReportingMetricDefinitionSchema/1.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "contract",
+    "schemaVersion",
+    "definitionId",
+    "revision",
+    "policyVersion",
+    "metric",
+    "definitionsStatus",
+    "formula",
+    "source"
+  ],
+  "properties": {
+    "contract": {
+      "const": "cost-intelligence.reporting.metric-definition",
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "definitionId": {
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-8[a-f0-9]{3}-[a-f0-9]{12}$",
+      "type": "string"
+    },
+    "revision": {
+      "const": 1,
+      "type": "number"
+    },
+    "policyVersion": {
+      "const": "ci06-accounting-policy-1.0.0",
+      "type": "string"
+    },
+    "metric": {
+      "anyOf": [
+        {
+          "const": "expense",
+          "type": "string"
+        },
+        {
+          "const": "gross_sales",
+          "type": "string"
+        },
+        {
+          "const": "net_sales",
+          "type": "string"
+        },
+        {
+          "const": "direct_costs",
+          "type": "string"
+        },
+        {
+          "const": "contribution",
+          "type": "string"
+        },
+        {
+          "const": "cash_receipts",
+          "type": "string"
+        },
+        {
+          "const": "cash_payouts",
+          "type": "string"
+        }
+      ]
+    },
+    "definitionsStatus": {
+      "const": "PENDING FINANCE-OWNER SIGN-OFF",
+      "type": "string"
+    },
+    "formula": {
+      "minLength": 1,
+      "maxLength": 1000,
+      "type": "string"
+    },
+    "source": {
+      "anyOf": [
+        {
+          "const": "expense",
+          "type": "string"
+        },
+        {
+          "const": "revenue",
+          "type": "string"
+        },
+        {
+          "const": "cash",
+          "type": "string"
+        },
+        {
+          "const": "revenue_and_expense",
+          "type": "string"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/integrations/ReportingExportManifestSchema/2.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "sourceEncoding",
+    "exportId",
+    "status",
+    "destination",
+    "createdAt",
+    "snapshotId",
+    "queryContentHash",
+    "projectionContentHash",
+    "snapshotEnvelopeHash",
+    "definitionRegistryHash",
+    "artifactSetHash",
+    "artifacts",
+    "evidenceMode",
+    "requestedFormat",
+    "period",
+    "timezone",
+    "currencies",
+    "itemCount",
+    "delivery",
+    "deliveryReference",
+    "canonicalAdoption",
+    "definitionsStatus",
+    "consumerAcknowledgement",
+    "sourceEvidenceStatus"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "2.0.0",
+      "type": "string"
+    },
+    "sourceEncoding": {
+      "const": "2.0.0",
+      "type": "string"
+    },
+    "exportId": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "status": {
+      "const": "prepared",
+      "type": "string"
+    },
+    "destination": {
+      "const": "cfo.ai",
+      "type": "string"
+    },
+    "createdAt": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "snapshotId": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "queryContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "projectionContentHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "snapshotEnvelopeHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "definitionRegistryHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "artifactSetHash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "type": "string"
+    },
+    "artifacts": {
+      "minItems": 2,
+      "maxItems": 2,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "fileName",
+          "mediaType",
+          "contentHash",
+          "byteLength"
+        ],
+        "properties": {
+          "fileName": {
+            "anyOf": [
+              {
+                "const": "summary.json",
+                "type": "string"
+              },
+              {
+                "const": "metrics.csv",
+                "type": "string"
+              }
+            ]
+          },
+          "mediaType": {
+            "anyOf": [
+              {
+                "const": "application/json",
+                "type": "string"
+              },
+              {
+                "const": "text/csv",
+                "type": "string"
+              }
+            ]
+          },
+          "contentHash": {
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "type": "string"
+          },
+          "byteLength": {
+            "minimum": 1,
+            "maximum": 1048576,
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "evidenceMode": {
+      "anyOf": [
+        {
+          "const": "mocked",
+          "type": "string"
+        },
+        {
+          "const": "sandbox",
+          "type": "string"
+        },
+        {
+          "const": "live",
+          "type": "string"
+        }
+      ]
+    },
+    "requestedFormat": {
+      "anyOf": [
+        {
+          "const": "json",
+          "type": "string"
+        },
+        {
+          "const": "csv",
+          "type": "string"
+        }
+      ]
+    },
+    "period": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "format": "date-time",
+          "type": "string"
+        },
+        "end": {
+          "format": "date-time",
+          "type": "string"
+        }
+      }
+    },
+    "timezone": {
+      "minLength": 1,
+      "maxLength": 64,
+      "type": "string"
+    },
+    "currencies": {
+      "maxItems": 100,
+      "uniqueItems": true,
+      "type": "array",
+      "items": {
+        "pattern": "^[A-Z]{3}$",
+        "type": "string"
+      }
+    },
+    "itemCount": {
+      "minimum": 0,
+      "maximum": 1100,
+      "type": "integer"
+    },
+    "delivery": {
+      "const": "manual_prepared",
+      "type": "string"
+    },
+    "deliveryReference": {
+      "type": "null"
+    },
+    "canonicalAdoption": {
+      "const": "proposal_only",
+      "type": "string"
+    },
+    "definitionsStatus": {
+      "const": "pending_owner_review",
+      "type": "string"
+    },
+    "consumerAcknowledgement": {
+      "const": "pending",
+      "type": "string"
+    },
+    "sourceEvidenceStatus": {
+      "const": "not_exposed_by_query",
+      "type": "string"
+    }
+  }
+}

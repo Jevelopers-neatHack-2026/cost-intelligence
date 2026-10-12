@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/reporting/ReportingDimensionSchema/2.0.0",
+  "x-schema-completeness": "complete",
+  "anyOf": [
+    {
+      "const": "provider",
+      "type": "string"
+    },
+    {
+      "const": "model",
+      "type": "string"
+    },
+    {
+      "const": "feature",
+      "type": "string"
+    },
+    {
+      "const": "repo",
+      "type": "string"
+    },
+    {
+      "const": "workflowId",
+      "type": "string"
+    },
+    {
+      "const": "productId",
+      "type": "string"
+    },
+    {
+      "const": "orderId",
+      "type": "string"
+    },
+    {
+      "const": "channel",
+      "type": "string"
+    }
+  ]
+}
