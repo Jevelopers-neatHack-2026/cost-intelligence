@@ -1,5 +1,8 @@
 import { types } from 'node:util';
 import { errorEnvelope, sameScope, type ApiResult, type Clock, type FinanceAuthorizationDecision, type TrustedScope } from '../shared/contracts.js';
+import type { PreparedExportArtifacts } from './runtime.js';
+import type { ReportingPreparedExportArtifacts } from './reporting-export.js';
+import type { ExportManifest } from './index.js';
 type Allowed = Extract<FinanceAuthorizationDecision, { readonly status: 'allowed' }>;
 export type ExportDisclosureFenceRequest = { readonly schemaVersion: '1.0.0'; readonly requestId: string; readonly scope: TrustedScope; readonly requiredPermissions: readonly ['finance.summary.read', 'finance.summary.export'] };
 declare const permitBrand: unique symbol;
@@ -17,6 +20,9 @@ export interface ExportDisclosureFencePort {
 }
 export type DisclosureFrame = { readonly port: ExportDisclosureFencePort; readonly acquire: ExportDisclosureFencePort['acquire']; readonly validate: ExportDisclosureFencePort['validateCurrent']; readonly request: ExportDisclosureFenceRequest; readonly permit: ExportAccessPermit };
 const bindings = new WeakMap<object, DisclosureFrame>();
+type PublicValue = ExportManifest | PreparedExportArtifacts | ReportingPreparedExportArtifacts;
+type ResultBinding = { readonly frame: DisclosureFrame; readonly value: PublicValue; readonly clock: Clock; readonly now: Clock['now'] };
+const publicResults = new WeakMap<object, ResultBinding>();
 const reject = (code: 'FORBIDDEN_SCOPE' | 'SOURCE_UNAVAILABLE') => ({ ok: false as const, error: errorEnvelope('integrations', 'exportSummary', code, 'unavailable', code === 'FORBIDDEN_SCOPE' ? 'Current financial disclosure is not authorized.' : 'A coherent current financial disclosure capability is unavailable.', code === 'SOURCE_UNAVAILABLE') });
 function method(port: object, name: string): unknown { if (types.isProxy(port)) return undefined; const d = Object.getOwnPropertyDescriptor(port, name); return d && 'value' in d ? d.value : undefined; }
 function frozenPlain(value: unknown, depth = 0): boolean {
@@ -76,10 +82,38 @@ export function sealDisclosureSuccess<T>(value: T): ApiResult<T> {
   return Object.freeze(result);
 }
 export function bindDisclosure(value: object, frame: DisclosureFrame | undefined): void { if (frame) bindings.set(value, frame); }
+function registerPublicResult<T>(result: ApiResult<T>, frame: DisclosureFrame | undefined, clock: Clock): void {
+  if (!result.ok || !frame) return;
+  const now = method(clock, 'now');
+  if (typeof now !== 'function') return;
+  publicResults.set(result, Object.freeze({ frame, value: result.value as PublicValue, clock, now: now as Clock['now'] }));
+}
+/** Internal: only the exact immutable own manifest of a known preparation qualifies. */
+export function bindManifestDisclosure(prepared: object, result: ApiResult<ExportManifest>, clock: Clock): void {
+  const frame = bindings.get(prepared);
+  if (!frame || !result.ok || types.isProxy(prepared) || types.isProxy(result.value) || !Object.isFrozen(prepared) || !Object.isFrozen(result.value)) return;
+  const descriptor = Object.getOwnPropertyDescriptor(prepared, 'manifest');
+  if (!descriptor || !('value' in descriptor) || descriptor.value !== result.value) return;
+  bindings.set(result.value, frame);
+  registerPublicResult(result, frame, clock);
+}
+/** Mandatory coherent release of an exact original result, after the caller's awaits. */
+export function releaseExportDisclosure<T extends PublicValue>(result: ApiResult<T>, clock: Clock): ApiResult<T> {
+  try {
+    // Identity lookup precedes any property inspection of unknown caller objects.
+    const record = result !== null && (typeof result === 'object' || typeof result === 'function') ? publicResults.get(result) : undefined;
+    if (!record || clock !== record.clock || method(clock, 'now') !== record.now) return reject('SOURCE_UNAVAILABLE');
+    const sealed = sealDisclosureSuccess(record.value as T);
+    publicResults.set(sealed, record); // no registration work after the final fence
+    const current = validateDisclosure(record.frame, record.clock);
+    return current.ok ? sealed : current;
+  } catch { return reject('SOURCE_UNAVAILABLE'); }
+}
 export function releaseDisclosure<T>(result: ApiResult<T>, clock: Clock, required: boolean): ApiResult<T> {
   if (!result.ok) return result;
   const frame = typeof result.value === 'object' && result.value !== null ? bindings.get(result.value) : undefined;
   if (required && !frame) return reject('SOURCE_UNAVAILABLE');
   const sealed = sealDisclosureSuccess(result.value);
+  registerPublicResult(sealed, frame, clock);
   const current = validateDisclosure(frame, clock); return current.ok ? sealed : current;
 }

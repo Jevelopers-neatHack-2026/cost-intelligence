@@ -63,6 +63,8 @@ test('configured v1 facade prepares v2 JSON/CSV and exact decimals while unconfi
   const result = await api.exportSummaryV2(x.request, x.ports);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.equal(result.value.manifest.status, 'prepared');
+  const standaloneRelease = api.releaseExportDisclosure(result, x.ports.clock);
+  assert.equal(standaloneRelease.ok, false); assert.equal(standaloneRelease.error.code, 'SOURCE_UNAVAILABLE'); assert.equal(Object.hasOwn(standaloneRelease, 'value'), false);
   assert.equal(result.value.manifest.createdAt, '2026-10-10T13:00:00.000Z');
   assert.notEqual(result.value.manifest.createdAt, x.page.asOf, 'export time is not relabelled query as-of');
   assert.equal(result.value.manifest.deliveryReference, null);

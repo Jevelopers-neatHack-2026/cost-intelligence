@@ -95,6 +95,42 @@ they do not supply arbitrary authorization responses. This adapter is a
 synthetic conformance fixture, with no mounted session or actual host adoption.
 A real host must independently provide the reviewed coherent capability.
 
+## Public final release after caller awaits
+
+Import `releaseExportDisclosure` from the package root or `/integrations`.
+It synchronously returns `ApiResult<T>` for an original privately bound legacy
+manifest, legacy prepared receipt, or rich prepared receipt. Its coherent fence
+is mandatory: there is no requirement flag, caller proof or permit parameter.
+The exact result identity, its immutable value, original clock object and own
+`now` method binding are private. A copied envelope around an original value,
+JSON roundtrip, foreign module instance, replaced/foreign clock, unbound result
+or standalone mocked result returns opaque `SOURCE_UNAVAILABLE` without value.
+Current authority/context/revision/expiry vetoes return their safe refusal.
+
+```ts
+const original = await exportSummaryV2(request, ports);
+if (!original.ok) return prepareSafeError(original.error);
+const response = prepareLocalResponse(original.value); // no external disclosure
+// Finish every additional await before this synchronous boundary.
+const released = releaseExportDisclosure(original, ports.clock);
+if (!released.ok) return prepareSafeError(released.error);
+return response; // immediate handoff; no await, serializer or host hook afterward
+```
+
+Only the same server process/package instance can retain this private identity.
+Both supported barrels share it; another loaded module graph cannot borrow it.
+Handle an original failure directly rather than trying to release bytes. A
+released success may be released again while the same coherent frame remains
+current. Revoke/restore does not revive an old frame: retrieve afresh to acquire
+a new permit. The legacy manifest is bound internally only as the exact immutable
+own manifest of its verified preparation. Registration/projection helpers and
+frames are absent from public exports and wire schemas.
+
+The gate covers the original immutable Finance value. Callers must construct
+and immediately hand off their response from that value; it does not authorize
+arbitrary changed transport bodies, deferred serialization or a later async
+boundary. No mounted real host or consumer adoption is implied.
+
 ## Amounts, tables and privacy
 
 Every preparation produces both `summary.json` and `metrics.csv`, regardless

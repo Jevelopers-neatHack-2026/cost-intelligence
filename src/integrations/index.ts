@@ -1,4 +1,4 @@
-import { releaseDisclosure, sealDisclosureSuccess } from './disclosure-fence.js';
+import { releaseDisclosure, sealDisclosureSuccess, bindManifestDisclosure } from './disclosure-fence.js';
 import { reportingExportBridge } from './reporting-bridge.js';
 import { Type, type Static } from '@sinclair/typebox';
 import { TrustedScopeSchema, validateRequest, type ApiResult, type Validation } from '../shared/contracts.js';
@@ -109,6 +109,7 @@ export function serializeSafeFinancialSummaryCsv(summary: SharedFinancialSummary
 export async function exportSummary(request: ExportRequest, ports: ExportRuntimePorts): Promise<ApiResult<ExportManifest>> {
   const prepared = await prepareExport(request, ports, true);
   const response = prepared.ok ? sealDisclosureSuccess(prepared.value.manifest) : prepared;
+  if (prepared.ok && response.ok) bindManifestDisclosure(prepared.value, response, ports.clock);
   const released = releaseDisclosure(prepared, ports.clock, !!reportingExportBridge(ports));
   return released.ok ? response : released;
 }
@@ -121,3 +122,5 @@ export { validateReportingExportRequestBoundary, ReportingExportRequestSchema, R
 export type { ReportingExportRequest, ReportingExportManifest, ReportingPreparedExportArtifacts, ReportingStoredExportArtifacts, ReportingExportArtifactStorePort } from './reporting-export.js';
 
 export type { ExportDisclosureFencePort, ExportDisclosureFenceRequest, ExportDisclosureFenceResult, ExportAccessPermit, CurrentExportAccessSnapshot } from './disclosure-fence.js';
+
+export { releaseExportDisclosure } from './disclosure-fence.js';
