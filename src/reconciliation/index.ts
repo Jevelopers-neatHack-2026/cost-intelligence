@@ -1,5 +1,7 @@
 import { Type, type Static } from '@sinclair/typebox';
 import { blockedBoundary, CurrencySchema, DecimalAmountSchema, TrustedScopeSchema, type ApiResult, type RuntimePorts } from '../shared/contracts.js';
+import {startBudgetReconciliation,getBudgetReconciliation,type BudgetReconciliationRequest,type BudgetReconciliationQuery,type BudgetReconciliationReceipt} from './budget-runtime.js';
+export * from './budget-runtime.js';
 export { CoverageSnapshotReferenceSchema, CoverageImportRecordSchema, CoverageDryRunRequestSchema, CoverageDryRunReadRequestSchema, CoverageDryRunSummarySchema, CoverageDryRunPageSchema } from './coverage-types.js';
 export type { CoverageSnapshotReference, CoverageImportRecord, CoverageDryRunRequest, CoverageDryRunReadRequest, CoverageDryRunSummary, CoverageDryRunPage, CoverageEntry, CoverageImportReaderPort, CoverageStoredRun, CoverageStoreAccess, CoverageRunStorePort, ReconciliationCoveragePorts } from './coverage-types.js';
 export { createPostgresCoverageRunStore, type PostgresCoverageDatabasePort, type PostgresCoverageTransactionPort } from './coverage-store.js';
@@ -41,9 +43,17 @@ export const ReconciliationResultSchema = Type.Object({
 }, { additionalProperties: false });
 export type ReconciliationResult = Static<typeof ReconciliationResultSchema>;
 
-export async function startReconciliation(request: ReconciliationRequest, ports: RuntimePorts): Promise<ApiResult<ReconciliationRun>> {
+export function startReconciliation(request:ReconciliationRequest,ports:RuntimePorts):Promise<ApiResult<ReconciliationRun>>;
+export function startReconciliation(request:BudgetReconciliationRequest,ports:RuntimePorts):Promise<ApiResult<BudgetReconciliationReceipt>>;
+export function startReconciliation(request:ReconciliationRequest,ports:RuntimePorts):Promise<ApiResult<ReconciliationRun>>;
+export async function startReconciliation(request: ReconciliationRequest|BudgetReconciliationRequest, ports: RuntimePorts): Promise<ApiResult<ReconciliationRun|BudgetReconciliationReceipt>> {
+  if(request!==null&&typeof request==='object'&&request.schemaVersion==='2.0.0')return startBudgetReconciliation(request,ports);
   return blockedBoundary<ReconciliationRequest, ReconciliationRun>({ module: 'reconciliation', operation: 'startReconciliation', authorityOperation: 'reconciliation.startReconciliation', schema: ReconciliationRequestSchema, request, ports, unavailableCode: 'RECONCILIATION_PENDING', safeMessage: 'Reconciliation cannot start until its source adapters and matching rules are delivered.', retryable: true });
 }
-export async function getReconciliation(request: ReconciliationRequest, ports: RuntimePorts): Promise<ApiResult<ReconciliationResult>> {
+export function getReconciliation(request:ReconciliationRequest,ports:RuntimePorts):Promise<ApiResult<ReconciliationResult>>;
+export function getReconciliation(request:BudgetReconciliationQuery,ports:RuntimePorts):Promise<ApiResult<BudgetReconciliationReceipt>>;
+export function getReconciliation(request:ReconciliationRequest,ports:RuntimePorts):Promise<ApiResult<ReconciliationResult>>;
+export async function getReconciliation(request: ReconciliationRequest|BudgetReconciliationQuery, ports: RuntimePorts): Promise<ApiResult<ReconciliationResult|BudgetReconciliationReceipt>> {
+  if(request!==null&&typeof request==='object'&&request.schemaVersion==='2.0.0')return getBudgetReconciliation(request,ports);
   return blockedBoundary<ReconciliationRequest, ReconciliationResult>({ module: 'reconciliation', operation: 'getReconciliation', authorityOperation: 'reconciliation.getReconciliation', schema: ReconciliationRequestSchema, request, ports, unavailableCode: 'RECONCILIATION_PENDING', safeMessage: 'Reconciliation results are unavailable until its source adapters and matching rules are delivered.', retryable: true });
 }

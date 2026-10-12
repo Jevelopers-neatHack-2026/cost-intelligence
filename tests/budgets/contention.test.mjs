@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import {diagnosticTest} from './static-diagnostics.mjs';
+const test=diagnosticTest('contention.test.mjs');
 import { authorizeReservation, changeBudgetPolicy, readCapacity } from '../../dist/index.js';
 import {
   loadReserveFixture, setBudgetLimit, reservationPool, makePorts, makeScope, policyChange, reservationRequest,

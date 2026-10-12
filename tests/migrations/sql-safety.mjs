@@ -1,5 +1,19 @@
 import { createHash } from 'node:crypto';
 
+const reportedValuationReplacements=[
+  {schema:'cost_intelligence',table:'financial_ledger_events',constraint:'financial_ledger_events_valuation_check',column:'valuation'},
+  {schema:'cost_intelligence',table:'usage_intake_inbox',constraint:'usage_intake_inbox_valuation_basis_check',column:'valuation_basis'},
+  {schema:'cost_intelligence',table:'usage_intake_attempts',constraint:'usage_intake_attempts_valuation_basis_check',column:'valuation_basis'},
+];
+export function approvedReportedValuationReplacements(filename,sql){
+  if(filename!=='0011_budget_settlement_reconciliation.sql')return [];
+  for(const {schema,table,constraint,column} of reportedValuationReplacements){
+    const exact=`ALTER TABLE ${schema}.${table} DROP CONSTRAINT ${constraint};\nALTER TABLE ${schema}.${table} ADD CONSTRAINT ${constraint} CHECK (${column} IN ('unknown', 'estimated', 'provider_confirmed', 'provider_reported_unsettled'));`;
+    if(sql.split(exact).length!==2)return [];
+  }
+  return reportedValuationReplacements;
+}
+
 // A whole-file fingerprint binds the paired temporary CREATE/cleanup statements,
 // their transactional DO block, and any exact read-only catalog expressions.
 // Drift never inherits these narrow exceptions; the generic scanner is unchanged.

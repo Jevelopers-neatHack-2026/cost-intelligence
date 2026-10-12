@@ -1,16 +1,59 @@
 // Shared helpers for the CI-05A budget reservation acceptance suites.
 // Not a *.test.mjs file, so the suite runner never executes it directly.
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomUUID, generateKeyPairSync, sign } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { budgetDigest } from '../../dist/index.js';
+import {diagnosticBudgetClient} from './static-diagnostics.mjs';
+import {syntheticCapabilityRows} from './synthetic-capability.mjs';
+import { budgetDigest, canonicalBudgetJson } from '../../dist/index.js';
 import { databaseConfigFromEnvironment, runtimeDatabaseConfigFromEnvironment } from '../../scripts/test-db-lifecycle.mjs';
 
 const { Pool } = pg;
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 export const FIXED_TIME = '2026-10-12T04:00:00.000Z';
+
+// Independent owner fixture store. A request cannot supply registry keys or replace these immutable profiles.
+const SYNTHETIC_KEYS=generateKeyPairSync('ed25519');
+const SYNTHETIC_PUBLIC={publicKeySpkiBase64:SYNTHETIC_KEYS.publicKey.export({type:'spki',format:'der'}).toString('base64'),
+  revoked:false,validFrom:'2026-01-01T00:00:00Z',validUntil:'2027-01-01T00:00:00Z',
+  allowedKinds:['pricing_profile','maximum_policy']};
+const SYNTHETIC_PROFILES=new Map();
+const hashJson=value=>`sha256:${createHash('sha256').update(canonicalBudgetJson(value)).digest('hex')}`;
+const signCollector=(kind,value)=>sign(null,Buffer.from(`ci-budget-source-1.0.0:${kind}\n${canonicalBudgetJson(value)}`),SYNTHETIC_KEYS.privateKey).toString('base64');
+function registerSyntheticProfile(request,options={}){
+  const normalized=structuredClone(request);delete normalized.requestId;delete normalized.pricingProfileRef;
+  const digest=hashJson({domain:'ci-budget-pricing-1.0.0',request:normalized});
+  const publish=(kind,payload)=>{
+  const sourceBytes=JSON.stringify(kind==='pricing_profile'?{financial_pricing_policy:payload}:{financial_maximum_policy:payload});
+  const record={version:'ci-budget-source-1.0.0',issuerKeyId:'ci05a-synthetic-policy-owner',id:randomUUID(),revision:1,predecessorHash:null,
+    scope:structuredClone(request.scope),provider:request.authorityBinding.provider,model:request.authorityBinding.model,operation:request.authorityBinding.operation,
+    authorityBinding:structuredClone(request.authorityBinding),evidenceMode:'mocked',targetBindingSha256:request.authorityBinding.targetBindingSha256,
+    attempt:structuredClone(request.attemptBinding),kind,sourceFormat:kind==='pricing_profile'?'finance_pricing_policy_v1':'finance_maximum_policy_v1',sourceBytesSha256:`sha256:${createHash('sha256').update(sourceBytes).digest('hex')}`,
+    observedAt:FIXED_TIME,payload};
+  const reference={contract:'ci-budget-source',schema_version:'1.0.0',id:record.id,revision:1,content_hash:hashJson(record)};
+  SYNTHETIC_PROFILES.set(record.id,{record,sourceBytes,recordSignature:signCollector('record',record)});
+  return reference;
+  };
+  // This argument is an explicit fixture-owner approval, never inferred from a caller's boundedMaximum field.
+  const maximum=options.trustedMaximum?publish('maximum_policy',{schemaVersion:'ci-budget-maximum-1.0.0',currency:options.trustedMaximum.currency,
+    economicRequestDigest:digest,policyRef:options.trustedMaximum.policyRef,authorizedMaximum:options.trustedMaximum.authorizedCap}):null;
+  const pricingUnit=options.pricingUnit??(request.estimate.completeness==='complete'?'fixed_per_attempt':'unknown');
+  return publish('pricing_profile',{schemaVersion:'ci-budget-pricing-1.0.0',currency:request.estimate.currency,economicRequestDigest:digest,
+    pricingUnit,fixedAttemptAmount:pricingUnit==='fixed_per_attempt'?request.estimate.knownSubtotal:null,maximumPolicyRef:maximum});
+}
+/** Explicit fixture-owner issuance after all financial request fields are fixed. */
+export function refreshSyntheticPricing(request,options={}){request.pricingProfileRef=registerSyntheticProfile(request,options);return request;}
+function syntheticSourceBackend(scope,clock){return {
+  loadCurrent:async reference=>{
+    const stored=SYNTHETIC_PROFILES.get(reference.id);if(!stored)return null;
+    const {actorId,...financialScope}=scope;
+    const current={version:'ci-budget-source-1.0.0',issuerKeyId:'ci05a-synthetic-policy-owner',recordId:stored.record.id,revision:stored.record.revision,
+      recordHash:hashJson(stored.record),scopeHash:hashJson(financialScope),verifiedAt:clock.now().toISOString(),expiresAt:new Date(clock.now().getTime()+60000).toISOString(),revoked:false};
+    return structuredClone({...stored,current,currentSignature:signCollector('current',current)});
+  },loadCurrentIssuerKey:async id=>id==='ci05a-synthetic-policy-owner'?structuredClone(SYNTHETIC_PUBLIC):null,
+};}
 
 async function loadFixtureValid(contract) {
   const path = join(root, `node_modules/@jevelopers/shared-contracts/fixtures/${contract}.json`);
@@ -64,12 +107,14 @@ export function makePorts(pool, scope, options = {}) {
     database: {
       connect: async () => {
         if (options.databaseError) throw new Error('synthetic unavailable budget database');
-        return pool.connect();
+        return diagnosticBudgetClient(await pool.connect());
       },
     },
     trustedContext: { resolve: async requested => ({ ...requested }) },
     clock,
     authorityWaitMs: options.authorityWaitMs,
+    sourceCollector: options.sourceCollector??syntheticSourceBackend(scope,clock),
+    reportedCostContractMode:'development_0_10_1',
     budgetEvidence: options.budgetEvidence ?? { verifyCurrent: async query => ({status:'verified', queryDigest:await budgetDigest(query), verifiedAt:clock.now().toISOString(),expiresAt:new Date(clock.now().getTime()+60000).toISOString(), ...(options.maximum?{maximum:options.maximum}:{})}) },
     reservationAuthority: options.reservationAuthority ?? { verifyCurrent: async query => ({status:'allowed',revoked:false,queryDigest:await budgetDigest(query),verifiedAt:clock.now().toISOString(),expiresAt:new Date(clock.now().getTime()+60000).toISOString(),evidenceRef:'synthetic-host-fixture',evidenceSha256:`sha256:${'a'.repeat(64)}`}) },
     financeAuthority: options.financeAuthority ?? {
@@ -151,11 +196,11 @@ export function reservationRequest(scope, reserveFixture, options = {}) {
   const estimate = options.estimate ?? {
     completeness: 'complete', knownSubtotal: amount, currency, rateCardRef: null, missingDimensions: [],
   };
-  return {
+  const request = {
     schemaVersion: '1.0.0', requestId: options.requestId ?? `req-${idem}`, idempotencyKey: idem, scope,
     canonicalRequest, estimate,
     sourceAuthorityRef: options.sourceAuthorityRef ?? authorityRef(),
-    authorityBinding: options.authorityBinding ?? {mappingVersion:'ci-reservation-authority-1.0.0',budgetScopeId:canonicalRequest.budget_scope_id,grantRef:'synthetic-grant',accountRef:'synthetic-account',projectRef:'synthetic-project',provider:'synthetic-provider',model:'synthetic-model',operation:'generate',targetBindingSha256:`sha256:${'b'.repeat(64)}`,leaseRef:'ci05a-lease',leaseExpiresAt:'2026-10-12T05:00:00.000Z'},
+    authorityBinding: options.authorityBinding ?? {mappingVersion:'ci-reservation-authority-1.0.0',budgetScopeId:canonicalRequest.budget_scope_id,grantRef:'synthetic-grant',accountRef:'synthetic-account',projectRef:'synthetic-project',provider:options.provider??'synthetic-provider',model:options.model??'synthetic-model',operation:'generate',targetBindingSha256:`sha256:${'b'.repeat(64)}`,leaseRef:'ci05a-lease',leaseExpiresAt:'2026-10-12T05:00:00.000Z'},
     ...(options.workPlan?{workPlan:options.workPlan}:{}),
     allowPartialAuthorization: options.allowPartialAuthorization ?? false,
     attemptBinding: {
@@ -163,6 +208,8 @@ export function reservationRequest(scope, reserveFixture, options = {}) {
       providerRequestId: null, providerAttemptId: `provider-${logicalOperationId}`, billableAttemptId,
     },
   };
+  request.pricingProfileRef=options.pricingProfileRef??registerSyntheticProfile(request,options);
+  return request;
 }
 
 export function lifecycleBase(scope, reservationId, expectedRevision, { idempotencyKey = `cmd-${randomUUID()}`, requestId = `req-${randomUUID()}`, logicalOperationId = `logical-${randomUUID()}`, billableAttemptId = `billable-${randomUUID()}`, attemptBinding } = {}) {
@@ -249,7 +296,12 @@ export const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 /** Scripted ports whose database hands out the given client (optionally late or never). */
 export function scriptedPorts(scope, connect, options = {}) {
-  return makePorts({ connect }, scope, options);
+  return makePorts({ connect:async()=>{
+    const client=await connect();return {release:()=>client.release(),query:async(sql,values)=>{
+      const result=await client.query(sql,values),metadata=syntheticCapabilityRows(sql);
+      return metadata===null?result:{rows:structuredClone(metadata),rowCount:metadata.length};
+    }};
+  } }, scope, options);
 }
 
 /** The policy row, aggregate row and event rows a typical scripted authorization partition returns. */

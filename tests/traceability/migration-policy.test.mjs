@@ -5,7 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { FINANCE_CORE_MIGRATIONS, EXPECTED_MIGRATIONS } from '../migrations/migration-catalog.mjs';
-import { hasDestructiveMigrationStatement, hasUnapprovedDestructiveMigrationStatement } from '../migrations/sql-safety.mjs';
+import { approvedReportedValuationReplacements, hasDestructiveMigrationStatement, hasUnapprovedDestructiveMigrationStatement } from '../migrations/sql-safety.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const name = '0014_evidence_reader_indexes.sql';
@@ -16,7 +16,7 @@ const catalogRead = "has_table_privilege('ci_finance_runtime',c.oid,'TRUNCATE')"
 test('migration catalog includes every checked-in feature while the Finance core stays separate', async () => {
   const names = (await readdir(join(root, 'migrations'))).filter(file => file.endsWith('.sql')).sort();
   assert.deepEqual(names, EXPECTED_MIGRATIONS);
-  assert.equal(FINANCE_CORE_MIGRATIONS.length, 10);
+  assert.equal(FINANCE_CORE_MIGRATIONS.length, 11);
   assert.ok(EXPECTED_MIGRATIONS.includes(name));
   assert.equal(FINANCE_CORE_MIGRATIONS.includes(name), false);
 });
@@ -26,7 +26,7 @@ test('all exact reviewed migrations pass the conservative safety scan before dat
     const source = await readFile(join(root, 'migrations', file), 'utf8');
     const replacements = file === '0009_usage_intake.sql'
       ? [{ schema: 'cost_intelligence', table: 'financial_projection_quantities', constraint: 'financial_projection_quantities_key' }]
-      : [];
+      : approvedReportedValuationReplacements(file, source);
     assert.equal(hasUnapprovedDestructiveMigrationStatement(file, source, replacements), false, file);
   }
 });

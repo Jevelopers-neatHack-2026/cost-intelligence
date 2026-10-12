@@ -14,7 +14,7 @@ const cleanups = [
   cleanup: "EXECUTE 'DROP POLICY ci10_lineage_expected_" + suffix + ' ON cost_intelligence.' + table + "';" }));
 
 test('stored lineage is enrolled as an independent feature rather than a changed Finance core', () => {
-  assert.equal(FINANCE_CORE_MIGRATIONS.length, 10);
+  assert.equal(FINANCE_CORE_MIGRATIONS.length, 11);
   assert.equal(FINANCE_CORE_MIGRATIONS.includes(name), false);
   assert.equal(EXPECTED_MIGRATIONS.includes(name), true);
   assert.equal(hasDestructiveMigrationStatement(sql), true, 'the generic scanner still rejects all policy removals');
