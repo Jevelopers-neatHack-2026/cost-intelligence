@@ -13,6 +13,7 @@ import {
   type ApiResult,
   type Clock,
   type ErrorEnvelope,
+  type FinanceAuthorizationDecision,
   type FinanceAuthorizationPort,
   type FinanceOperation,
   type TrustedContextPort,
@@ -231,6 +232,7 @@ const ProjectionQuantitySchema = Type.Object({
   currency: CurrencySchema,
   unitName: Type.Union([Type.String({ minLength: 1, maxLength: 128 }), Type.Null()]),
   relation: Type.Union([Type.Literal('standalone'), Type.Literal('included_subset'), Type.Literal('unknown_relation'), Type.Null()]),
+  includedIn: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
   observationCount: Type.Integer({ minimum: 1 }),
   knownQuantityCount: Type.Integer({ minimum: 0 }),
   unknownQuantityCount: Type.Integer({ minimum: 0 }),
@@ -238,6 +240,12 @@ const ProjectionQuantitySchema = Type.Object({
   knownSubtotal: Type.Union([NonNegativeDecimalAmountSchema, Type.Null()]),
   totalQuantity: Type.Union([NonNegativeDecimalAmountSchema, Type.Null()]),
   completeness: Type.Union([Type.Literal('unknown'), Type.Literal('incomplete'), Type.Literal('complete')]),
+}, { additionalProperties: false });
+const ProjectionUnresolvedIntakeSchema = Type.Object({
+  unknownEconomicExposureCount: Type.Integer({ minimum: 0 }),
+  quarantinedObservationCount: Type.Integer({ minimum: 0 }),
+  awaitingEvidenceAttemptCount: Type.Integer({ minimum: 0 }),
+  unpostedAttemptCount: Type.Integer({ minimum: 0 }),
 }, { additionalProperties: false });
 
 export const LedgerProjectionSchema = Type.Object({
@@ -249,6 +257,7 @@ export const LedgerProjectionSchema = Type.Object({
   eventCount: Type.Integer({ minimum: 0 }),
   amounts: Type.Array(ProjectionAmountSchema),
   quantities: Type.Array(ProjectionQuantitySchema),
+  unresolvedIntake: Type.Optional(ProjectionUnresolvedIntakeSchema),
 }, { additionalProperties: false });
 export type LedgerProjection = Static<typeof LedgerProjectionSchema>;
 
@@ -761,18 +770,65 @@ async function rollback(client: LedgerTransactionPort): Promise<void> {
   await client.query('ROLLBACK').catch(() => undefined);
 }
 
+async function rollbackLedgerSavepoint(client: LedgerTransactionPort): Promise<void> {
+  await client.query('ROLLBACK TO SAVEPOINT ci04a_ledger_append').catch(() => undefined);
+  await client.query('RELEASE SAVEPOINT ci04a_ledger_append').catch(() => undefined);
+}
+
+function usageDecisionIsCurrent(
+  decision: FinanceAuthorizationDecision,
+  request: LedgerAppendRequest,
+  ports: LedgerRuntimePorts,
+): boolean {
+  if (decision.status !== 'allowed' || decision.operation !== 'metering.ingestUsage'
+      || decision.permission !== 'usage.ingest' || !sameScope(decision.scope, request.scope)
+      || decision.principal.kind !== 'service' || decision.principal.actorId !== request.scope.actorId
+      || decision.principal.serviceStatus !== 'active' || decision.principal.serviceGrantRevision.length === 0) return false;
+  const now = ports.clock.now();
+  const verified = Date.parse(decision.verifiedAt);
+  const expires = Date.parse(decision.expiresAt);
+  return now instanceof Date && Number.isFinite(now.getTime()) && Number.isFinite(verified) && Number.isFinite(expires)
+    && verified <= now.getTime() && now.getTime() - verified <= 60_000
+    && expires > now.getTime() && expires > verified && expires - verified <= 300_000;
+}
+
 /** Transactionally append an immutable event. Status outcomes never rewrite prior postings. */
 export async function appendLedgerEvent(
   value: unknown,
   ports: LedgerRuntimePorts,
 ): Promise<ApiResult<LedgerAppendReceipt>> {
-  const quarantined = await quarantineUnsupportedPayload(value, ports);
+  return appendLedgerEventInternal(value, ports);
+}
+
+/** Narrow internal bridge for an already-authorized metering transaction. */
+export async function appendUsageLedgerEventInTransaction(
+  value: unknown,
+  client: LedgerTransactionPort,
+  ports: LedgerRuntimePorts,
+  decision: FinanceAuthorizationDecision,
+): Promise<ApiResult<LedgerAppendReceipt>> {
+  return appendLedgerEventInternal(value, ports, { client, decision });
+}
+
+async function appendLedgerEventInternal(
+  value: unknown,
+  ports: LedgerRuntimePorts,
+  bridge?: { readonly client: LedgerTransactionPort; readonly decision: FinanceAuthorizationDecision },
+): Promise<ApiResult<LedgerAppendReceipt>> {
+  const quarantined = bridge ? null : await quarantineUnsupportedPayload(value, ports);
   if (quarantined !== null) return quarantined;
   const validated = validateLedgerAppendRequestBoundary(value);
   if (!validated.ok) return failure(validated.error);
   const request = validated.value;
-  const authorizationError = await trustedScope(request, ports, 'appendLedgerEvent', 'ledger.appendLedgerEvent');
-  if (authorizationError) return failure(authorizationError);
+  if (bridge) {
+    if (!usageDecisionIsCurrent(bridge.decision, request, ports)) {
+      return failure(makeError('ledger', 'appendLedgerEvent', 'FORBIDDEN_SCOPE', request.requestId,
+        'The current metering authorization does not permit this ledger append.'));
+    }
+  } else {
+    const authorizationError = await trustedScope(request, ports, 'appendLedgerEvent', 'ledger.appendLedgerEvent');
+    if (authorizationError) return failure(authorizationError);
+  }
   let now: Date;
   try {
     now = ports.clock.now();
@@ -789,10 +845,11 @@ export async function appendLedgerEvent(
   let client: LedgerTransactionPort | undefined;
   let inTransaction = false;
   try {
-    client = await ports.database.connect();
-    await client.query('BEGIN');
+    client = bridge ? bridge.client : await ports.database.connect();
+    if (bridge) await client.query('SAVEPOINT ci04a_ledger_append');
+    else await client.query('BEGIN');
     inTransaction = true;
-    await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+    if (!bridge) await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
     await bindFinancialDatabaseScope(client, scope);
     await client.query(
       'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
@@ -801,7 +858,7 @@ export async function appendLedgerEvent(
 
     const legacyHistoryError = await legacyFinancialScopeError(client, scope, 'appendLedgerEvent', request.requestId);
     if (legacyHistoryError) {
-      await rollback(client);
+      if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
       inTransaction = false;
       return failure(legacyHistoryError);
     }
@@ -812,7 +869,7 @@ export async function appendLedgerEvent(
       [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, request.idempotencyKey],
     );
     if (idempotency.rows.length) {
-      await rollback(client);
+      if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
       inTransaction = false;
       const row = idempotency.rows[0] ?? {};
       const existingId = fromRow(row, 'event_id');
@@ -838,7 +895,7 @@ export async function appendLedgerEvent(
     );
     for (const row of lockedBindings.rows) {
       if (fromRow(row, 'logical_operation_id') !== request.identities.logicalOperationId) {
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return conflictResult(request, 'conflict');
       }
@@ -852,7 +909,7 @@ export async function appendLedgerEvent(
         const duplicate = fromRow(prior, 'event_hash') === eventHash
           && fromRow(prior, 'source_content_hash') === request.sourceIdentity.contentHash
           && Number(prior.source_revision_sequence) === request.sourceIdentity.revisionSequence;
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return { ok: true, value: receipt(request, duplicate ? 'duplicate' : 'conflict', fromRow(prior, 'event_id'), null) };
       }
@@ -864,7 +921,7 @@ export async function appendLedgerEvent(
         );
         const prior = existing.rows[0] ?? {};
         const duplicate = fromRow(prior, 'event_hash') === eventHash;
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return { ok: true, value: receipt(request, duplicate ? 'duplicate' : 'conflict', fromRow(prior, 'event_id'), null) };
       }
@@ -885,7 +942,7 @@ export async function appendLedgerEvent(
         || fromRow(authorizationRow, 'reservation_id') !== request.identities.reservationId
         || fromRow(authorizationRow, 'logical_operation_id') !== request.identities.logicalOperationId
         || fromRow(authorizationRow, 'currency')?.trim() !== request.money.currency) {
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return conflictResult(request, 'conflict', request.reservationAuthorizationEventId);
       }
@@ -911,12 +968,12 @@ export async function appendLedgerEvent(
       ? null : Number(currentSource.current_revision_sequence);
     if (currentSourceRevision !== null) {
       if (request.sourceIdentity.revisionSequence <= currentSourceRevision || request.supersedesEventId !== currentSourceEventId) {
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return conflictResult(request, 'stale_revision', currentSourceEventId);
       }
     } else if (request.supersedesEventId !== null) {
-      await rollback(client);
+      if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
       inTransaction = false;
       return conflictResult(request, 'stale_revision');
     }
@@ -932,7 +989,7 @@ export async function appendLedgerEvent(
       );
       predecessor = existing.rows[0] ?? null;
       if (!predecessor) {
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return conflictResult(request, 'stale_revision', currentSourceEventId);
       }
@@ -967,7 +1024,7 @@ export async function appendLedgerEvent(
       const consumptionDoesNotDecrease = !cumulativeConsumption || priorAmount === null || nextAmount === null
         || parseScaledDecimal(nextAmount) >= parseScaledDecimal(priorAmount);
       if (!(usageRevision || financialCorrection || cumulativeConsumption) || !sameLineage || !consumptionDoesNotDecrease) {
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return conflictResult(request, 'conflict', currentSourceEventId);
       }
@@ -1000,7 +1057,7 @@ export async function appendLedgerEvent(
         || fromRow(target, 'logical_operation_id') !== request.identities.logicalOperationId
         || fromRow(target, 'reservation_id') !== request.identities.reservationId
         || fromRow(target, 'reservation_authorization_event_id') !== request.reservationAuthorizationEventId) {
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return conflictResult(request, 'conflict', request.reversesEventId);
       }
@@ -1015,7 +1072,7 @@ export async function appendLedgerEvent(
       });
       if (targetValue === 0n || (targetValue > 0n) === (reversalValue > 0n)
         || !ancestorsRemainWithinReversalCeiling) {
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return conflictResult(request, 'conflict', request.reversesEventId);
       }
@@ -1037,7 +1094,7 @@ export async function appendLedgerEvent(
         return validEconomicNet(rootValue, nextNet);
       });
       if (!allAncestorsRemainWithinReversalCeiling) {
-        await rollback(client);
+        if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
         inTransaction = false;
         return conflictResult(request, 'conflict', currentSourceEventId);
       }
@@ -1118,11 +1175,11 @@ export async function appendLedgerEvent(
       [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, request.sourceIdentity.source,
         request.sourceIdentity.sourceObjectId, request.sourceIdentity.revisionSubjectId, request.sourceIdentity.revisionSequence, request.eventId],
     );
-    await client.query('COMMIT');
+    if (bridge) await client.query('RELEASE SAVEPOINT ci04a_ledger_append'); else await client.query('COMMIT');
     inTransaction = false;
     return { ok: true, value: receipt(request, 'accepted', null, ingestedAt) };
   } catch (error) {
-    if (client && inTransaction) await rollback(client);
+    if (client && inTransaction) if (bridge) await rollbackLedgerSavepoint(client); else await rollback(client);
     const code = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
     if (code === '23505' && client) {
       try {
@@ -1154,7 +1211,7 @@ export async function appendLedgerEvent(
     }
     return failure(makeError('ledger', 'appendLedgerEvent', 'SOURCE_UNAVAILABLE', request.requestId, 'Ledger persistence is temporarily unavailable.'));
   } finally {
-    client?.release();
+    if (!bridge) client?.release();
   }
 }
 
@@ -1173,6 +1230,7 @@ type QuantityAccumulator = {
   currency: string;
   unitName: string | null;
   relation: 'standalone' | 'included_subset' | 'unknown_relation' | null;
+  includedIn: string | null;
   observationCount: number;
   knownQuantityCount: number;
   unknownQuantityCount: number;
@@ -1184,7 +1242,7 @@ function keyFor(...parts: (string | null)[]): string {
   return JSON.stringify(parts);
 }
 
-function computeProjectionRows(rows: readonly Record<string, unknown>[]): {
+function computeProjectionRows(rows: readonly Record<string, unknown>[], preserveIncludedIn: boolean): {
   amounts: Static<typeof ProjectionAmountSchema>[];
   quantities: Static<typeof ProjectionQuantitySchema>[];
 } {
@@ -1211,11 +1269,13 @@ function computeProjectionRows(rows: readonly Record<string, unknown>[]): {
     const completeness = asString(row.quantity_completeness) as 'unknown' | 'incomplete' | 'complete';
     const rawUnits = row.quantity_units;
     const units = typeof rawUnits === 'string' ? JSON.parse(rawUnits) as Array<Record<string, unknown>> : rawUnits as Array<Record<string, unknown>>;
-    const addQuantity = (unitName: string | null, relation: QuantityAccumulator['relation'], quantity: string | null, incomplete: boolean): void => {
-      const quantityKey = keyFor(eventType, classification, currency, unitName, relation);
+    const addQuantity = (unitName: string | null, relation: QuantityAccumulator['relation'], includedIn: string | null,
+      quantity: string | null, incomplete: boolean): void => {
+      const quantityKey = keyFor(eventType, classification, currency, unitName, relation, includedIn);
       let accumulator = quantities.get(quantityKey);
       if (!accumulator) {
-        accumulator = { eventType, classification, currency, unitName, relation, observationCount: 0, knownQuantityCount: 0, unknownQuantityCount: 0, incompleteObservationCount: 0, knownQuantity: 0n };
+        accumulator = { eventType, classification, currency, unitName, relation, includedIn,
+          observationCount: 0, knownQuantityCount: 0, unknownQuantityCount: 0, incompleteObservationCount: 0, knownQuantity: 0n };
         quantities.set(quantityKey, accumulator);
       }
       accumulator.observationCount++;
@@ -1227,13 +1287,14 @@ function computeProjectionRows(rows: readonly Record<string, unknown>[]): {
       }
     };
     if (units.length === 0) {
-      if (completeness !== 'complete') addQuantity(null, null, null, completeness === 'incomplete');
+      if (completeness !== 'complete') addQuantity(null, null, null, null, completeness === 'incomplete');
     } else {
       for (const unit of units) {
         const unitName = typeof unit.name === 'string' ? unit.name : null;
         const relation = typeof unit.relation === 'string' ? unit.relation as QuantityAccumulator['relation'] : null;
+        const includedIn = preserveIncludedIn && typeof unit.includedIn === 'string' ? unit.includedIn : null;
         const quantity = unit.quantity === null || unit.quantity === undefined ? null : asString(unit.quantity);
-        addQuantity(unitName, relation, quantity, completeness !== 'complete');
+        addQuantity(unitName, relation, includedIn, quantity, completeness !== 'complete');
       }
     }
   }
@@ -1252,16 +1313,164 @@ function computeProjectionRows(rows: readonly Record<string, unknown>[]): {
       ? 'complete' : item.knownQuantityCount === 0 && item.incompleteObservationCount === 0 ? 'unknown' : 'incomplete';
     return {
       eventType: item.eventType, classification: item.classification, currency: item.currency,
-      unitName: item.unitName, relation: item.relation, observationCount: item.observationCount,
+      unitName: item.unitName, relation: item.relation, ...(item.includedIn !== null ? { includedIn: item.includedIn } : {}),
+      observationCount: item.observationCount,
       knownQuantityCount: item.knownQuantityCount, unknownQuantityCount: item.unknownQuantityCount,
       incompleteObservationCount: item.incompleteObservationCount,
       knownSubtotal: item.knownQuantityCount === 0 ? null : formatScaledDecimal(item.knownQuantity),
       totalQuantity: completeness === 'complete' ? formatScaledDecimal(item.knownQuantity) : null,
       completeness,
     };
-  }).sort((left, right) => keyFor(left.eventType, left.classification, left.currency, left.unitName, left.relation)
-    .localeCompare(keyFor(right.eventType, right.classification, right.currency, right.unitName, right.relation)));
+  }).sort((left, right) => keyFor(left.eventType, left.classification, left.currency, left.unitName, left.relation, left.includedIn ?? null)
+    .localeCompare(keyFor(right.eventType, right.classification, right.currency, right.unitName, right.relation, right.includedIn ?? null)));
   return { amounts: amountRows, quantities: quantityRows };
+}
+
+async function computeUnresolvedIntakeProjection(
+  client: LedgerTransactionPort,
+  scope: LedgerProjectionRequest['scope'],
+  asOf: string,
+): Promise<Static<typeof ProjectionUnresolvedIntakeSchema>> {
+  const values = [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, asOf];
+  const quarantined = await client.query(
+    `SELECT count(*)::integer AS count
+     FROM cost_intelligence.usage_intake_quarantine
+     WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND created_at <= $5`,
+    values,
+  );
+  const heads = await client.query(
+    `SELECT observation.billable_attempt_id, observation.source_observation_id,
+            observation.event_id, observation.completeness, observation.valuation_basis
+     FROM cost_intelligence.usage_intake_inbox observation
+     WHERE observation.tenant_id=$1 AND observation.project_id=$2 AND observation.environment=$3
+       AND observation.billing_mode=$4 AND observation.created_at <= $5
+       AND observation.attempt_revision_accepted
+       AND NOT EXISTS (
+         SELECT 1 FROM cost_intelligence.usage_intake_inbox successor
+         WHERE successor.tenant_id=observation.tenant_id AND successor.project_id=observation.project_id
+           AND successor.environment=observation.environment AND successor.billing_mode=observation.billing_mode
+           AND successor.billable_attempt_id=observation.billable_attempt_id
+           AND successor.attempt_revision_accepted
+           AND successor.event_facts->>'supersedes_observation_id'=observation.source_observation_id
+           AND successor.created_at <= $5
+       )
+     ORDER BY observation.billable_attempt_id, observation.source_observation_id`,
+    values,
+  );
+  const postedEvents = await client.query(
+    `SELECT event_id FROM cost_intelligence.financial_ledger_events
+     WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND ingested_at <= $5`,
+    values,
+  );
+  const quarantinedObservationCount = Number(quarantined.rows[0]?.count ?? 0);
+  const postedEventIds = new Set(postedEvents.rows.map(row => asString(row.event_id)));
+  const unposted = heads.rows.filter(row => !postedEventIds.has(asString(row.event_id)));
+  const awaitingEvidence = heads.rows.filter(row => asString(row.valuation_basis) === 'unknown'
+    || asString(row.completeness) !== 'complete');
+  const unknownEconomicExposureCount = quarantinedObservationCount + unposted.filter(row =>
+    asString(row.valuation_basis) === 'unknown' || asString(row.completeness) !== 'complete').length;
+  return {
+    unknownEconomicExposureCount,
+    quarantinedObservationCount,
+    awaitingEvidenceAttemptCount: awaitingEvidence.length,
+    unpostedAttemptCount: unposted.length,
+  };
+}
+
+const CURRENT_INTAKE_REQUIRED_COLUMNS = [
+  ['usage_intake_inbox', 'tenant_id'], ['usage_intake_inbox', 'project_id'],
+  ['usage_intake_inbox', 'environment'], ['usage_intake_inbox', 'billing_mode'],
+  ['usage_intake_inbox', 'source_observation_id'], ['usage_intake_inbox', 'idempotency_key'],
+  ['usage_intake_inbox', 'request_id'], ['usage_intake_inbox', 'event_id'],
+  ['usage_intake_inbox', 'logical_operation_id'], ['usage_intake_inbox', 'provider_attempt_id'],
+  ['usage_intake_inbox', 'billable_attempt_id'], ['usage_intake_inbox', 'transport_attempt_id'],
+  ['usage_intake_inbox', 'provider_request_id'], ['usage_intake_inbox', 'source_name'],
+  ['usage_intake_inbox', 'occurred_at'], ['usage_intake_inbox', 'observed_at'],
+  ['usage_intake_inbox', 'completeness'], ['usage_intake_inbox', 'valuation_basis'],
+  ['usage_intake_inbox', 'payload_sha256'], ['usage_intake_inbox', 'idempotency_sha256'],
+  ['usage_intake_inbox', 'provenance_sha256'], ['usage_intake_inbox', 'event_facts'],
+  ['usage_intake_inbox', 'attempt_revision_accepted'], ['usage_intake_inbox', 'created_at'],
+  ['usage_intake_attempts', 'tenant_id'], ['usage_intake_attempts', 'project_id'],
+  ['usage_intake_attempts', 'environment'], ['usage_intake_attempts', 'billing_mode'],
+  ['usage_intake_attempts', 'billable_attempt_id'], ['usage_intake_attempts', 'logical_operation_id'],
+  ['usage_intake_attempts', 'provider_attempt_id'], ['usage_intake_attempts', 'first_observation_id'],
+  ['usage_intake_attempts', 'current_observation_id'], ['usage_intake_attempts', 'current_ledger_event_id'],
+  ['usage_intake_attempts', 'revision_sequence'], ['usage_intake_attempts', 'status'],
+  ['usage_intake_attempts', 'completeness'], ['usage_intake_attempts', 'valuation_basis'],
+  ['usage_intake_attempts', 'created_at'], ['usage_intake_attempts', 'updated_at'],
+  ['usage_intake_outbox', 'tenant_id'], ['usage_intake_outbox', 'project_id'],
+  ['usage_intake_outbox', 'environment'], ['usage_intake_outbox', 'billing_mode'],
+  ['usage_intake_outbox', 'source_observation_id'], ['usage_intake_outbox', 'billable_attempt_id'],
+  ['usage_intake_outbox', 'posting_payload'], ['usage_intake_outbox', 'status'],
+  ['usage_intake_outbox', 'retry_count'], ['usage_intake_outbox', 'available_at'],
+  ['usage_intake_outbox', 'last_error_code'], ['usage_intake_outbox', 'ledger_event_id'],
+  ['usage_intake_outbox', 'completed_at'], ['usage_intake_outbox', 'created_at'],
+  ['usage_intake_quarantine', 'diagnostic_ref'], ['usage_intake_quarantine', 'tenant_id'],
+  ['usage_intake_quarantine', 'project_id'], ['usage_intake_quarantine', 'environment'],
+  ['usage_intake_quarantine', 'billing_mode'], ['usage_intake_quarantine', 'reason_code'],
+  ['usage_intake_quarantine', 'payload_sha256'], ['usage_intake_quarantine', 'created_at'],
+  ['financial_projection_quantities', 'included_in'],
+  ['financial_projection_snapshots', 'unknown_economic_exposure_count'],
+  ['financial_projection_snapshots', 'quarantined_observation_count'],
+  ['financial_projection_snapshots', 'awaiting_evidence_attempt_count'],
+  ['financial_projection_snapshots', 'unposted_attempt_count'],
+] as const;
+
+type IntakeProjectionCapability = 'legacy' | 'available';
+
+async function inspectIntakeProjectionCapability(client: LedgerTransactionPort): Promise<IntakeProjectionCapability> {
+  const healthResult = await client.query(
+    'SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health',
+  );
+  const health = healthResult.rows[0];
+  if (!health || health.migrations_ready !== true) throw new Error('Finance migration health is incomplete.');
+
+  const schemaResult = await client.query(
+    `SELECT
+       to_regclass('cost_intelligence.usage_intake_inbox') IS NOT NULL AS has_inbox,
+       to_regclass('cost_intelligence.usage_intake_attempts') IS NOT NULL AS has_attempts,
+       to_regclass('cost_intelligence.usage_intake_outbox') IS NOT NULL AS has_outbox,
+       to_regclass('cost_intelligence.usage_intake_quarantine') IS NOT NULL AS has_quarantine,
+       EXISTS (SELECT 1 FROM information_schema.columns
+         WHERE table_schema='cost_intelligence' AND table_name='financial_projection_quantities'
+           AND column_name='included_in') AS has_included_in,
+       (SELECT count(*) FROM information_schema.columns
+         WHERE table_schema='cost_intelligence' AND table_name='financial_projection_snapshots'
+           AND column_name IN ('unknown_economic_exposure_count', 'quarantined_observation_count',
+             'awaiting_evidence_attempt_count', 'unposted_attempt_count'))::integer AS unresolved_count_columns`,
+  );
+  const schema = schemaResult.rows[0];
+  if (!schema) throw new Error('Finance projection capability metadata is unavailable.');
+  const hasAnyIntakeTable = schema.has_inbox === true || schema.has_attempts === true
+    || schema.has_outbox === true || schema.has_quarantine === true;
+  const hasAllIntakeTables = schema.has_inbox === true && schema.has_attempts === true
+    && schema.has_outbox === true && schema.has_quarantine === true;
+  const hasIncludedIn = schema.has_included_in === true;
+  const unresolvedCountColumnCount = Number(schema.unresolved_count_columns);
+  const hasAnyProjectionExtension = hasIncludedIn || unresolvedCountColumnCount > 0;
+  const migrationCount = Number(health.required_migrations_present);
+  const currentCapabilityDetected = migrationCount >= 9 || hasAnyIntakeTable || hasAnyProjectionExtension;
+
+  if (!currentCapabilityDetected && migrationCount >= 3 && migrationCount <= 8) return 'legacy';
+  if (migrationCount < 9 || !hasAllIntakeTables || !hasIncludedIn || unresolvedCountColumnCount !== 4) {
+    throw new Error('Usage intake projection capability is incomplete.');
+  }
+
+  const columnNames = CURRENT_INTAKE_REQUIRED_COLUMNS.map(([, column]) => column);
+  const tableNames = CURRENT_INTAKE_REQUIRED_COLUMNS.map(([table]) => table);
+  const missingColumns = await client.query(
+    `SELECT required.table_name, required.column_name
+     FROM unnest($1::text[], $2::text[]) AS required(table_name, column_name)
+     WHERE NOT EXISTS (
+       SELECT 1 FROM information_schema.columns column_info
+       WHERE column_info.table_schema='cost_intelligence'
+         AND column_info.table_name=required.table_name
+         AND column_info.column_name=required.column_name
+     )`,
+    [tableNames, columnNames],
+  );
+  if (missingColumns.rows.length !== 0) throw new Error('Usage intake projection columns are incomplete.');
+  return 'available';
 }
 
 /** Rebuild and persist an immutable as-of snapshot using exact integer decimal arithmetic. */
@@ -1297,6 +1506,8 @@ export async function rebuildLedgerProjection(
       inTransaction = false;
       return failure(legacyHistoryError);
     }
+    const intakeCapability = await inspectIntakeProjectionCapability(client);
+    const hasIncludedIn = intakeCapability === 'available';
     const events = await client.query(
       `SELECT e.event_id, e.event_hash, e.event_type, e.classification, e.currency, e.amount::text AS amount,
               e.quantity_completeness, e.quantity_units
@@ -1310,26 +1521,44 @@ export async function rebuildLedgerProjection(
        ORDER BY e.event_id`,
       [request.scope.tenantId, request.scope.projectId, request.scope.environment, request.scope.billingMode, request.asOf],
     );
-    const computed = computeProjectionRows(events.rows);
+    const computed = computeProjectionRows(events.rows, hasIncludedIn);
+    const unresolvedIntake = intakeCapability === 'available'
+      ? await computeUnresolvedIntakeProjection(client, request.scope, request.asOf)
+      : undefined;
     const eventEvidence = events.rows.map(row => ({ eventId: asString(row.event_id), eventHash: asString(row.event_hash) }));
     const content = {
       schemaVersion: '1.0.0', scope: request.scope, asOf: request.asOf,
       eventEvidence, eventCount: events.rows.length, amounts: computed.amounts, quantities: computed.quantities,
+      ...(unresolvedIntake ? { unresolvedIntake } : {}),
     };
     const projectionHash = await hashValue(content);
     const snapshot: LedgerProjection = {
       schemaVersion: '1.0.0', snapshotId: projectionHash, projectionHash,
       scope: request.scope, asOf: request.asOf, eventCount: events.rows.length,
       amounts: computed.amounts, quantities: computed.quantities,
+      ...(unresolvedIntake ? { unresolvedIntake } : {}),
     };
-    const inserted = await client.query(
-      `INSERT INTO cost_intelligence.financial_projection_snapshots
-        (snapshot_id, tenant_id, project_id, environment, billing_mode, as_of, event_count, projection_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (snapshot_id) DO NOTHING`,
-      [projectionHash, request.scope.tenantId, request.scope.projectId, request.scope.environment, request.scope.billingMode,
-        request.asOf, events.rows.length, projectionHash],
-    );
+    const inserted = unresolvedIntake
+      ? await client.query(
+        `INSERT INTO cost_intelligence.financial_projection_snapshots
+          (snapshot_id, tenant_id, project_id, environment, billing_mode, as_of, event_count,
+           unknown_economic_exposure_count, quarantined_observation_count,
+           awaiting_evidence_attempt_count, unposted_attempt_count, projection_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (snapshot_id) DO NOTHING`,
+        [projectionHash, request.scope.tenantId, request.scope.projectId, request.scope.environment, request.scope.billingMode,
+          request.asOf, events.rows.length, unresolvedIntake.unknownEconomicExposureCount,
+          unresolvedIntake.quarantinedObservationCount, unresolvedIntake.awaitingEvidenceAttemptCount,
+          unresolvedIntake.unpostedAttemptCount, projectionHash],
+      )
+      : await client.query(
+        `INSERT INTO cost_intelligence.financial_projection_snapshots
+          (snapshot_id, tenant_id, project_id, environment, billing_mode, as_of, event_count, projection_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (snapshot_id) DO NOTHING`,
+        [projectionHash, request.scope.tenantId, request.scope.projectId, request.scope.environment, request.scope.billingMode,
+          request.asOf, events.rows.length, projectionHash],
+      );
     if (inserted.rowCount !== 0) {
       for (const item of computed.amounts) {
         await client.query(
@@ -1342,32 +1571,58 @@ export async function rebuildLedgerProjection(
         );
       }
       for (const item of computed.quantities) {
-        await client.query(
-          `INSERT INTO cost_intelligence.financial_projection_quantities
-            (snapshot_id, event_type, classification, currency, unit_name, relation, observation_count,
-             known_quantity_count, unknown_quantity_count, incomplete_observation_count, known_subtotal,
-             total_quantity, quantity_completeness)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-          [projectionHash, item.eventType, item.classification, item.currency, item.unitName, item.relation,
-            item.observationCount, item.knownQuantityCount, item.unknownQuantityCount, item.incompleteObservationCount,
-            item.knownSubtotal, item.totalQuantity, item.completeness],
-        );
+        if (hasIncludedIn) {
+          await client.query(
+            `INSERT INTO cost_intelligence.financial_projection_quantities
+              (snapshot_id, event_type, classification, currency, unit_name, relation, included_in, observation_count,
+               known_quantity_count, unknown_quantity_count, incomplete_observation_count, known_subtotal,
+               total_quantity, quantity_completeness)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+            [projectionHash, item.eventType, item.classification, item.currency, item.unitName, item.relation,
+              item.includedIn ?? null, item.observationCount, item.knownQuantityCount, item.unknownQuantityCount,
+              item.incompleteObservationCount, item.knownSubtotal, item.totalQuantity, item.completeness],
+          );
+        } else {
+          await client.query(
+            `INSERT INTO cost_intelligence.financial_projection_quantities
+              (snapshot_id, event_type, classification, currency, unit_name, relation, observation_count,
+               known_quantity_count, unknown_quantity_count, incomplete_observation_count, known_subtotal,
+               total_quantity, quantity_completeness)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+            [projectionHash, item.eventType, item.classification, item.currency, item.unitName, item.relation,
+              item.observationCount, item.knownQuantityCount, item.unknownQuantityCount,
+              item.incompleteObservationCount, item.knownSubtotal, item.totalQuantity, item.completeness],
+          );
+        }
       }
     }
+    const unresolvedHeaderColumns = unresolvedIntake
+      ? `unknown_economic_exposure_count, quarantined_observation_count,
+         awaiting_evidence_attempt_count, unposted_attempt_count`
+      : `NULL::integer AS unknown_economic_exposure_count, NULL::integer AS quarantined_observation_count,
+         NULL::integer AS awaiting_evidence_attempt_count, NULL::integer AS unposted_attempt_count`;
     const persistedHeader = await client.query(
       `SELECT tenant_id, project_id, environment, billing_mode,
               to_char(as_of AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS as_of_utc,
-              event_count, projection_hash
+              event_count, ${unresolvedHeaderColumns}, projection_hash
        FROM cost_intelligence.financial_projection_snapshots WHERE snapshot_id = $1`,
       [projectionHash],
     );
     const header = persistedHeader.rows[0];
+    const unresolvedHeaderMatches = unresolvedIntake
+      ? Number(header?.unknown_economic_exposure_count) === unresolvedIntake.unknownEconomicExposureCount
+        && Number(header?.quarantined_observation_count) === unresolvedIntake.quarantinedObservationCount
+        && Number(header?.awaiting_evidence_attempt_count) === unresolvedIntake.awaitingEvidenceAttemptCount
+        && Number(header?.unposted_attempt_count) === unresolvedIntake.unpostedAttemptCount
+      : header?.unknown_economic_exposure_count === null && header?.quarantined_observation_count === null
+        && header?.awaiting_evidence_attempt_count === null && header?.unposted_attempt_count === null;
     if (!header || fromRow(header, 'tenant_id') !== request.scope.tenantId
       || fromRow(header, 'project_id') !== request.scope.projectId
       || fromRow(header, 'environment') !== request.scope.environment
       || fromRow(header, 'billing_mode') !== request.scope.billingMode
       || canonicalProjectionInstant(asString(header.as_of_utc)) !== request.asOf
       || Number(header.event_count) !== events.rows.length
+      || !unresolvedHeaderMatches
       || fromRow(header, 'projection_hash') !== projectionHash) {
       throw new Error('Persisted snapshot header does not match its content address.');
     }
@@ -1392,11 +1647,12 @@ export async function rebuildLedgerProjection(
       throw new Error('Persisted projection amounts do not match their content address.');
     }
     const persistedQuantities = await client.query(
-      `SELECT event_type, classification, currency, unit_name, relation, observation_count,
+      `SELECT event_type, classification, currency, unit_name, relation,
+              ${hasIncludedIn ? 'included_in' : 'NULL::text AS included_in'}, observation_count,
               known_quantity_count, unknown_quantity_count, incomplete_observation_count,
               known_subtotal::text AS known_subtotal, total_quantity::text AS total_quantity, quantity_completeness
        FROM cost_intelligence.financial_projection_quantities WHERE snapshot_id = $1
-       ORDER BY event_type, classification, currency, unit_name NULLS FIRST, relation NULLS FIRST`,
+       ORDER BY event_type, classification, currency, unit_name NULLS FIRST, relation NULLS FIRST, included_in NULLS FIRST`,
       [projectionHash],
     );
     const normalizedQuantities = persistedQuantities.rows.map(row => ({
@@ -1405,13 +1661,14 @@ export async function rebuildLedgerProjection(
       currency: asString(row.currency).trim(),
       unitName: fromRow(row, 'unit_name'),
       relation: fromRow(row, 'relation') as QuantityAccumulator['relation'],
+      ...(fromRow(row, 'included_in') !== null ? { includedIn: fromRow(row, 'included_in')! } : {}),
       observationCount: Number(row.observation_count), knownQuantityCount: Number(row.known_quantity_count),
       unknownQuantityCount: Number(row.unknown_quantity_count), incompleteObservationCount: Number(row.incomplete_observation_count),
       knownSubtotal: fromRow(row, 'known_subtotal') === null ? null : formatScaledDecimal(parseScaledDecimal(asString(row.known_subtotal))),
       totalQuantity: fromRow(row, 'total_quantity') === null ? null : formatScaledDecimal(parseScaledDecimal(asString(row.total_quantity))),
       completeness: asString(row.quantity_completeness) as Static<typeof ProjectionQuantitySchema>['completeness'],
-    })).sort((left, right) => keyFor(left.eventType, left.classification, left.currency, left.unitName, left.relation)
-      .localeCompare(keyFor(right.eventType, right.classification, right.currency, right.unitName, right.relation)));
+    })).sort((left, right) => keyFor(left.eventType, left.classification, left.currency, left.unitName, left.relation, left.includedIn ?? null)
+      .localeCompare(keyFor(right.eventType, right.classification, right.currency, right.unitName, right.relation, right.includedIn ?? null)));
     if (JSON.stringify(normalizedQuantities) !== JSON.stringify(computed.quantities)) {
       throw new Error('Persisted projection quantities do not match their content address.');
     }

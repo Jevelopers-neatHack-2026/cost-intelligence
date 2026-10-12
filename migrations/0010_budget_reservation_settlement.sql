@@ -119,7 +119,7 @@ WITH required(version) AS (
     ('0001_foundation'), ('0002_foundation_health'), ('0003_financial_ledger'),
     ('0004_pricing_catalog'), ('0005_pricing_valuation_history'), ('0006_finance_security_roles'),
     ('0007_accounting_projection_snapshots'), ('0008_budget_reservations'),
-    ('0009_budget_reservation_settlement')
+    ('0009_usage_intake'), ('0010_budget_reservation_settlement')
 )
 SELECT bool_and(m.version IS NOT NULL) AS migrations_ready,
        count(m.version)::integer AS required_migrations_present,

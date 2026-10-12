@@ -532,6 +532,11 @@
               }
             ]
           },
+          "includedIn": {
+            "minLength": 1,
+            "maxLength": 128,
+            "type": "string"
+          },
           "observationCount": {
             "minimum": 1,
             "type": "integer"
@@ -590,6 +595,34 @@
               }
             ]
           }
+        }
+      }
+    },
+    "unresolvedIntake": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "unknownEconomicExposureCount",
+        "quarantinedObservationCount",
+        "awaitingEvidenceAttemptCount",
+        "unpostedAttemptCount"
+      ],
+      "properties": {
+        "unknownEconomicExposureCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "quarantinedObservationCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "awaitingEvidenceAttemptCount": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unpostedAttemptCount": {
+          "minimum": 0,
+          "type": "integer"
         }
       }
     }

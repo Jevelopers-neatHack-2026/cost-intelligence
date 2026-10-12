@@ -1,6 +1,6 @@
 export * from './shared/index.js';
-export { ingestUsage, validateUsageObservationBoundary, UsageObservationSchema, IngestionReceiptSchema } from './metering/index.js';
-export type { UsageObservation, IngestionReceipt } from './metering/index.js';
+export { ingestUsage, replayUsageOutbox, validateUsageObservationBoundary, UsageObservationSchema, IngestionReceiptSchema, UsageOutboxReplayRequestSchema, UsageOutboxReplayReceiptSchema } from './metering/index.js';
+export type { UsageObservation, IngestionReceipt, UsageIntakeRuntimePorts, UsageOutboxReplayRequest, UsageOutboxReplayReceipt } from './metering/index.js';
 export {
   estimate,
   estimateV2,

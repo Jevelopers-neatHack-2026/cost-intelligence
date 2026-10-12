@@ -35,8 +35,12 @@ jobs:
         run: npm run test:exports
       - name: Verify immutable pricing and exact estimates
         run: npm run test:pricing -- --offline
+      - name: Verify durable usage intake boundaries
+        run: npm run test:metering
       - name: Verify PostgreSQL financial ledger behavior
         run: npm run test:ledger -- --offline
+      - name: Verify PostgreSQL usage recovery and idempotency
+        run: npm run test:recovery -- --offline
       - name: Verify financial authorization and tenant isolation
         run: npm run test:security -- --offline
       - name: Verify atomic budget reservation authorization

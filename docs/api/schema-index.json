@@ -47,7 +47,7 @@
       "path": "schemas/cost-intelligence/1.0.0/metering/UsageObservationSchema.json",
       "completeness": "partial_wrapper_requires_combined_validation",
       "combined_validator": "validateUsageObservationBoundary",
-      "sha256": "da5072439f461b88ba3fbcb5756fed224a916f48314da2dc4c86e4cbcf5564f6"
+      "sha256": "7c1c1a7817a65bf4decd94ac115523542b0d4001c2f0426fe6529fe40f03f0b0"
     },
     {
       "module": "metering",
@@ -56,7 +56,25 @@
       "export_name": "IngestionReceiptSchema",
       "path": "schemas/cost-intelligence/1.0.0/metering/IngestionReceiptSchema.json",
       "completeness": "complete",
-      "sha256": "0b12ec89dae6144a215ee3c46c54d2f9a3277c22606292e869f7f3503bbf9ded"
+      "sha256": "2a95accb92d54f1ebcd339a4d5e977b257f3ca2a66bddb8f23c5dc73fd31a2ab"
+    },
+    {
+      "module": "metering",
+      "name": "UsageOutboxReplayRequestSchema",
+      "schema_version": "1.0.0",
+      "export_name": "UsageOutboxReplayRequestSchema",
+      "path": "schemas/cost-intelligence/1.0.0/metering/UsageOutboxReplayRequestSchema.json",
+      "completeness": "complete",
+      "sha256": "a6856e797993fda6b77c11d117ce8330f69e7f6b13abb8c4dbac743bd925a913"
+    },
+    {
+      "module": "metering",
+      "name": "UsageOutboxReplayReceiptSchema",
+      "schema_version": "1.0.0",
+      "export_name": "UsageOutboxReplayReceiptSchema",
+      "path": "schemas/cost-intelligence/1.0.0/metering/UsageOutboxReplayReceiptSchema.json",
+      "completeness": "complete",
+      "sha256": "d5b1c661b58d1e2294ac0b71acbf3f6efe8cb37841c8e8536d020cdfe011c966"
     },
     {
       "module": "pricing",
@@ -253,7 +271,7 @@
       "export_name": "LedgerProjectionSchema",
       "path": "schemas/cost-intelligence/1.0.0/ledger/LedgerProjectionSchema.json",
       "completeness": "complete",
-      "sha256": "2e1a1003c24c2108f3344df77b8210e0778f1cc30b6da30dedd122cb64629ee8"
+      "sha256": "85b92fe49a0376e1a47061da618128993b69057c70c11bfbbb2417aa14ba19a4"
     },
     {
       "module": "reporting",

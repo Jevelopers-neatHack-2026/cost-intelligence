@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/metering/UsageOutboxReplayReceiptSchema/1.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "asOf",
+    "scanned",
+    "posted",
+    "retried",
+    "deadLettered",
+    "durableCommit"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "maxLength": 128,
+      "type": "string"
+    },
+    "asOf": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "scanned": {
+      "minimum": 0,
+      "maximum": 100,
+      "type": "integer"
+    },
+    "posted": {
+      "minimum": 0,
+      "maximum": 100,
+      "type": "integer"
+    },
+    "retried": {
+      "minimum": 0,
+      "maximum": 100,
+      "type": "integer"
+    },
+    "deadLettered": {
+      "minimum": 0,
+      "maximum": 100,
+      "type": "integer"
+    },
+    "durableCommit": {
+      "type": "boolean"
+    }
+  }
+}

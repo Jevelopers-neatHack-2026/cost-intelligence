@@ -1,7 +1,7 @@
 -- CI-05B remediation: persist the reason an expiry/revocation event was recorded.
 --
--- Additive, non-destructive extension on top of 0009. It only ADDs one nullable
--- column and refreshes the foundation health view. Nothing in 0001-0009 is edited
+-- Additive, non-destructive extension on top of 0010. It only ADDs one nullable
+-- column and refreshes the foundation health view. Nothing in 0001-0010 is edited
 -- or renumbered, and no DROP/TRUNCATE/destructive operation touches financial
 -- state. Every existing row keeps its meaning (the column is NULL for events that
 -- predate it and for every non-expiry event).
@@ -22,7 +22,8 @@ WITH required(version) AS (
     ('0001_foundation'), ('0002_foundation_health'), ('0003_financial_ledger'),
     ('0004_pricing_catalog'), ('0005_pricing_valuation_history'), ('0006_finance_security_roles'),
     ('0007_accounting_projection_snapshots'), ('0008_budget_reservations'),
-    ('0009_budget_reservation_settlement'), ('0010_budget_expiry_reason')
+    ('0009_usage_intake'), ('0010_budget_reservation_settlement'),
+    ('0011_budget_expiry_reason')
 )
 SELECT bool_and(m.version IS NOT NULL) AS migrations_ready,
        count(m.version)::integer AS required_migrations_present,

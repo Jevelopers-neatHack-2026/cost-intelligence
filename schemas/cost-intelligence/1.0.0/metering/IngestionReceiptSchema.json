@@ -15,6 +15,7 @@
     "providerAttemptId",
     "billableAttemptId",
     "transportAttemptId",
+    "outboxStatus",
     "completeness",
     "valuation",
     "durableCommit"
@@ -26,6 +27,7 @@
     },
     "requestId": {
       "minLength": 1,
+      "maxLength": 128,
       "type": "string"
     },
     "asOf": {
@@ -53,28 +55,332 @@
       ]
     },
     "eventId": {
-      "minLength": 1,
-      "type": "string"
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "id"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown",
+              "type": "string"
+            }
+          }
+        }
+      ]
     },
     "sourceObservationId": {
-      "minLength": 1,
-      "type": "string"
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "id"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown",
+              "type": "string"
+            }
+          }
+        }
+      ]
     },
     "logicalOperationId": {
-      "minLength": 1,
-      "type": "string"
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "id"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown",
+              "type": "string"
+            }
+          }
+        }
+      ]
     },
     "providerAttemptId": {
-      "minLength": 1,
-      "type": "string"
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "id"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown",
+              "type": "string"
+            }
+          }
+        }
+      ]
     },
     "billableAttemptId": {
-      "minLength": 1,
-      "type": "string"
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "id"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown",
+              "type": "string"
+            }
+          }
+        }
+      ]
     },
     "transportAttemptId": {
-      "minLength": 1,
-      "type": "string"
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "id"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown",
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "existingEventId": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "id"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown",
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "existingAttemptId": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status",
+            "id"
+          ],
+          "properties": {
+            "status": {
+              "const": "known",
+              "type": "string"
+            },
+            "id": {
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+              "type": "string"
+            }
+          }
+        },
+        {
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown",
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "outboxStatus": {
+      "anyOf": [
+        {
+          "const": "awaiting_evidence",
+          "type": "string"
+        },
+        {
+          "const": "pending",
+          "type": "string"
+        },
+        {
+          "const": "retry",
+          "type": "string"
+        },
+        {
+          "const": "posted",
+          "type": "string"
+        },
+        {
+          "const": "duplicate",
+          "type": "string"
+        },
+        {
+          "const": "suppressed",
+          "type": "string"
+        },
+        {
+          "const": "dead_letter",
+          "type": "string"
+        }
+      ]
     },
     "completeness": {
       "anyOf": [
@@ -111,12 +417,9 @@
     "durableCommit": {
       "type": "boolean"
     },
-    "existingEventId": {
-      "minLength": 1,
-      "type": "string"
-    },
     "quarantineCode": {
       "minLength": 1,
+      "maxLength": 64,
       "type": "string"
     }
   }

@@ -593,6 +593,43 @@ test('all exposed APIs request their operation grant before domain access', asyn
   assert.equal(safeCsvCell(`=${privateMarker}`).includes(privateMarker), true, 'CSV quoting preserves data after formula neutralization');
 });
 
+test('usage intake requires the exact fresh service grant and denies revoked or forged principal decisions before persistence', async () => {
+  const event = JSON.parse(await readFile(join(sharedFixtureRoot, 'UsageEvent.json'), 'utf8')).valid;
+  event.tenant_id = scope.tenantId;
+  event.project_id = scope.projectId;
+  event.environment = scope.environment;
+  event.billing_mode = scope.billingMode;
+  const request = {
+    schemaVersion: '1.0.0', requestId: 'security-usage-auth', idempotencyKey: 'security-usage-auth-idem',
+    scope: safeScope(), usageEvent: event, evidenceMode: 'mocked', verificationStatus: 'unverified',
+    evidenceProvenanceRef: 'fixture:security-usage-auth',
+  };
+  const deniedCalls = [];
+  const deniedPorts = runtimePorts({ calls: deniedCalls, deny: true });
+  const denied = await ingestUsage(request, deniedPorts);
+  assert.equal(denied.ok, false);
+  if (!denied.ok) assert.equal(denied.error.code, 'FORBIDDEN_SCOPE');
+  assert.equal(deniedPorts.connects, 0, 'revoked usage authority is rejected before intake reads or writes');
+  assert.equal(deniedCalls[0]?.operation, 'metering.ingestUsage');
+  assert.equal(deniedCalls[0]?.permission, 'usage.ingest');
+
+  const stalePorts = runtimePorts({ financeAuthority: { authorizeCurrent: async auth => ({
+    ...allowedDecision(auth), verifiedAt: '2026-10-11T03:28:00.000Z', expiresAt: '2026-10-11T03:29:00.000Z',
+  }) } });
+  const stale = await ingestUsage({ ...request, requestId: 'security-usage-stale' }, stalePorts);
+  assert.equal(stale.ok, false);
+  if (!stale.ok) assert.equal(stale.error.code, 'FORBIDDEN_SCOPE');
+  assert.equal(stalePorts.connects, 0, 'expired usage decisions do not reach persistence');
+
+  const forgedPorts = runtimePorts({ financeAuthority: { authorizeCurrent: async auth => ({
+    ...allowedDecision(auth), principal: { ...allowedDecision(auth).principal, actorId: 'forged-actor' },
+  }) } });
+  const forged = await ingestUsage({ ...request, requestId: 'security-usage-forged' }, forgedPorts);
+  assert.equal(forged.ok, false);
+  if (!forged.ok) assert.equal(forged.error.code, 'FORBIDDEN_SCOPE');
+  assert.equal(forgedPorts.connects, 0, 'forged actor context does not authorize a database call');
+});
+
 test('PostgreSQL ledger reads and writes recheck current grants and preserve tenant isolation', async () => {
   assert.ok(process.env.CI_TEST_DB_RUNTIME_HOST, 'security suite requires its restricted disposable PostgreSQL role');
   const pool = new Pool({ ...runtimeDatabaseConfigFromEnvironment(), max: 8 });

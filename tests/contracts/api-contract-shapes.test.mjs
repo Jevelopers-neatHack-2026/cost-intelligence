@@ -209,6 +209,34 @@ test('combined public validators enforce every nested pinned canonical request a
   assert.equal(api.validateReservationCommandBoundary({ ...settleCommand, canonicalCommand: {} }).error.code, 'VALIDATION_ERROR');
 });
 
+test('usage intake boundary keeps unknown valuation null and quarantines no invented attempt identities', async () => {
+  const request = JSON.parse(await readFile(join(root, 'fixtures/metering/usage-observation.request.json'), 'utf8'));
+  assert.equal(api.validateUsageObservationBoundary(request).ok, true);
+  const unknown = structuredClone(request);
+  unknown.usageEvent.completeness = 'incomplete';
+  unknown.usageEvent.usage_units = null;
+  unknown.usageEvent.missing_fields = ['usage', 'amount'];
+  unknown.usageEvent.valuation = { basis: 'unknown', money: null, rate_card_ref: null };
+  const unknownBoundary = api.validateUsageObservationBoundary(unknown);
+  assert.equal(unknownBoundary.ok, true, unknownBoundary.ok ? '' : unknownBoundary.error.code);
+  if (unknownBoundary.ok) {
+    assert.equal(unknownBoundary.value.usageEvent.valuation.money, null);
+    assert.equal(unknownBoundary.value.usageEvent.usage_units, null);
+  }
+  const missing = structuredClone(request);
+  delete missing.usageEvent.provider_attempt_id;
+  assert.equal(api.validateUsageObservationBoundary(missing).ok, false, 'canonical attempt IDs remain required by the pinned schema');
+  const receipt = {
+    schemaVersion: '1.0.0', requestId: 'usage-quarantine-receipt', asOf: '2026-10-11T12:00:00Z', status: 'quarantined',
+    eventId: { status: 'unknown' }, sourceObservationId: { status: 'unknown' }, logicalOperationId: { status: 'unknown' },
+    providerAttemptId: { status: 'unknown' }, billableAttemptId: { status: 'unknown' }, transportAttemptId: { status: 'unknown' },
+    outboxStatus: 'dead_letter', completeness: 'unknown', valuation: 'unknown', durableCommit: true,
+    quarantineCode: 'invalid_usage_event',
+  };
+  assert.equal(Value.Check(api.IngestionReceiptSchema, receipt), true);
+  assert.equal(Value.Check(api.IngestionReceiptSchema, { ...receipt, eventId: { status: 'known', id: '' } }), false);
+});
+
 test('generated partial wrapper schemas name their complete public validator in both catalog and artifact', async () => {
   const index = JSON.parse(await readFile(join(root, 'docs/api/schema-index.json'), 'utf8'));
   for (const entry of index.schemas) {

@@ -43,16 +43,32 @@ test('foundation suites name nonempty real evidence and integration/release fail
   assert.ok(unit.selectedFiles.length >= 5);
   const integration = suitePlan('integration', existing);
   const release = suitePlan('release', existing);
+  const withoutRecovery = new Set([...existing].filter(file => !file.startsWith('tests/recovery/')));
+  const releaseWithoutRecovery = suitePlan('release', withoutRecovery);
   assert.deepEqual(integration.requiredDomainSuites, requiredDomainSuites);
   assert.deepEqual(integration.deferredDomainSuites, deferredDomainSuites);
   assert.deepEqual(integration.deferredDomainSuites, [{ suite: 'budgets', selector: 'nested-scopes', issue: 17, priority: 'P1', status: 'assigned_not_v1' }]);
-  assert.ok(integration.missingFiles.some(file => file.startsWith('tests/metering/')));
   // CI-05B delivers the recovery and reconciliation leaves, so they resolve to
   // present, selected test files; the fail-closed-on-missing gate is still
-  // proven by the yet-undelivered metering/adapters/reporting leaves above.
+  // proven by the yet-undelivered adapters/reporting leaves asserted below
+  // (CI-04A has since delivered the metering leaf, so it is no longer missing).
   assert.ok(!release.missingFiles.some(file => file.startsWith('tests/recovery/')), 'CI-05B delivers the recovery leaf');
   assert.ok(release.selectedFiles.includes('tests/recovery/recovery.test.mjs'));
   assert.ok(release.selectedFiles.includes('tests/reconciliation/reconciliation.test.mjs'));
+  assert.equal(integration.missingFiles.includes('tests/accounting/accounting.test.mjs'), false, 'the actual accounting leaf is recognized by the integration plan');
+  assert.ok(integration.missingFiles.some(file => file.startsWith('tests/adapters/')), 'unimplemented assigned domains remain explicitly missing');
+  assert.ok(existing.has('tests/recovery/recovery.test.mjs'), 'the implemented recovery leaf contributes real suite evidence');
+  assert.equal(release.missingFiles.includes('tests/recovery/recovery.test.mjs'), false,
+    'the actual recovery leaf is recognized by the release plan');
+  assert.deepEqual(
+    releaseWithoutRecovery.missingFiles.filter(file => file !== 'tests/recovery/recovery.test.mjs'),
+    release.missingFiles,
+    'omitting recovery from a controlled file set restores only its missing-file evidence and preserves every other assigned-domain gap',
+  );
+  assert.ok(releaseWithoutRecovery.missingFiles.includes('tests/recovery/recovery.test.mjs'));
+  assert.deepEqual(release.selectedFiles.filter(file => file !== 'tests/recovery/recovery.test.mjs'), releaseWithoutRecovery.selectedFiles,
+    'recovery implementation cannot change which other available release tests execute');
+  assert.ok(release.missingFiles.length > 0, 'other assigned domains remain explicitly missing');
   assert.equal(suitePlan('release', new Set()).selectedFiles.length, 0);
   assert.ok(suitePlan('release', new Set()).missingFiles.length > 0);
 

@@ -12,7 +12,7 @@ import { assertDisposableMarker, databaseConfigFromEnvironment, migratorDatabase
 const { Client, Pool } = pg;
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 
-function hasDestructiveMigrationStatement(sql) {
+function hasDestructiveMigrationStatement(sql, allowedConstraintReplacements = []) {
   const tokens = [];
   let index = 0;
   let statement = 0;
@@ -95,7 +95,17 @@ function hasDestructiveMigrationStatement(sql) {
 
   return tokens.some(token => {
     if (token.kind !== 'word') return false;
-    if (token.value === 'DROP') return true;
+    if (token.value === 'DROP') {
+      const statementTokens = tokens.filter(item => item.statement === token.statement);
+      const codeWords = statementTokens.filter(item => item.kind === 'word' && !item.quoted && !item.inDollar);
+      const position = codeWords.indexOf(token);
+      const prefix = codeWords.slice(0, position).map(item => item.value);
+      const suffix = codeWords.slice(position + 1).map(item => item.value);
+      const safeReplacement = allowedConstraintReplacements.some(({ schema, table, constraint }) =>
+        prefix.join(' ') === `ALTER TABLE ${schema.toUpperCase()} ${table.toUpperCase()}`
+          && suffix.join(' ') === `CONSTRAINT ${constraint.toUpperCase()}`);
+      return !safeReplacement;
+    }
     if (token.value !== 'TRUNCATE') return false;
 
     // Only the SQL event name in a CREATE TRIGGER ... BEFORE TRUNCATE ON
@@ -129,7 +139,7 @@ async function verifyDurability(prefix) {
     assertDisposableMarker(marker.rows);
     const health = await client.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
     assert.equal(health.rows[0].migrations_ready, true);
-    assert.equal(Number(health.rows[0].required_migrations_present), 10);
+    assert.equal(Number(health.rows[0].required_migrations_present), 11);
     await client.query('CREATE TABLE IF NOT EXISTS ci_test.foundation_durable_probe (probe_id uuid PRIMARY KEY, payload text NOT NULL)');
     await client.query('INSERT INTO ci_test.foundation_durable_probe(probe_id, payload) VALUES ($1, $2)', [probeId, `verified:${prefix}`]);
   } finally {
@@ -507,6 +517,14 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
     'dollar-quoted dynamic TRUNCATE text remains rejected conservatively');
   assert.equal(hasDestructiveMigrationStatement('CREATE TRIGGER guard BEFORE TRUNCATE ON schema.table FOR EACH STATEMENT EXECUTE FUNCTION guard_fn(); TRUNCATE TABLE schema.table;'), true,
     'a safe trigger declaration cannot exempt a later destructive statement');
+  assert.equal(hasDestructiveMigrationStatement(
+    'ALTER TABLE cost_intelligence.financial_projection_quantities DROP CONSTRAINT financial_projection_quantities_key;',
+    [{ schema: 'cost_intelligence', table: 'financial_projection_quantities', constraint: 'financial_projection_quantities_key' }],
+  ), false, '0009 may replace only the projection identity constraint to retain included-parent fidelity');
+  assert.equal(hasDestructiveMigrationStatement(
+    'ALTER TABLE cost_intelligence.financial_projection_snapshots DROP CONSTRAINT financial_projection_quantities_key;',
+    [{ schema: 'cost_intelligence', table: 'financial_projection_quantities', constraint: 'financial_projection_quantities_key' }],
+  ), true, 'the safe replacement exception is limited to the exact projection table and key');
   assert.throws(() => assertDisposableMarker([]), /not marked as a disposable/);
   assert.throws(() => assertDisposableMarker([{ marker: 'unrelated' }]), /not marked as a disposable/);
   assert.equal(assertDisposableMarker([{ marker: DISPOSABLE_MARKER }]), true);
@@ -527,12 +545,20 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
     { version: '0006_finance_security_roles', status: 'applied' },
     { version: '0007_accounting_projection_snapshots', status: 'applied' },
     { version: '0008_budget_reservations', status: 'applied' },
-    { version: '0009_budget_reservation_settlement', status: 'applied' },
-    { version: '0010_budget_expiry_reason', status: 'applied' },
+    { version: '0009_usage_intake', status: 'applied' },
+    { version: '0010_budget_reservation_settlement', status: 'applied' },
+    { version: '0011_budget_expiry_reason', status: 'applied' },
   ]);
 
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(names.length, 10, 'foundation migration suite must exercise fresh creation, an additive security upgrade, the additive accounting projection migration, the additive CI-05A budget reservation migration, the additive CI-05B settlement/reconciliation migration, and the additive CI-05B expiry-reason migration');
+  assert.deepEqual(names, [
+    '0001_foundation.sql', '0002_foundation_health.sql', '0003_financial_ledger.sql',
+    '0004_pricing_catalog.sql', '0005_pricing_valuation_history.sql',
+    '0006_finance_security_roles.sql', '0007_accounting_projection_snapshots.sql',
+    '0008_budget_reservations.sql', '0009_usage_intake.sql',
+    '0010_budget_reservation_settlement.sql', '0011_budget_expiry_reason.sql',
+  ], 'the current migration set is additive through accounting projections, budget reservations, usage intake, CI-05B settlement/reconciliation, and expiry-reason, and preserves every earlier migration');
+  assert.equal(names.length, 11, 'foundation migration suite must exercise fresh creation, an additive security upgrade, the additive accounting projection migration, the additive CI-05A budget reservation migration, the additive usage-intake migration, the additive CI-05B settlement/reconciliation migration, and the additive CI-05B expiry-reason migration');
   for (const prefix of ['CI_TEST_DB', 'CI_TEST_PREVIOUS_DB']) {
     const client = new Client(databaseConfigFromEnvironment(prefix));
     await client.connect();
@@ -543,7 +569,10 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
       assert.equal(records.rowCount, names.length);
       for (let index = 0; index < names.length; index++) {
         const sql = await readFile(join(root, 'migrations', names[index]), 'utf8');
-        assert.equal(hasDestructiveMigrationStatement(sql), false,
+        const safeConstraintReplacements = names[index] === '0009_usage_intake.sql'
+          ? [{ schema: 'cost_intelligence', table: 'financial_projection_quantities', constraint: 'financial_projection_quantities_key' }]
+          : [];
+        assert.equal(hasDestructiveMigrationStatement(sql, safeConstraintReplacements), false,
           'incremental migrations must not start destructive DROP or TRUNCATE statements');
         assert.equal(records.rows[index].version, names[index].replace(/\.sql$/, ''));
         assert.equal(records.rows[index].checksum_sha256.trim(), createHash('sha256').update(sql).digest('hex'));
@@ -571,6 +600,16 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
       );
       assert.deepEqual(pricingTables.rows.map(row => row.table_name), [...requiredPricingTables].sort(),
         'fresh and upgraded schemas must include append-only rate, rule, and FX version catalogs');
+      const requiredIntakeTables = [
+        'usage_intake_inbox', 'usage_intake_attempts', 'usage_intake_outbox', 'usage_intake_quarantine',
+      ];
+      const intakeTables = await client.query(
+        `SELECT table_name FROM information_schema.tables
+         WHERE table_schema = 'cost_intelligence' AND table_name = ANY($1::text[]) ORDER BY table_name`,
+        [requiredIntakeTables],
+      );
+      assert.deepEqual(intakeTables.rows.map(row => row.table_name), [...requiredIntakeTables].sort(),
+        'fresh and upgraded schemas must include durable usage intake and posting coverage');
       const requiredEventColumns = [
         'posting_mapping_version', 'source_line_id', 'transport_attempt_status', 'provider_attempt_status',
         'provider_request_status', 'billable_attempt_status', 'economic_event_type',
@@ -621,7 +660,7 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
       );
       assert.deepEqual(pricingTriggers.rows.map(row => row.trigger_name), [...requiredPricingTriggers].sort(),
         'rate cards, rules, and FX records must reject update, delete, and truncate');
-      // CI-05B additive settlement/reconciliation schema (migration 0009).
+      // CI-05B additive settlement/reconciliation schema (migration 0010).
       const budgetColumns = await client.query(
         `SELECT column_name FROM information_schema.columns
          WHERE table_schema = 'cost_intelligence' AND table_name = 'budget_reservation_events'
@@ -630,14 +669,14 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
       );
       assert.deepEqual(budgetColumns.rows.map(row => row.column_name), ['expires_at', 'worker_lease_expires_at', 'worker_lease_id'],
         'CI-05B adds a financial expiry and a separate worker lease to the budget event log');
-      // CI-05B remediation (defect e): migration 0010 adds a constrained expiry_reason
+      // CI-05B remediation (defect e): migration 0011 adds a constrained expiry_reason
       // column so a matured financial expiry and an operator revocation stay distinct.
       const expiryReasonColumn = await client.query(
         `SELECT column_name, is_nullable FROM information_schema.columns
          WHERE table_schema = 'cost_intelligence' AND table_name = 'budget_reservation_events'
            AND column_name = 'expiry_reason'`,
       );
-      assert.equal(expiryReasonColumn.rowCount, 1, 'CI-05B migration 0010 records why an expiry event occurred');
+      assert.equal(expiryReasonColumn.rowCount, 1, 'CI-05B migration 0011 records why an expiry event occurred');
       assert.equal(expiryReasonColumn.rows[0].is_nullable, 'YES', 'the expiry reason is additive and nullable for pre-existing rows');
       const reconciliationTable = await client.query(
         `SELECT table_name FROM information_schema.tables
@@ -660,6 +699,22 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
       );
       assert.equal(partialUnique.rowCount, 1, 'the first-event billable attempt binding is unique per partition');
 
+      const requiredIntakeAuditTriggers = [
+        'usage_intake_inbox_append_only', 'usage_intake_inbox_no_truncate',
+        'usage_intake_quarantine_append_only', 'usage_intake_quarantine_no_truncate',
+        'usage_intake_attempt_identity_immutable', 'usage_intake_outbox_intent_immutable',
+      ];
+      const intakeTriggers = await client.query(
+        `SELECT t.tgname::text AS trigger_name
+         FROM pg_trigger t
+         JOIN pg_class c ON c.oid = t.tgrelid
+         JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'cost_intelligence' AND t.tgname::text = ANY($1::text[]) AND NOT t.tgisinternal
+         ORDER BY t.tgname`,
+        [requiredIntakeAuditTriggers],
+      );
+      assert.deepEqual(intakeTriggers.rows.map(row => row.trigger_name), [...requiredIntakeAuditTriggers].sort(),
+        'intake observations and quarantines stay append-only while attempt and outbox identity remain immutable');
       const health = await client.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
       assert.equal(health.rows[0].migrations_ready, true);
       assert.equal(Number(health.rows[0].required_migrations_present), names.length);
@@ -690,16 +745,24 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
         `SELECT count(*)::integer AS total FROM pg_policies WHERE schemaname = 'cost_intelligence'
            AND policyname LIKE '%_scope_policy'`,
       );
-      assert.equal(policyCount.rows[0].total, 14, 'each scoped runtime table has an explicit RLS policy');
+      assert.equal(policyCount.rows[0].total, 18, 'each scoped runtime table has an explicit RLS policy');
       const runtimePrivileges = await client.query(
         `SELECT has_table_privilege('ci_finance_runtime', 'cost_intelligence.financial_ledger_events', 'SELECT') AS can_read,
                 has_table_privilege('ci_finance_runtime', 'cost_intelligence.financial_ledger_events', 'UPDATE') AS can_update,
                 has_table_privilege('ci_finance_runtime', 'cost_intelligence.financial_ledger_events', 'DELETE') AS can_delete,
                 has_table_privilege('ci_finance_runtime', 'cost_intelligence.financial_ledger_events', 'TRUNCATE') AS can_truncate,
+                has_table_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_inbox', 'SELECT') AS intake_read,
+                has_table_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_inbox', 'UPDATE') AS intake_update,
+                has_table_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_inbox', 'DELETE') AS intake_delete,
+                has_column_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_attempts', 'billable_attempt_id', 'UPDATE') AS attempt_identity_update,
+                has_column_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_outbox', 'tenant_id', 'UPDATE') AS outbox_scope_update,
                 has_schema_privilege('ci_finance_runtime', 'cost_intelligence', 'CREATE') AS can_ddl,
                 pg_has_role('ci_finance_runtime', 'ci_finance_owner', 'MEMBER') AS is_owner`);
       assert.deepEqual(runtimePrivileges.rows[0], {
-        can_read: true, can_update: false, can_delete: false, can_truncate: false, can_ddl: false, is_owner: false,
+        can_read: true, can_update: false, can_delete: false, can_truncate: false,
+        intake_read: true, intake_update: false, intake_delete: false,
+        attempt_identity_update: false, outbox_scope_update: false,
+        can_ddl: false, is_owner: false,
       });
       const migrationPrivileges = await client.query(
         `SELECT has_schema_privilege('ci_finance_migrator', 'cost_intelligence', 'CREATE') AS can_ddl,
@@ -880,8 +943,9 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
 test('0006 rejects pre-existing runtime role graphs and ACL escalation before a restricted-login upgrade', async () => {
   assert.ok(process.env.CI_TEST_DB_HOST, 'role-upgrade audit requires the disposable PostgreSQL harness');
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(names.length, 10);
+  assert.equal(names.length, 11);
   const migrationName = names[5];
+  assert.equal(migrationName, '0006_finance_security_roles.sql', 'the security preflight continues to target the frozen 0006 migration');
   const { name, base, config } = await createPre0006Database();
   const admin = new Client(config);
   await admin.connect();
@@ -2042,9 +2106,125 @@ test('0006 rejects pre-existing runtime role graphs and ACL escalation before a 
   }
 });
 
+test('separate migration login applies 0007 accounting, 0008 budget reservations, 0009 usage intake, and the CI-05B settlement and expiry-reason migrations to an existing 0006 database without widening runtime grants', async () => {
+  assert.ok(process.env.CI_TEST_DB_HOST, 'migration-role upgrade requires the disposable PostgreSQL harness');
+  const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
+  assert.equal(names[5], '0006_finance_security_roles.sql');
+  assert.equal(names[6], '0007_accounting_projection_snapshots.sql');
+  assert.equal(names[7], '0008_budget_reservations.sql');
+  assert.equal(names[8], '0009_usage_intake.sql');
+  const { name, base, config } = await createPre0006Database();
+  let installer;
+  let migrator;
+  try {
+    installer = new Client(config);
+    await installer.connect();
+    await installDisposableMarker(installer);
+    await applyMigrationsThrough0005(installer, names);
+    await apply0006ToLegacyDatabase(installer, names[5]);
+
+    // 0006 predates the finance-owner handoff for these bootstrap objects.
+    // The database owner performs that one-time handoff before the distinct
+    // migration login assumes the existing non-login owner role.
+    await installer.query('ALTER TABLE cost_intelligence.schema_migrations OWNER TO ci_finance_owner');
+    await installer.query('ALTER VIEW cost_intelligence.foundation_health OWNER TO ci_finance_owner');
+    // 0007 (accounting) creates append-only triggers from the 0003 function, which 0006 left installer-owned
+    // with PUBLIC execute revoked; the owner role needs EXECUTE to create those triggers.
+    await installer.query('GRANT EXECUTE ON FUNCTION cost_intelligence.reject_ledger_projection_mutation() TO ci_finance_owner');
+    await installer.end();
+    installer = undefined;
+
+    migrator = new Client({ ...migratorDatabaseConfigFromEnvironment(), database: name });
+    await migrator.connect();
+    const login = await migrator.query(
+      `SELECT current_user, pg_has_role(current_user, 'ci_finance_migrator', 'MEMBER') AS is_migrator,
+              pg_has_role(current_user, 'ci_finance_runtime', 'MEMBER') AS is_runtime,
+              rolsuper, rolcreatedb, rolcreaterole
+       FROM pg_roles WHERE rolname = current_user`,
+    );
+    assert.deepEqual({
+      isMigrator: login.rows[0].is_migrator, isRuntime: login.rows[0].is_runtime,
+      superuser: login.rows[0].rolsuper, createdb: login.rows[0].rolcreatedb,
+      createrole: login.rows[0].rolcreaterole,
+    }, { isMigrator: true, isRuntime: false, superuser: false, createdb: false, createrole: false });
+    await migrator.query('SET ROLE ci_finance_migrator');
+    await migrator.query('SET ROLE ci_finance_owner');
+    assert.equal((await migrator.query('SELECT current_user')).rows[0].current_user, 'ci_finance_owner');
+
+    for (const migrationName of names.slice(6)) {
+      const migration = await readFile(join(root, 'migrations', migrationName), 'utf8');
+      const checksum = createHash('sha256').update(migration).digest('hex');
+      await migrator.query('BEGIN');
+      try {
+        await migrator.query(migration);
+        await migrator.query(
+          'INSERT INTO cost_intelligence.schema_migrations(version, checksum_sha256) VALUES ($1, $2)',
+          [migrationName.replace(/\.sql$/, ''), checksum],
+        );
+        await migrator.query('COMMIT');
+      } catch (error) {
+        await migrator.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      }
+    }
+
+    const health = await migrator.query(
+      'SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health',
+    );
+    assert.deepEqual(health.rows[0], { migrations_ready: true, required_migrations_present: 11 });
+    const intakeProjectionColumns = await migrator.query(
+      `SELECT table_name, column_name FROM information_schema.columns
+       WHERE table_schema='cost_intelligence' AND (
+         (table_name='usage_intake_inbox' AND column_name='attempt_revision_accepted')
+         OR (table_name='financial_projection_quantities' AND column_name='included_in')
+         OR (table_name='financial_projection_snapshots' AND column_name IN (
+           'unknown_economic_exposure_count', 'quarantined_observation_count',
+           'awaiting_evidence_attempt_count', 'unposted_attempt_count'))
+       ) ORDER BY table_name, column_name`,
+    );
+    assert.deepEqual(intakeProjectionColumns.rows.map(row => `${row.table_name}.${row.column_name}`), [
+      'financial_projection_quantities.included_in',
+      'financial_projection_snapshots.awaiting_evidence_attempt_count',
+      'financial_projection_snapshots.quarantined_observation_count',
+      'financial_projection_snapshots.unknown_economic_exposure_count',
+      'financial_projection_snapshots.unposted_attempt_count',
+      'usage_intake_inbox.attempt_revision_accepted',
+    ], 'additive 0009 migration exposes durable unresolved exposure and parent lineage fields');
+    const quantityKey = await migrator.query(
+      `SELECT pg_get_constraintdef(oid) AS definition FROM pg_constraint
+       WHERE conrelid='cost_intelligence.financial_projection_quantities'::regclass
+         AND conname='financial_projection_quantities_key'`,
+    );
+    assert.match(quantityKey.rows[0].definition, /UNIQUE NULLS NOT DISTINCT .*included_in/);
+    const privileges = await migrator.query(
+      `SELECT has_schema_privilege('ci_finance_runtime', 'cost_intelligence', 'CREATE') AS runtime_schema_ddl,
+              has_database_privilege('ci_finance_runtime', current_database(), 'CREATE') AS runtime_database_ddl,
+              has_table_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_inbox', 'SELECT') AS inbox_select,
+              has_table_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_inbox', 'UPDATE') AS inbox_update,
+              has_table_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_inbox', 'DELETE') AS inbox_delete,
+              has_column_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_attempts', 'billable_attempt_id', 'UPDATE') AS attempt_identity_update,
+              has_column_privilege('ci_finance_runtime', 'cost_intelligence.usage_intake_outbox', 'tenant_id', 'UPDATE') AS outbox_scope_update,
+              has_schema_privilege('ci_finance_migrator', 'cost_intelligence', 'CREATE') AS migrator_schema_ddl,
+              pg_has_role('ci_finance_migrator', 'ci_finance_owner', 'MEMBER') AS migrator_owner,
+              pg_has_role('ci_finance_migrator', 'ci_finance_runtime', 'MEMBER') AS migrator_runtime`,
+    );
+    assert.deepEqual(privileges.rows[0], {
+      runtime_schema_ddl: false, runtime_database_ddl: false, inbox_select: true,
+      inbox_update: false, inbox_delete: false, attempt_identity_update: false,
+      outbox_scope_update: false, migrator_schema_ddl: true, migrator_owner: true,
+      migrator_runtime: false,
+    });
+  } finally {
+    await installer?.end().catch(() => undefined);
+    await migrator?.end().catch(() => undefined);
+    await dropTestDatabase(name, base);
+  }
+});
+
 test('legacy financial privacy upgrade preserves immutable economics and fails affected scopes closed', async () => {
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(names.length, 10);
+  assert.equal(names.length, 11);
+  assert.equal(names[5], '0006_finance_security_roles.sql', 'privacy and role-boundary upgrade remains explicitly fixed at 0006');
   const { name, base, config } = await createPre0006Database();
   let admin;
   let seedPool;

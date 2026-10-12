@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.jevelopers.org/cost-intelligence/metering/UsageOutboxReplayRequestSchema/1.0.0",
+  "x-schema-completeness": "complete",
+  "additionalProperties": false,
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "requestId",
+    "scope",
+    "limit"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "requestId": {
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]*$",
+      "type": "string"
+    },
+    "scope": {
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "tenantId",
+        "projectId",
+        "environment",
+        "billingMode",
+        "actorId"
+      ],
+      "properties": {
+        "tenantId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "projectId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        },
+        "environment": {
+          "anyOf": [
+            {
+              "const": "development",
+              "type": "string"
+            },
+            {
+              "const": "test",
+              "type": "string"
+            },
+            {
+              "const": "production",
+              "type": "string"
+            }
+          ]
+        },
+        "billingMode": {
+          "anyOf": [
+            {
+              "const": "live",
+              "type": "string"
+            },
+            {
+              "const": "sandbox",
+              "type": "string"
+            },
+            {
+              "const": "simulated",
+              "type": "string"
+            }
+          ]
+        },
+        "actorId": {
+          "minLength": 1,
+          "maxLength": 128,
+          "type": "string"
+        }
+      }
+    },
+    "limit": {
+      "minimum": 1,
+      "maximum": 100,
+      "type": "integer"
+    }
+  }
+}

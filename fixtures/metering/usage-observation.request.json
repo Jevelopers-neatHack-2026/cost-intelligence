@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "1.0.0",
+  "requestId": "ci04a-fixture-request",
+  "idempotencyKey": "ci04a-fixture-idempotency",
+  "scope": {
+    "tenantId": "123e4567-e89b-42d3-a456-426614174000",
+    "projectId": "123e4567-e89b-42d3-a456-426614174000",
+    "environment": "test",
+    "billingMode": "simulated",
+    "actorId": "ci04a-fixture-service"
+  },
+  "usageEvent": {
+    "contract": "UsageEvent",
+    "schema_version": "1.0.0",
+    "policy_version": "1.0.0",
+    "event_id": "123e4567-e89b-42d3-a456-000000000100",
+    "tenant_id": "123e4567-e89b-42d3-a456-426614174000",
+    "project_id": "123e4567-e89b-42d3-a456-426614174000",
+    "correlation_id": "123e4567-e89b-42d3-a456-426614174000",
+    "producer": {
+      "module": "shared-contracts",
+      "source_revision": "c4caaccc2ea63b273eeac17ed89af8ac64f6bbde",
+      "build_revision": "fixture-1"
+    },
+    "occurred_at": "2026-10-10T12:00:00Z",
+    "observed_at": "2026-10-10T12:00:01Z",
+    "ingested_at": "2026-10-10T12:00:02Z",
+    "environment": "test",
+    "billing_mode": "simulated",
+    "source_refs": [],
+    "usage_event_id": "123e4567-e89b-42d3-a456-000000000017",
+    "source_observation_id": "123e4567-e89b-42d3-a456-000000000019",
+    "logical_operation_id": "123e4567-e89b-42d3-a456-000000000008",
+    "provider_attempt_id": "123e4567-e89b-42d3-a456-000000000020",
+    "billable_attempt_id": "123e4567-e89b-42d3-a456-000000000009",
+    "transport_attempt_id": "123e4567-e89b-42d3-a456-000000000021",
+    "provider_request_id": null,
+    "provider": "synthetic_provider",
+    "model": "synthetic_model",
+    "source": "provider_response",
+    "completeness": "complete",
+    "usage_units": [
+      {
+        "name": "tokens",
+        "quantity": "0.000001",
+        "scale": 6,
+        "relation": "standalone"
+      }
+    ],
+    "missing_fields": [],
+    "valuation": {
+      "basis": "estimated",
+      "money": {
+        "amount": "0.000003",
+        "currency": "USD",
+        "scale": 6
+      },
+      "rate_card_ref": {
+        "contract": "RateCard",
+        "schema_version": "1.0.0",
+        "id": "123e4567-e89b-42d3-a456-000000000022",
+        "revision": 1,
+        "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "outcome": "succeeded",
+    "retry_mapping_ref": {
+      "contract": "RetryMapping",
+      "schema_version": "1.0.0",
+      "id": "123e4567-e89b-42d3-a456-000000000023",
+      "revision": 1,
+      "content_hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "supersedes_observation_id": null,
+    "reconciliation_ref": null
+  },
+  "evidenceMode": "mocked",
+  "verificationStatus": "unverified",
+  "evidenceProvenanceRef": "fixture:synthetic_usage_trace_v1"
+}

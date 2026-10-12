@@ -1,21 +1,30 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import pg from 'pg';
 import {
   appendLedgerEvent,
+  ingestUsage,
   rebuildLedgerProjection,
   validateLedgerAppendRequestBoundary,
   validateLedgerProjectionRequestBoundary,
 } from '../../dist/index.js';
-import { assertDisposableMarker, databaseConfigFromEnvironment, runtimeDatabaseConfigFromEnvironment, DISPOSABLE_MARKER } from '../../scripts/test-db-lifecycle.mjs';
+import {
+  assertDisposableMarker,
+  databaseConfigFromEnvironment,
+  migratorDatabaseConfigFromEnvironment,
+  runtimeDatabaseConfigFromEnvironment,
+  DISPOSABLE_MARKER,
+} from '../../scripts/test-db-lifecycle.mjs';
 
-const { Pool } = pg;
+const { Client, Pool } = pg;
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const fixturePath = join(root, 'fixtures/ledger/ci02-synthetic-acceptance.json');
+const intakeFixturePath = join(root, 'fixtures/metering/usage-observation.request.json');
+const intakeFixture = JSON.parse(await readFile(intakeFixturePath, 'utf8'));
 const fixedTime = '2026-10-11T03:00:00.000Z';
 const producerRevision = 'a'.repeat(40);
 
@@ -35,6 +44,18 @@ function apiObserverPool(max) {
 
 function contentHash(label) {
   return `sha256:${createHash('sha256').update(`ci02-synthetic:${label}`).digest('hex')}`;
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalize(value[key])]));
+  }
+  return value;
+}
+
+function contentAddress(value) {
+  return `sha256:${createHash('sha256').update(JSON.stringify(canonicalize(value))).digest('hex')}`;
 }
 
 function evidenceRef(label) {
@@ -158,6 +179,141 @@ function makePorts(pool, scope, clock) {
   };
 }
 
+async function applyCapabilityMigration(client, name) {
+  const sql = await readFile(join(root, 'migrations', name), 'utf8');
+  const version = name.replace(/\.sql$/, '');
+  const checksum = createHash('sha256').update(sql).digest('hex');
+  await client.query('BEGIN');
+  try {
+    await client.query(sql);
+    await client.query(
+      'INSERT INTO cost_intelligence.schema_migrations(version, checksum_sha256) VALUES ($1, $2)',
+      [version, checksum],
+    );
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  }
+}
+
+// `through` is the number of migrations applied: 6 (legacy), 7 (accounting), 8 (budget reservations), or 9 (usage intake).
+async function createProjectionCapabilityDatabase(through) {
+  const base = databaseConfigFromEnvironment('CI_TEST_DB');
+  const name = `ci04a_projection_${randomUUID().replaceAll('-', '')}`;
+  const guard = new Client(base);
+  await guard.connect();
+  try {
+    const marker = await guard.query('SELECT marker FROM ci_test.disposable_database_marker');
+    assertDisposableMarker(marker.rows);
+    const server = await guard.query('SHOW server_version_num');
+    assert.equal(String(server.rows[0].server_version_num).slice(0, 2), '16', 'projection compatibility checks use PostgreSQL 16');
+  } finally {
+    await guard.end();
+  }
+
+  const admin = new Client({ ...base, database: 'postgres' });
+  await admin.connect();
+  try {
+    await admin.query(`CREATE DATABASE "${name}"`);
+  } finally {
+    await admin.end();
+  }
+
+  let setup;
+  try {
+    setup = new Client({ ...base, database: name });
+    await setup.connect();
+    await setup.query('CREATE SCHEMA ci_test');
+    await setup.query('CREATE TABLE ci_test.disposable_database_marker (marker text PRIMARY KEY)');
+    await setup.query('INSERT INTO ci_test.disposable_database_marker(marker) VALUES ($1)', [DISPOSABLE_MARKER]);
+    const migrations = (await readdir(join(root, 'migrations'))).filter(file => file.endsWith('.sql')).sort();
+    for (const migration of migrations.slice(0, 6)) await applyCapabilityMigration(setup, migration);
+    await setup.query('ALTER TABLE cost_intelligence.schema_migrations OWNER TO ci_finance_owner');
+    await setup.query('ALTER VIEW cost_intelligence.foundation_health OWNER TO ci_finance_owner');
+    await setup.query('GRANT EXECUTE ON FUNCTION cost_intelligence.reject_ledger_projection_mutation() TO ci_finance_owner');
+    if (through > 6) {
+      const migrationLogin = new Client({ ...migratorDatabaseConfigFromEnvironment(), database: name });
+      await migrationLogin.connect();
+      try {
+        const role = await migrationLogin.query(
+          `SELECT current_user, account.rolsuper, account.rolcreatedb, account.rolcreaterole, account.rolbypassrls,
+                  pg_has_role(current_user, 'ci_finance_migrator', 'MEMBER') AS is_migrator
+           FROM pg_roles account WHERE account.rolname=current_user`,
+        );
+        assert.deepEqual(role.rows[0], {
+          current_user: role.rows[0].current_user, rolsuper: false, rolcreatedb: false,
+          rolcreaterole: false, rolbypassrls: false, is_migrator: true,
+        }, 'post-0006 capability setup uses a separate restricted migration login');
+        await migrationLogin.query('SET ROLE ci_finance_migrator');
+        await migrationLogin.query('SET ROLE ci_finance_owner');
+        for (const migration of migrations.slice(6, through)) await applyCapabilityMigration(migrationLogin, migration);
+      } finally {
+        await migrationLogin.end();
+      }
+    }
+    const health = await setup.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
+    assert.equal(health.rows[0].migrations_ready, true);
+    assert.equal(Number(health.rows[0].required_migrations_present), through);
+    await setup.end();
+    setup = undefined;
+    return { name, base };
+  } catch (error) {
+    await setup?.end().catch(() => undefined);
+    await dropProjectionCapabilityDatabase(name, base);
+    throw error;
+  }
+}
+
+async function dropProjectionCapabilityDatabase(name, base) {
+  const admin = new Client({ ...base, database: 'postgres' });
+  await admin.connect();
+  try {
+    await admin.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=$1 AND pid<>pg_backend_pid()', [name]);
+    await admin.query(`DROP DATABASE IF EXISTS "${name}"`);
+  } finally {
+    await admin.end();
+  }
+}
+
+function makeUnknownUsageObservation(scope) {
+  const event = structuredClone(intakeFixture.usageEvent);
+  const now = new Date().toISOString();
+  event.event_id = randomUUID();
+  event.usage_event_id = randomUUID();
+  event.source_observation_id = randomUUID();
+  event.logical_operation_id = randomUUID();
+  event.provider_attempt_id = randomUUID();
+  event.billable_attempt_id = randomUUID();
+  event.transport_attempt_id = randomUUID();
+  event.correlation_id = randomUUID();
+  event.provider_request_id = null;
+  event.tenant_id = scope.tenantId;
+  event.project_id = scope.projectId;
+  event.environment = scope.environment;
+  event.billing_mode = scope.billingMode;
+  event.producer = { module: 'shared-contracts', source_revision: producerRevision, build_revision: 'ci04a-synthetic-fixture' };
+  event.occurred_at = now;
+  event.observed_at = now;
+  event.ingested_at = now;
+  event.source = 'provider_response';
+  event.provider = 'synthetic_provider';
+  event.model = 'synthetic_model';
+  event.completeness = 'incomplete';
+  event.usage_units = null;
+  event.missing_fields = ['usage', 'amount'];
+  event.valuation = { basis: 'unknown', money: null, rate_card_ref: null };
+  event.outcome = 'partial';
+  event.supersedes_observation_id = null;
+  event.reconciliation_ref = null;
+  return {
+    schemaVersion: '1.0.0', requestId: `ci04a-capability-${randomUUID()}`,
+    idempotencyKey: `ci04a-capability-idempotency-${randomUUID()}`, scope,
+    usageEvent: event, evidenceMode: 'mocked', verificationStatus: 'unverified',
+    evidenceProvenanceRef: `fixture:synthetic:${randomUUID()}`,
+  };
+}
+
 async function append(request, ports, expectedStatus = 'accepted') {
   const result = await appendLedgerEvent(request, ports);
   assert.equal(result.ok, true, result.ok ? '' : `${result.error.code}: ${result.error.safe_message}`);
@@ -213,8 +369,8 @@ test('CI02 ledger persists exact immutable records and rebuilds scoped projectio
     assert.equal(postgresVersion.slice(0, 2), '16', 'ledger acceptance must run on PostgreSQL 16');
     const health = await pool.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
     assert.equal(health.rows[0].migrations_ready, true);
-    assert.equal(Number(health.rows[0].required_migrations_present), 10,
-      'the additive pricing history, accounting projection, CI-05A budget reservation, CI-05B settlement, and CI-05B expiry-reason migrations extend the complete foundation set');
+    assert.equal(Number(health.rows[0].required_migrations_present), 11,
+      'the additive pricing history, accounting projection, CI-05A budget reservation, usage intake, CI-05B settlement, and CI-05B expiry-reason migrations extend the complete foundation set');
 
     const scope = makeScope('union');
     const eventCases = [
@@ -695,7 +851,9 @@ test('CI02 ledger persists exact immutable records and rebuilds scoped projectio
     }
 
     const fixtureBytes = await readFile(fixturePath);
-    const evidencePath = join(root, 'artifacts/evidence/ci02-ledger-acceptance.json');
+    const evidenceDirectory = process.env.CI04A_EVIDENCE_DIR ?? join(root, 'artifacts/evidence');
+    const evidenceName = `ci04a-fix1-ledger-acceptance-${Date.now()}-${process.pid}.json`;
+    const evidencePath = join(evidenceDirectory, evidenceName);
     await mkdir(dirname(evidencePath), { recursive: true });
     await writeFile(evidencePath, `${JSON.stringify({
       evidence_version: '1.0.0',
@@ -1318,6 +1476,10 @@ test('CI02 issue 7 review regressions preserve lineage, reversals, partial usage
     await append(makeRequest(usageScope, {
       amount: '0.10', usage: { completeness: 'complete', missingFields: [], units: [
         { name: 'tokens', quantity: '10', scale: 0, relation: 'standalone' },
+        { name: 'input_tokens', quantity: '6', scale: 0, relation: 'standalone' },
+        { name: 'cached_tokens', quantity: '3', scale: 0, relation: 'included_subset', includedIn: 'input_tokens' },
+        { name: 'output_tokens', quantity: '4', scale: 0, relation: 'standalone' },
+        { name: 'reasoning_tokens', quantity: '2', scale: 0, relation: 'included_subset', includedIn: 'output_tokens' },
       ] },
     }), usagePorts);
     const partialUsage = await project(usageScope, usagePorts, '2026-10-11T03:02:00.000Z');
@@ -1329,11 +1491,20 @@ test('CI02 issue 7 review regressions preserve lineage, reversals, partial usage
     assert.equal(tokenQuantity.knownSubtotal, '160');
     assert.equal(tokenQuantity.totalQuantity, null);
     assert.equal(tokenQuantity.completeness, 'incomplete');
-    const cachedTokens = partialUsage.quantities.find(row => row.eventType === 'expense' && row.unitName === 'cached_tokens');
-    assert.equal(cachedTokens.knownQuantityCount, 0);
-    assert.equal(cachedTokens.unknownQuantityCount, 1);
-    assert.equal(cachedTokens.totalQuantity, null);
-    assert.equal(cachedTokens.completeness, 'incomplete');
+    const cachedForTokens = partialUsage.quantities.find(row => row.eventType === 'expense'
+      && row.unitName === 'cached_tokens' && row.includedIn === 'tokens');
+    assert.equal(cachedForTokens.knownQuantityCount, 0);
+    assert.equal(cachedForTokens.unknownQuantityCount, 1);
+    assert.equal(cachedForTokens.totalQuantity, null);
+    assert.equal(cachedForTokens.completeness, 'incomplete');
+    const cachedForInput = partialUsage.quantities.find(row => row.eventType === 'expense'
+      && row.unitName === 'cached_tokens' && row.includedIn === 'input_tokens');
+    assert.equal(cachedForInput.knownSubtotal, '3');
+    const reasoningForOutput = partialUsage.quantities.find(row => row.eventType === 'expense'
+      && row.unitName === 'reasoning_tokens' && row.includedIn === 'output_tokens');
+    assert.equal(reasoningForOutput.knownSubtotal, '2');
+    assert.equal(amountRow(partialUsage, 'expense', 'direct_cost', 'USD').totalAmount, '0.3',
+      'cache and reasoning subsets remain quantity lineage and do not add to monetary charge totals');
 
     const mappingScope = makeScope('review-source-line-mapping');
     const mappingPorts = makePorts(pool, mappingScope, clock);
@@ -1743,5 +1914,168 @@ test('CI02 issue 7 review regressions preserve lineage, reversals, partial usage
     assert.equal(forbiddenRows.rows[0].total, 0);
   } finally {
     await pool.end().catch(() => {});
+  }
+});
+
+for (const [through, label] of [[6, '0006'], [7, '0007 accounting'], [8, '0008 budget reservations']]) test(`legacy ledger-only ${label} projection omits unavailable intake coverage and preserves its content address`, async () => {
+  let database;
+  let runtime;
+  let observer;
+  try {
+    database = await createProjectionCapabilityDatabase(through);
+    runtime = new Pool({ ...runtimeDatabaseConfigFromEnvironment(), database: database.name, max: 3 });
+    observer = new Client({ ...databaseConfigFromEnvironment('CI_TEST_DB'), database: database.name });
+    await observer.connect();
+    const role = await runtime.query(
+      `SELECT current_user, account.rolsuper, account.rolbypassrls
+       FROM pg_roles account WHERE account.rolname=current_user`,
+    );
+    assert.deepEqual(role.rows[0], { current_user: role.rows[0].current_user, rolsuper: false, rolbypassrls: false },
+      'legacy projection executes through the isolated restricted runtime login');
+
+    const scope = makeScope('legacy-ledger-projection');
+    const clock = { value: fixedTime };
+    const request = makeRequest(scope, { amount: '0.37', occurredAt: '2026-10-11T02:59:00.000Z' });
+    await append(request, makePorts(runtime, scope, clock));
+    const asOf = '2026-10-11T04:00:00.000Z';
+    const projected = await rebuildLedgerProjection({
+      schemaVersion: '1.0.0', requestId: randomId('legacy-projection'), scope, asOf,
+    }, makePorts(runtime, scope, clock));
+    assert.equal(projected.ok, true, projected.ok ? '' : projected.error.code);
+    if (!projected.ok) return;
+    assert.equal(Object.hasOwn(projected.value, 'unresolvedIntake'), false,
+      'pre-intake schema leaves intake coverage unavailable instead of certifying queried zero');
+    assert.equal(projected.value.eventCount, 1);
+    assert.equal(amountRow(projected.value, 'expense', 'direct_cost', 'USD')?.totalAmount, '0.37');
+
+    const source = await observer.query(
+      `SELECT event_id, event_hash FROM cost_intelligence.financial_ledger_events
+       WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4
+         AND ingested_at <= $5 AND financial_effect ORDER BY event_id`,
+      [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, asOf],
+    );
+    const expectedContent = {
+      schemaVersion: '1.0.0', scope, asOf,
+      eventEvidence: source.rows.map(row => ({ eventId: row.event_id, eventHash: row.event_hash })),
+      eventCount: source.rows.length, amounts: projected.value.amounts, quantities: projected.value.quantities,
+    };
+    assert.equal(projected.value.projectionHash, contentAddress(expectedContent),
+      'legacy snapshot content address retains the pre-intake projection shape');
+    const replayed = await rebuildLedgerProjection({
+      schemaVersion: '1.0.0', requestId: randomId('legacy-projection-replay'), scope, asOf,
+    }, makePorts(runtime, scope, clock));
+    assert.equal(replayed.ok, true, replayed.ok ? '' : replayed.error.code);
+    if (replayed.ok) assert.equal(replayed.value.snapshotId, projected.value.snapshotId);
+
+    const storedShape = await observer.query(
+      `SELECT count(*)::integer AS count FROM information_schema.columns
+       WHERE table_schema='cost_intelligence' AND (
+         (table_name='financial_projection_snapshots' AND column_name IN
+           ('unknown_economic_exposure_count', 'quarantined_observation_count', 'awaiting_evidence_attempt_count', 'unposted_attempt_count'))
+         OR (table_name='financial_projection_quantities' AND column_name='included_in'))`,
+    );
+    assert.equal(storedShape.rows[0].count, 0, 'the legacy database remains on its genuine pre-intake schema');
+  } finally {
+    await runtime?.end().catch(() => undefined);
+    await observer?.end().catch(() => undefined);
+    if (database) await dropProjectionCapabilityDatabase(database.name, database.base);
+  }
+});
+
+test('partial current 0009 tables or columns fail projection without hiding unknown intake exposure', async () => {
+  let database;
+  let runtime;
+  let observer;
+  try {
+    database = await createProjectionCapabilityDatabase(9);
+    runtime = new Pool({ ...runtimeDatabaseConfigFromEnvironment(), database: database.name, max: 3 });
+    observer = new Client({ ...databaseConfigFromEnvironment('CI_TEST_DB'), database: database.name });
+    await observer.connect();
+    const role = await runtime.query(
+      `SELECT current_user, account.rolsuper, account.rolcreatedb, account.rolcreaterole,
+              account.rolbypassrls, pg_has_role(current_user, 'ci_finance_owner', 'MEMBER') AS is_owner
+       FROM pg_roles account WHERE account.rolname=current_user`,
+    );
+    assert.deepEqual(role.rows[0], {
+      current_user: role.rows[0].current_user, rolsuper: false, rolcreatedb: false,
+      rolcreaterole: false, rolbypassrls: false, is_owner: false,
+    }, 'partial-schema projection executes through the isolated non-owner runtime login');
+
+    const scope = { ...makeScope('partial-intake-projection'), tenantId: randomUUID(), projectId: randomUUID() };
+    const clock = { value: new Date().toISOString() };
+    const receipt = await ingestUsage(makeUnknownUsageObservation(scope), makePorts(runtime, scope, clock));
+    assert.equal(receipt.ok, true, receipt.ok ? '' : receipt.error.code);
+    if (!receipt.ok) return;
+    assert.equal(receipt.value.status, 'accepted');
+    assert.equal(receipt.value.outboxStatus, 'awaiting_evidence');
+    assert.equal(receipt.value.valuation, 'unknown');
+    const before = await observer.query(
+      `SELECT
+         (SELECT count(*)::integer FROM cost_intelligence.usage_intake_inbox WHERE tenant_id=$1 AND project_id=$2) AS inbox,
+         (SELECT count(*)::integer FROM cost_intelligence.usage_intake_attempts WHERE tenant_id=$1 AND project_id=$2) AS attempts,
+         (SELECT count(*)::integer FROM cost_intelligence.usage_intake_outbox WHERE tenant_id=$1 AND project_id=$2) AS outbox,
+         (SELECT count(*)::integer FROM cost_intelligence.financial_ledger_events WHERE tenant_id=$1 AND project_id=$2) AS ledger,
+         (SELECT count(*)::integer FROM cost_intelligence.financial_projection_snapshots WHERE tenant_id=$1 AND project_id=$2) AS snapshots`,
+      [scope.tenantId, scope.projectId],
+    );
+    assert.deepEqual(before.rows[0], { inbox: 1, attempts: 1, outbox: 1, ledger: 0, snapshots: 0 },
+      'the fixture retains an unresolved economic observation before capability corruption');
+
+    const asOf = new Date(Date.now() + 2_000).toISOString();
+    const ports = makePorts(runtime, scope, clock);
+    const projectionRequest = label => ({
+      schemaVersion: '1.0.0', requestId: randomId(label), scope, asOf,
+    });
+    const authoritative = await rebuildLedgerProjection(projectionRequest('unknown-intake-authoritative-projection'), ports);
+    assert.equal(authoritative.ok, true, authoritative.ok ? '' : authoritative.error.code);
+    if (authoritative.ok) {
+      assert.equal(authoritative.value.eventCount, 0, 'an unknown unpriced observation does not invent a ledger charge');
+      assert.deepEqual(authoritative.value.unresolvedIntake, {
+        unknownEconomicExposureCount: 1, quarantinedObservationCount: 0,
+        awaitingEvidenceAttemptCount: 1, unpostedAttemptCount: 1,
+      }, 'the authoritative current-0009 projection exposes durable unknown economic exposure as of the observation');
+    }
+    const authoritativeSnapshot = await observer.query(
+      `SELECT unknown_economic_exposure_count, quarantined_observation_count,
+              awaiting_evidence_attempt_count, unposted_attempt_count
+       FROM cost_intelligence.financial_projection_snapshots
+       WHERE tenant_id=$1 AND project_id=$2 AND as_of=$3`,
+      [scope.tenantId, scope.projectId, asOf],
+    );
+    assert.deepEqual(authoritativeSnapshot.rows[0], {
+      unknown_economic_exposure_count: 1, quarantined_observation_count: 0,
+      awaiting_evidence_attempt_count: 1, unposted_attempt_count: 1,
+    }, 'the immutable snapshot header stores the same unknown exposure counts');
+    const missingTableResult = async () => rebuildLedgerProjection(projectionRequest('missing-intake-table'), ports);
+    await observer.query('ALTER TABLE cost_intelligence.usage_intake_inbox RENAME TO usage_intake_inbox_partial_test');
+    try {
+      const result = await missingTableResult();
+      assert.equal(result.ok, false, 'a missing intake table cannot be reported as zero unresolved exposure');
+      if (!result.ok) assert.equal(result.error.code, 'SOURCE_UNAVAILABLE');
+    } finally {
+      await observer.query('ALTER TABLE cost_intelligence.usage_intake_inbox_partial_test RENAME TO usage_intake_inbox');
+    }
+
+    await observer.query('ALTER TABLE cost_intelligence.usage_intake_inbox DROP COLUMN provenance_sha256');
+    const missingColumnResult = await rebuildLedgerProjection(projectionRequest('missing-intake-column'), ports);
+    assert.equal(missingColumnResult.ok, false, 'a missing 0009 source-fact column cannot pass as a complete intake projection');
+    if (!missingColumnResult.ok) assert.equal(missingColumnResult.error.code, 'SOURCE_UNAVAILABLE');
+
+    const after = await observer.query(
+      `SELECT count(*)::integer AS snapshots FROM cost_intelligence.financial_projection_snapshots
+       WHERE tenant_id=$1 AND project_id=$2`, [scope.tenantId, scope.projectId],
+    );
+    assert.equal(after.rows[0].snapshots, 1, 'failed partial-capability probes create no additional misleading projection snapshot');
+    const preserved = await observer.query(
+      `SELECT count(*)::integer AS inbox, min(completeness) AS completeness, min(valuation_basis) AS valuation_basis
+       FROM cost_intelligence.usage_intake_inbox WHERE tenant_id=$1 AND project_id=$2`,
+      [scope.tenantId, scope.projectId],
+    );
+    assert.deepEqual(preserved.rows[0], { inbox: 1, completeness: 'incomplete', valuation_basis: 'unknown' },
+      'fail-closed projection leaves unresolved intake facts intact');
+  } finally {
+    await runtime?.end().catch(() => undefined);
+    await observer?.end().catch(() => undefined);
+    if (database) await dropProjectionCapabilityDatabase(database.name, database.base);
   }
 });
