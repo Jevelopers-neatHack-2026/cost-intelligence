@@ -286,7 +286,7 @@ try {
     const logDir = join(root, 'artifacts', 'test-database');
     await mkdir(logDir, { recursive: true });
     await writeFile(join(logDir, `${suite}-${runId}.log`), sanitizedLogs);
-    const removal = exec('docker', ['rm', '--force', containerName]);
+    const removal = exec('docker', ['rm', '--force', '--volumes', containerName]);
     if (removal.status !== 0) {
       finalStatus = 'failed';
       console.error('Disposable PostgreSQL cleanup failed; manual removal is required.');
