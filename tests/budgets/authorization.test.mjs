@@ -4,7 +4,8 @@ import './settlement-integrity.test.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import test from 'node:test';
+import {diagnosticTest} from './static-diagnostics.mjs';
+const test=diagnosticTest('authorization.test.mjs');
 import {
   authorizeReservation, changeBudgetPolicy, readCapacity, markReservationDispatched, normalizedBudgetRequest,
 } from '../../dist/index.js';

@@ -1,10 +1,12 @@
-import test from 'node:test';
+import {diagnosticTest} from './static-diagnostics.mjs';
+const test=diagnosticTest('settlement-integrity.test.mjs');
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Value} from '@sinclair/typebox/value';
 import pg from 'pg';
 import {databaseConfigFromEnvironment} from '../../scripts/test-db-lifecycle.mjs';
 import * as api from '../../dist/budgets/index.js';
+import * as reconciliation from '../../dist/reconciliation/index.js';
 import {appendLedgerEvent} from '../../dist/ledger/store.js';
 import {loadReserveFixture,setBudgetLimit,reservationPool,makeScope,makePorts,reservationRequest,markDispatchedCommand,settleCommand,releaseCommand,FIXED_TIME} from './reservation-harness.mjs';
 import {signedSourceHarness} from './signed-source-harness.mjs';
@@ -142,6 +144,28 @@ test('CI05B public durable recovery visits final/released attempts and authentic
   const changed=await api.reconcileEvidence({...reconcile,actionReference:'different-action'},f.ports);assert.equal(changed.ok,false);assert.equal(changed.error.code,'IDEMPOTENCY_CONFLICT');
   const heads=await f.pool.query(`SELECT count(*)::int AS n,sum(e.amount)::text AS amount FROM cost_intelligence.financial_ledger_events e JOIN cost_intelligence.financial_source_revision_heads h ON h.current_event_id=e.event_id WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.financial_effect`,[f.scope.tenantId,f.scope.projectId]);assert.equal(heads.rows[0].n,1);assert.equal(heads.rows[0].amount,'1.1');
   const cursors=await f.pool.query('SELECT count(*)::int AS n FROM cost_intelligence.budget_recovery_cursors WHERE tenant_id=$1 AND project_id=$2',[f.scope.tenantId,f.scope.projectId]);assert.equal(cursors.rows[0].n,1);
+  const priorReceipts=await f.pool.query('SELECT count(*)::int AS n FROM cost_intelligence.budget_command_receipts WHERE tenant_id=$1 AND project_id=$2',[f.scope.tenantId,f.scope.projectId]);
+  const event=(await f.pool.query(`SELECT e.event_hash FROM cost_intelligence.financial_ledger_events e JOIN cost_intelligence.financial_source_revision_heads h ON h.current_event_id=e.event_id WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.financial_effect`,[f.scope.tenantId,f.scope.projectId])).rows[0];
+  await f.pool.query(`INSERT INTO cost_intelligence.financial_privacy_quarantine(record_kind,record_hash,tenant_id,project_id,environment,billing_mode,reason_code) VALUES('ledger_event',$1,$2,$3,$4,$5,'legacy_sensitive_event_data')`,[event.event_hash,f.scope.tenantId,f.scope.projectId,f.scope.environment,f.scope.billingMode]);
+  const quarantinedReplay=await api.reconcileEvidence(reconcile,f.ports);assert.equal(quarantinedReplay.ok,false);assert.equal(quarantinedReplay.error.code,'RECONCILIATION_PENDING');
+  const afterReceipts=await f.pool.query('SELECT count(*)::int AS n FROM cost_intelligence.budget_command_receipts WHERE tenant_id=$1 AND project_id=$2',[f.scope.tenantId,f.scope.projectId]);assert.deepEqual(afterReceipts.rows,priorReceipts.rows);
+  const immutable=await f.pool.query('SELECT count(*)::int AS n,sum(released_amount)::text AS released FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$1',[f.reservationId]);assert.equal(immutable.rows[0].n,4);assert.equal(immutable.rows[0].released,'0.2');
+ }finally{await f.pool.end();}
+});
+test('CI05B public native reconciliation discovers signed actual/finality and journals immutable complete run without issuing dispatch authority',async()=>{
+ const f=await fixture('native-discovery-run',{native:true,production:true});try{
+  const cost=await f.source.nativeCost('0.8'),finality=await f.source.finality({schemaVersion:'ci-budget-finality-1.0.0',state:'final_billed',dispatchIntentRef:f.dispatch.dispatchIntentRef,cumulativeCostRef:cost,fenceReference:null});
+  let discoveries=0;const collector={...f.source.backend,findAttemptEvidence:async query=>{discoveries++;assert.deepEqual(query.scope,f.scope);assert.deepEqual(query.attempt,f.request.attemptBinding);assert.deepEqual(query.authorityBinding,f.request.authorityBinding);return {reportedCostRefs:[cost],finalityRef:finality};}};
+  const ports={...f.ports,budgets:{...f.ports.budgets,sourceCollector:collector,authorityWaitMs:10000}};
+  const request={schemaVersion:'2.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope:f.scope,currency:'USD',jobReference:'native-discovery-run',expectedCursorRevision:0,pageSize:1,ownerReference:'synthetic-finance-investigator',actionReference:'collect-independent-current-source'};
+  assert.equal(Value.Check(reconciliation.BudgetReconciliationRequestSchema,request),true);
+  const run=await reconciliation.startReconciliation(request,ports);assert.equal(run.ok,true,JSON.stringify(run));assert.equal(run.value.status,'complete');assert.equal(run.value.matchedCount,1);assert.equal(run.value.unresolvedCount,0);assert.equal(run.value.cursorRevision,2);assert.equal(run.value.dispatchEligible,false);assert.equal(discoveries,1);
+  const repeated=await reconciliation.startReconciliation(request,ports);assert.equal(repeated.ok,true,JSON.stringify(repeated));assert.equal(repeated.value.replay,true);assert.equal(discoveries,1);
+  const changed=await reconciliation.startReconciliation({...request,ownerReference:'different-owner'},ports);assert.equal(changed.ok,false);assert.equal(changed.error.code,'IDEMPOTENCY_CONFLICT');assert.equal(discoveries,1);
+  const read=await reconciliation.getReconciliation({schemaVersion:'2.0.0',requestId:randomUUID(),scope:f.scope,runId:run.value.runId},ports);assert.equal(read.ok,true,JSON.stringify(read));assert.equal(read.value.status,'complete');assert.equal(read.value.dispatchEligible,false);
+  const snapshot=await api.getReservationSnapshot({schemaVersion:'2.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId},ports);assert.equal(snapshot.ok,true);assert.equal(snapshot.value.consumedAmount,'0.8');assert.equal(snapshot.value.releasedAmount,'0.2');assert.equal(snapshot.value.outstandingHold,'0');
+  const expenses=await f.pool.query(`SELECT count(*)::int AS n,sum(amount)::text AS amount FROM cost_intelligence.financial_ledger_events WHERE tenant_id=$1 AND project_id=$2 AND financial_effect`,[f.scope.tenantId,f.scope.projectId]);assert.equal(expenses.rows[0].n,1);assert.equal(expenses.rows[0].amount,'0.8');
+  const journals=await f.pool.query('SELECT count(*)::int AS n FROM cost_intelligence.budget_recovery_cursors WHERE tenant_id=$1 AND project_id=$2',[f.scope.tenantId,f.scope.projectId]);assert.equal(journals.rows[0].n,2);
  }finally{await f.pool.end();}
 });
 

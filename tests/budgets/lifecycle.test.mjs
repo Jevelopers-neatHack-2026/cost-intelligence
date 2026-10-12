@@ -1,6 +1,7 @@
 import './settlement-integrity.test.mjs';
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import {diagnosticTest} from './static-diagnostics.mjs';
+const test=diagnosticTest('lifecycle.test.mjs');
 import {
   authorizeReservation, changeBudgetPolicy, readCapacity,
   markReservationDispatched, normalizedBudgetRequest, settleReservation, releaseReservation,

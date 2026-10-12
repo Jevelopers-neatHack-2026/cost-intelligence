@@ -66,3 +66,23 @@ test('public recovery/reconciliation boundaries deny current Finance permission 
   const invalid=await operation({...request,schemaVersion:'invalid'},ports);assert.equal(invalid.ok,false);assert.equal(invalid.error.code,'UNSUPPORTED_VERSION');assert.equal(authorizations,1);
  }
 });
+test('root and reconciliation subpath version2 require current exact grants and refuse caller snapshot authority before discovery',async()=>{
+ const root=await import('../../dist/index.js'),module=await import('../../dist/reconciliation/index.js');
+ assert.equal(root.BudgetReconciliationRequestSchema,module.BudgetReconciliationRequestSchema);assert.equal(root.BudgetReconciliationQuerySchema,module.BudgetReconciliationQuerySchema);
+ const scope={tenantId:randomUUID(),projectId:randomUUID(),environment:'production',billingMode:'simulated',actorId:'synthetic-reconciliation-owner'};
+ const start={schemaVersion:'2.0.0',requestId:randomUUID(),idempotencyKey:randomUUID(),scope,currency:'USD',jobReference:'synthetic-run',expectedCursorRevision:0,pageSize:1,ownerReference:scope.actorId,actionReference:'collect-independent-source'};
+ const query={schemaVersion:'2.0.0',requestId:randomUUID(),scope,runId:`sha256:${'a'.repeat(64)}`};
+ let calls=0,connects=0;const ports={clock:{now:()=>new Date('2026-10-12T12:00:00Z')},trustedContext:{resolve:async()=>scope},
+  budgets:{database:{connect:async()=>{connects++;throw new Error('domain should not open');}}},financeAuthority:{authorizeCurrent:async request=>{
+   calls++;return {status:'denied',decisionId:'synthetic-current-denial',operation:request.operation,permission:request.permission};
+  }}};
+ for(const [operation,request] of [[root.startReconciliation,start],[root.getReconciliation,query]]){
+  const refused=await operation(request,ports);assert.equal(refused.ok,false);assert.equal(refused.error.code,'FORBIDDEN_SCOPE');
+ }
+ assert.equal(calls,2);assert.equal(connects,0);
+ const fakeSnapshots=await root.startReconciliation({...start,sourceSnapshots:[{name:'caller-final-cost',revision:'1',contentHash:`sha256:${'0'.repeat(64)}`,evidenceMode:'live',verificationStatus:'verified'}]},ports);
+ assert.equal(fakeSnapshots.ok,false);assert.equal(fakeSnapshots.error.code,'VALIDATION_ERROR');assert.equal(calls,2);assert.equal(connects,0);
+ ports.financeAuthority.authorizeCurrent=async request=>({status:'allowed',decisionId:'synthetic-current-grant',operation:request.operation,permission:request.permission,scope,
+  principal:{kind:'service',actorId:scope.actorId,serviceStatus:'active',serviceGrantRevision:'synthetic-1'},verifiedAt:'2026-10-12T12:00:00Z',expiresAt:'2026-10-12T12:01:00Z'});
+ const unavailable=await root.startReconciliation(start,ports);assert.equal(unavailable.ok,false);assert.equal(unavailable.error.code,'RECONCILIATION_PENDING');assert.equal(connects,0);
+});

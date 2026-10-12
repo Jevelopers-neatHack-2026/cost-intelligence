@@ -1835,7 +1835,9 @@ export async function reconcileReservationEvidence(value:unknown,ports:BudgetRun
       const initial=await authorizeScopeProof(scope,request.requestId,ports,'reconcileEvidence','reconciliation.startReconciliation');gate.checkpoint();if(!initial.ok)return initial;
       const proofs:TimedBudgetProof[]=[initial.value];
       client=await ports.database.connect();gate.checkpoint();await client.query('BEGIN');transaction=true;
-      await bindFinancialDatabaseScope(client,scope);await bindDeadline(client,gate);await requireBudgetSettlementCapability(client);gate.checkpoint();
+      await bindFinancialDatabaseScope(client,scope);await bindDeadline(client,gate);
+      if(!(await acquirePartitionLock(client,scope,'USD',gate)))return unavailable();
+      await requireBudgetSettlementCapability(client);gate.checkpoint();
       const replay=await client.query(`SELECT command_request,command_receipt FROM cost_intelligence.budget_command_receipts
         WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND idempotency_key=$5`,
         [scope.tenantId,scope.projectId,scope.environment,scope.billingMode,request.idempotencyKey]);
@@ -1877,6 +1879,7 @@ export interface BudgetRecoveryBatch {
   readonly completedCycle:boolean;readonly candidates:readonly {reservationId:string;revision:number;state:ReservationLifecycleState;
     attemptBinding:ReservationRequest['attemptBinding'];authorityBinding:NonNullable<ReservationRequest['authorityBinding']>;
     sourceAuthorityRef:VersionedReference;expiresAt:string;outstandingHold:string}[];
+  readonly unresolvedCandidates?:readonly {reservationId:string;revision:number;reason:'missing_current_source_binding'}[];
 }
 /** Durable keyset progress visits every row, including timestamp ties, rather than repeatedly selecting the oldest hold. */
 export async function recoverReservationBatch(value:unknown,ports:BudgetRuntimePorts):Promise<ApiResult<BudgetRecoveryBatch>>{
@@ -1892,6 +1895,7 @@ export async function recoverReservationBatch(value:unknown,ports:BudgetRuntimeP
       client=await ports.database.connect();gate.checkpoint();await client.query('BEGIN');transaction=true;
       await bindFinancialDatabaseScope(client,scope);await bindDeadline(client,gate);
       if(!(await acquirePartitionLock(client,scope,request.currency,gate)))return unavailable();
+      await requireBudgetSettlementCapability(client);gate.checkpoint();
       const replay=await client.query(`SELECT command_request,command_receipt FROM cost_intelligence.budget_recovery_cursors
         WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND idempotency_key=$5`,
         [scope.tenantId,scope.projectId,scope.environment,scope.billingMode,request.idempotencyKey]);
@@ -1913,15 +1917,18 @@ export async function recoverReservationBatch(value:unknown,ports:BudgetRuntimeP
         [scope.tenantId,scope.projectId,scope.environment,scope.billingMode,request.currency,previous?.after_recorded_at??null,previous?.after_reservation_id??null,request.pageSize+1]);
       const visited=rows.rows.slice(0,request.pageSize),completedCycle=rows.rows.length<=request.pageSize;
       const candidates:BudgetRecoveryBatch['candidates'][number][]=[];
+      const unresolvedCandidates:NonNullable<BudgetRecoveryBatch['unresolvedCandidates']>[number][]=[];
       for(const row of visited){
         gate.checkpoint();const state=await loadReservation(client,scope,asString(row.reservation_id));
         // A final/released hold can still acquire a genuine late charge. Scan the immutable attempt, not just positive holds.
-        if(!state?.authorizationRequest?.sourceAuthorityRef||!state.authorizationRequest.authorityBinding)continue;
+        if(!state?.authorizationRequest?.sourceAuthorityRef||!state.authorizationRequest.authorityBinding){
+          unresolvedCandidates.push({reservationId:asString(row.reservation_id),revision:state?.revision??0,reason:'missing_current_source_binding'});continue;
+        }
         candidates.push({reservationId:asString(row.reservation_id),revision:state.revision,state:stateFor(state.lastType,state.usageFinality),
           attemptBinding:state.authorizationRequest.attemptBinding,authorityBinding:state.authorizationRequest.authorityBinding,sourceAuthorityRef:state.authorizationRequest.sourceAuthorityRef,
           expiresAt:state.financialExpiresAt??state.authorizationRequest.canonicalRequest.expires_at,outstandingHold:formatScaledDecimal(state.held>state.released+state.consumed?state.held-state.released-state.consumed:0n)});
       }
-      const receipt:BudgetRecoveryBatch={schemaVersion:'1.0.0',requestId:request.requestId,status:'applied',cursorRevision:revision+1,completedCycle,candidates};
+      const receipt:BudgetRecoveryBatch={schemaVersion:'1.0.0',requestId:request.requestId,status:'applied',cursorRevision:revision+1,completedCycle,candidates,unresolvedCandidates};
       const last=visited.at(-1);
       const fresh=await refreshScopeProof(scope,request.requestId,ports,'recoverReservations','reconciliation.startReconciliation',gate,proofs);if(!fresh.ok)return fresh;
       if(!currentProofBound(ports,proofs))return unavailable();
@@ -1968,6 +1975,7 @@ export async function actOnBudgetException(value:unknown,ports:BudgetRuntimePort
       const proofs:TimedBudgetProof[]=[initial.value];
       client=await ports.database.connect();gate.checkpoint();await client.query('BEGIN');transaction=true;
       await bindFinancialDatabaseScope(client,scope);await bindDeadline(client,gate);if(!(await acquirePartitionLock(client,scope,'USD',gate)))return unavailable();
+      await requireBudgetSettlementCapability(client);gate.checkpoint();
       const replay=await client.query(`SELECT *,variance_amount::text FROM cost_intelligence.budget_reconciliation_exceptions
         WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND exception_id=$5 AND idempotency_key=$6`,
         [scope.tenantId,scope.projectId,scope.environment,scope.billingMode,request.exceptionId,request.idempotencyKey]);
@@ -2040,6 +2048,8 @@ export async function readBudgetExceptions(value:unknown,ports:BudgetRuntimePort
       const proofs:TimedBudgetProof[]=[initial.value];
       client=await ports.database.connect();gate.checkpoint();await client.query('BEGIN');transaction=true;
       await bindFinancialDatabaseScope(client,scope);await bindDeadline(client,gate);
+      if(!(await acquirePartitionLock(client,scope,'USD',gate)))return unavailable();
+      await requireBudgetSettlementCapability(client);gate.checkpoint();
       const rows=await client.query(`SELECT *,variance_amount::text FROM (
         SELECT DISTINCT ON(exception_id) * FROM cost_intelligence.budget_reconciliation_exceptions
         WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND currency='USD'

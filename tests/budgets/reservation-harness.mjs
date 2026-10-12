@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import {diagnosticBudgetClient} from './static-diagnostics.mjs';
 import { budgetDigest, canonicalBudgetJson } from '../../dist/index.js';
 import { databaseConfigFromEnvironment, runtimeDatabaseConfigFromEnvironment } from '../../scripts/test-db-lifecycle.mjs';
 
@@ -103,7 +104,7 @@ export function makePorts(pool, scope, options = {}) {
     database: {
       connect: async () => {
         if (options.databaseError) throw new Error('synthetic unavailable budget database');
-        return pool.connect();
+        return diagnosticBudgetClient(await pool.connect());
       },
     },
     trustedContext: { resolve: async requested => ({ ...requested }) },
