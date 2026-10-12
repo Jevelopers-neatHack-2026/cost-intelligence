@@ -284,6 +284,8 @@ export async function markDispatched(request: MarkDispatchedCommand, ports: Runt
     return result.ok ? { ok: true, value: result.value } : result;
   } });
 }
+// Legacy abstract-input inference and ReturnType remain stable; concrete v2 inputs keep their exact receipt.
+export function settle(request:SettleReservationCommand,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot>>;
 export function settle(request:VerifiedSettlementRequest,ports:RuntimePorts):Promise<ApiResult<VerifiedSettlementReceipt>>;
 export function settle(request:SettleReservationCommand,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot>>;
 export async function settle(request: SettleReservationCommand|VerifiedSettlementRequest, ports: RuntimePorts): Promise<ApiResult<ReservationSnapshot|VerifiedSettlementReceipt>> {
@@ -304,6 +306,8 @@ export async function settle(request: SettleReservationCommand|VerifiedSettlemen
   }
   return reservationCommand({ request, ports, operation: 'settle', authorityOperation: 'budgets.settle', expectedAction: 'settle', schema: SettleReservationCommandSchema, validate: value => validateSettleReservationCommandBoundary(value) });
 }
+// Legacy abstract-input inference and ReturnType remain stable; concrete v2 inputs keep their exact receipt.
+export function release(request:ReleaseReservationCommand,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot>>;
 export function release(request:VerifiedReleaseRequest,ports:RuntimePorts):Promise<ApiResult<VerifiedSettlementReceipt>>;
 export function release(request:ReleaseReservationCommand,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot>>;
 export async function release(request:ReleaseReservationCommand|VerifiedReleaseRequest,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot|VerifiedSettlementReceipt>>{
@@ -345,6 +349,7 @@ export async function changeBudget(request: BudgetChangeRequest, ports: RuntimeP
     alertThresholdPercent: 80, decisionPolicyVersion: 'ci-budget-policy-1.0.0', decisionReference: r.policyRef, ...(r.replayedStatus?{replayedStatus:r.replayedStatus}:{}) } };
 }
 
+export async function recordExpenseAdjustment(request:ExpenseAdjustmentRequest,ports:RuntimePorts):Promise<ApiResult<PostingReceipt>>;
 export async function recordExpenseAdjustment(request:VerifiedExpenseCorrectionRequest,ports:RuntimePorts):Promise<ApiResult<VerifiedSettlementReceipt>>;
 export async function recordExpenseAdjustment(request:ExpenseAdjustmentRequest,ports:RuntimePorts):Promise<ApiResult<PostingReceipt>>;
 export async function recordExpenseAdjustment(request:ExpenseAdjustmentRequest|VerifiedExpenseCorrectionRequest,ports:RuntimePorts):Promise<ApiResult<PostingReceipt|VerifiedSettlementReceipt>>{
