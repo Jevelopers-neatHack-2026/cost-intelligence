@@ -1599,9 +1599,9 @@ async function inspectBudgetSettlementCapability(client:LedgerTransactionPort,mi
     FROM unnest($1::text[]) AS required(name)`,[SETTLEMENT_TABLES]);
   const constraints=await client.query(`SELECT conname,convalidated,pg_get_constraintdef(oid) AS definition FROM pg_constraint
     WHERE connamespace='cost_intelligence'::regnamespace AND contype='c' AND
-      ((conname='financial_ledger_events_valuation_check' AND conrelid='cost_intelligence.financial_ledger_events'::regclass)
-      OR(conname='usage_intake_inbox_valuation_basis_check' AND conrelid='cost_intelligence.usage_intake_inbox'::regclass)
-      OR(conname='usage_intake_attempts_valuation_basis_check' AND conrelid='cost_intelligence.usage_intake_attempts'::regclass))`);
+      ((conname='financial_ledger_events_valuation_check' AND conrelid=to_regclass('cost_intelligence.financial_ledger_events'))
+      OR(conname='usage_intake_inbox_valuation_basis_check' AND conrelid=to_regclass('cost_intelligence.usage_intake_inbox'))
+      OR(conname='usage_intake_attempts_valuation_basis_check' AND conrelid=to_regclass('cost_intelligence.usage_intake_attempts')))`);
   const hasAny=presence.rows.some(row=>row.present===true)||constraints.rows.some(row=>String(row.definition).includes('provider_reported_unsettled'));
   if(migrationCount!==11){if(hasAny)throw new Error('Settlement artifacts cannot masquerade as legacy finance health.');return;}
   if(presence.rows.length!==7||presence.rows.some(row=>row.present!==true)||constraints.rows.length!==3)throw new Error('Settlement capability is incomplete.');
