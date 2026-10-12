@@ -191,6 +191,35 @@ export function releaseCommand(scope, reservationId, expectedRevision, { amount,
   };
 }
 
+/** A trusted clock fixed at an explicit ISO instant, for exercising lease/expiry maturation. */
+export function clockAt(iso) { return { now: () => new Date(iso) }; }
+
+/** CI-05B expire/operator-revocation command bound to the reservation's original attempt. */
+export function expireCommand(scope, reservationId, expectedRevision, { currency = 'USD', reason = 'operator_revocation', attemptBinding, ...rest } = {}) {
+  const base = lifecycleBase(scope, reservationId, expectedRevision, { attemptBinding, ...rest });
+  return {
+    schemaVersion: '1.0.0', requestId: base.requestId, idempotencyKey: base.idempotencyKey, scope,
+    reservationId, expectedRevision, currency, actorReference: 'ci05b-operator', sourceAuthorityRef: authorityRef(),
+    attemptBinding: base.attemptBinding, reason, evidenceRefs: [authorityRef()],
+  };
+}
+
+/** CI-05B bounded recovery scan request. */
+export function recoveryScanRequest(scope, { agingThresholdMs = 0, maxReservations = 1000, ownerRole = 'finance-reliability', requestId } = {}) {
+  return {
+    schemaVersion: '1.0.0', requestId: requestId ?? `recovery-${randomUUID()}`, scope,
+    agingThresholdMs, maxReservations, ownerRole, actorReference: 'ci05b-recovery-sweeper',
+  };
+}
+
+/** CI-05B reconciliation resolution request. */
+export function resolveReconciliationRequest(scope, reservationId, { disposition = 'held_for_reconciliation', resolution = 'ci05b reconciliation disposition', ownerRole = 'finance-reliability', nextAction = 'none', idempotencyKey, requestId } = {}) {
+  return {
+    schemaVersion: '1.0.0', requestId: requestId ?? `resolve-${randomUUID()}`, idempotencyKey: idempotencyKey ?? `resolve-${randomUUID()}`,
+    scope, reservationId, disposition, resolution, ownerRole, nextAction, actorReference: 'ci05b-reconciler', evidenceRefs: [authorityRef()],
+  };
+}
+
 function fractionScale(value) { return typeof value === 'string' && value.includes('.') ? value.split('.')[1].length : 0; }
 
 /** Valid canonical Settle/Release payload (cloned from the shared fixture) matching the wrapper scope and revision. */

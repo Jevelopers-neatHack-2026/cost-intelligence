@@ -70,7 +70,7 @@
     "test:metering": "npm run build --silent && node scripts/run-suite.mjs metering",
     "test:migrations": "npm run build --silent && node scripts/with-postgres.mjs migrations",
     "test:pricing": "npm run build --silent && node scripts/with-postgres.mjs pricing",
-    "test:reconciliation": "npm run build --silent && node scripts/run-suite.mjs reconciliation",
+    "test:reconciliation": "npm run build --silent && node scripts/with-postgres.mjs reconciliation",
     "test:recovery": "npm run build --silent && node scripts/with-postgres.mjs recovery",
     "test:release": "npm run build --silent && node scripts/with-postgres.mjs release",
     "test:reporting": "npm run build --silent && node scripts/run-suite.mjs reporting",

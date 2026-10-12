@@ -45,6 +45,10 @@ jobs:
         run: npm run test:budgets -- --offline --suite=contention
       - name: Verify budget reservation lifecycle
         run: npm run test:budgets -- --offline --suite=lifecycle
+      - name: Verify crash-safe settlement recovery and no-dispatch fencing
+        run: npm run test:recovery -- --offline
+      - name: Verify reconciliation queue and resolution dispositions
+        run: npm run test:reconciliation -- --offline
       - name: Verify disposable PostgreSQL migration lifecycle
         run: npm run test:migrations -- --offline
       - name: Verify offline API boundary behavior

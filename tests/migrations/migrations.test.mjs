@@ -129,7 +129,7 @@ async function verifyDurability(prefix) {
     assertDisposableMarker(marker.rows);
     const health = await client.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
     assert.equal(health.rows[0].migrations_ready, true);
-    assert.equal(Number(health.rows[0].required_migrations_present), 8);
+    assert.equal(Number(health.rows[0].required_migrations_present), 9);
     await client.query('CREATE TABLE IF NOT EXISTS ci_test.foundation_durable_probe (probe_id uuid PRIMARY KEY, payload text NOT NULL)');
     await client.query('INSERT INTO ci_test.foundation_durable_probe(probe_id, payload) VALUES ($1, $2)', [probeId, `verified:${prefix}`]);
   } finally {
@@ -527,10 +527,11 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
     { version: '0006_finance_security_roles', status: 'applied' },
     { version: '0007_accounting_projection_snapshots', status: 'applied' },
     { version: '0008_budget_reservations', status: 'applied' },
+    { version: '0009_budget_reservation_settlement', status: 'applied' },
   ]);
 
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(names.length, 8, 'foundation migration suite must exercise fresh creation, an additive security upgrade, the additive accounting projection migration, and the additive CI-05A budget reservation migration');
+  assert.equal(names.length, 9, 'foundation migration suite must exercise fresh creation, an additive security upgrade, the additive accounting projection migration, the additive CI-05A budget reservation migration, and the additive CI-05B settlement/reconciliation migration');
   for (const prefix of ['CI_TEST_DB', 'CI_TEST_PREVIOUS_DB']) {
     const client = new Client(databaseConfigFromEnvironment(prefix));
     await client.connect();
@@ -619,6 +620,36 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
       );
       assert.deepEqual(pricingTriggers.rows.map(row => row.trigger_name), [...requiredPricingTriggers].sort(),
         'rate cards, rules, and FX records must reject update, delete, and truncate');
+      // CI-05B additive settlement/reconciliation schema (migration 0009).
+      const budgetColumns = await client.query(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema = 'cost_intelligence' AND table_name = 'budget_reservation_events'
+           AND column_name = ANY($1::text[]) ORDER BY column_name`,
+        [['expires_at', 'worker_lease_id', 'worker_lease_expires_at']],
+      );
+      assert.deepEqual(budgetColumns.rows.map(row => row.column_name), ['expires_at', 'worker_lease_expires_at', 'worker_lease_id'],
+        'CI-05B adds a financial expiry and a separate worker lease to the budget event log');
+      const reconciliationTable = await client.query(
+        `SELECT table_name FROM information_schema.tables
+         WHERE table_schema = 'cost_intelligence' AND table_name = 'budget_reconciliation_exceptions'`,
+      );
+      assert.equal(reconciliationTable.rowCount, 1, 'the append-only reconciliation/exception queue is installed');
+      const budgetTriggers = await client.query(
+        `SELECT t.tgname::text AS trigger_name
+         FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+         WHERE n.nspname = 'cost_intelligence' AND t.tgname::text = ANY($1::text[]) AND NOT t.tgisinternal
+         ORDER BY t.tgname`,
+        [['budget_reconciliation_exceptions_append_only', 'budget_reconciliation_exceptions_no_truncate']],
+      );
+      assert.deepEqual(budgetTriggers.rows.map(row => row.trigger_name),
+        ['budget_reconciliation_exceptions_append_only', 'budget_reconciliation_exceptions_no_truncate'],
+        'the reconciliation queue rejects update, delete, and truncate of financial state');
+      const partialUnique = await client.query(
+        `SELECT indexname FROM pg_indexes
+         WHERE schemaname = 'cost_intelligence' AND indexname = 'budget_reservation_events_billable_attempt_unique'`,
+      );
+      assert.equal(partialUnique.rowCount, 1, 'the first-event billable attempt binding is unique per partition');
+
       const health = await client.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
       assert.equal(health.rows[0].migrations_ready, true);
       assert.equal(Number(health.rows[0].required_migrations_present), names.length);
@@ -839,7 +870,7 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
 test('0006 rejects pre-existing runtime role graphs and ACL escalation before a restricted-login upgrade', async () => {
   assert.ok(process.env.CI_TEST_DB_HOST, 'role-upgrade audit requires the disposable PostgreSQL harness');
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(names.length, 8);
+  assert.equal(names.length, 9);
   const migrationName = names[5];
   const { name, base, config } = await createPre0006Database();
   const admin = new Client(config);
@@ -2003,7 +2034,7 @@ test('0006 rejects pre-existing runtime role graphs and ACL escalation before a 
 
 test('legacy financial privacy upgrade preserves immutable economics and fails affected scopes closed', async () => {
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
-  assert.equal(names.length, 8);
+  assert.equal(names.length, 9);
   const { name, base, config } = await createPre0006Database();
   let admin;
   let seedPool;

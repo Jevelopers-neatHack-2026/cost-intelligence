@@ -81,6 +81,14 @@ export interface BudgetRuntimePorts {
   readonly financeAuthority?: FinanceAuthorizationPort;
   /** Bounded wait for the partition authority lock before returning unavailable. */
   readonly authorityWaitMs?: number;
+  /**
+   * CI-05B: optional financial expiry window, in milliseconds, stamped on a hold
+   * at authorization. This is the hold's FINANCIAL expiry (authoritative budget
+   * state), independent of any worker lease TTL. A never-dispatched hold whose
+   * financial expiry has matured may be released only through an authoritative,
+   * fenced `expireReservation`. Omitted means the hold never auto-expires.
+   */
+  readonly financialExpiryMs?: number;
 }
 
 const VersionedReferenceSchema = Type.Object({
@@ -181,6 +189,23 @@ function makeError(operation: string, code: ErrorEnvelope['code'], requestId: st
   return errorEnvelope('budgets', operation, code, requestId, message, retryable);
 }
 
+/**
+ * A PostgreSQL unique-violation (SQLSTATE 23505). This is a lost-update race on
+ * one of the budget idempotency/uniqueness bindings (the idempotency key, the
+ * monotonic sequence, or the CI-05B partial unique on the first event's
+ * billable attempt). It is a deterministic, typed conflict — not a transient
+ * outage — so it must surface as IDEMPOTENCY_CONFLICT and never be masked as
+ * a retryable "unavailable".
+ */
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && (error as { code?: unknown }).code === '23505';
+}
+
+function uniqueViolationConstraint(error: unknown): string {
+  return typeof error === 'object' && error !== null && typeof (error as { constraint?: unknown }).constraint === 'string'
+    ? (error as { constraint: string }).constraint : 'unknown';
+}
+
 function asString(value: unknown): string {
   if (typeof value !== 'string') throw new Error('Database returned an unexpected budget value.');
   return value;
@@ -265,6 +290,14 @@ async function runBounded<T>(waitMs: number, onTimeout: () => T, body: (gate: De
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+/** The financial expiry timestamp to stamp on a new hold, or null when no window is configured. */
+function financialExpiresAt(ports: BudgetRuntimePorts, now: Date): string | null {
+  const ms = ports.financialExpiryMs;
+  if (ms === undefined) return null;
+  if (!(typeof ms === 'number' && Number.isInteger(ms) && ms > 0)) return null;
+  return new Date(now.getTime() + ms).toISOString();
 }
 
 function trustedNow(ports: BudgetRuntimePorts): Date | null {
@@ -748,9 +781,9 @@ export async function authorizeReservation(
            event_type, decision_status, held_amount, consumed_amount, released_amount, estimate_completeness, known_subtotal,
            bounded_maximum, allow_partial, partial_allowed_amount, usage_finality, settlement_sequence, policy_version_id,
            rate_card_ref, policy_ref, idempotency_key, expected_revision, actor_reference, source_authority_ref,
-           attempt_binding, logical_operation_id, billable_attempt_id, content_hash)
+           attempt_binding, logical_operation_id, billable_attempt_id, content_hash, expires_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,1,$8,$9,$10::numeric,0,0,$11,$12::numeric,$13::numeric,$14,$15,'unknown',NULL,$16,
-           $17::jsonb,$18::jsonb,$19,NULL,$20,$21::jsonb,$22::jsonb,$23,$24,$25)`,
+           $17::jsonb,$18::jsonb,$19,NULL,$20,$21::jsonb,$22::jsonb,$23,$24,$25,$26::timestamptz)`,
         [eventId, scope.tenantId, scope.projectId, scope.environment, scope.billingMode, currency, reservationId,
           status === 'authorized' ? 'authorized' : 'partially_authorized', status,
           formatScaledDecimal(hold), request.estimate.completeness, request.estimate.knownSubtotal,
@@ -760,7 +793,8 @@ export async function authorizeReservation(
           request.estimate.rateCardRef === null ? null : JSON.stringify(request.estimate.rateCardRef),
           JSON.stringify(policyRef), request.idempotencyKey, scope.actorId,
           JSON.stringify({ actorId: scope.actorId, authority: 'budget.reservation.authorize', policyVersionId: capacity.policy.id }),
-          JSON.stringify(request.attemptBinding), request.attemptBinding.logicalOperationId, request.attemptBinding.billableAttemptId, contentHash],
+          JSON.stringify(request.attemptBinding), request.attemptBinding.logicalOperationId, request.attemptBinding.billableAttemptId, contentHash,
+          financialExpiresAt(ports, now)],
       );
       gate.beginCommit();
       await client.query('COMMIT'); inTransaction = false;
@@ -769,8 +803,15 @@ export async function authorizeReservation(
         ok: true,
         value: buildDecision({ requestId, request, currency, now, status, reservationId, held: hold, available: availableAfter, partialAllowed, policyRef, rateCardRef: request.estimate.rateCardRef }),
       };
-    } catch {
+    } catch (error) {
       if (client && inTransaction) await rollback(client);
+      // A unique-violation on the first-event billable attempt binding (or the
+      // idempotency key) is a typed conflict, never a transient outage: a second
+      // authorization can never reuse one billable attempt for a different hold.
+      if (isUniqueViolation(error)) {
+        return failure(makeError('authorize', 'IDEMPOTENCY_CONFLICT', requestId,
+          `This billable attempt or idempotency key is already bound to a reservation (${uniqueViolationConstraint(error)}); retry the identical request to replay the existing hold.`));
+      }
       return unavailable();
     } finally {
       client?.release();
@@ -836,6 +877,20 @@ interface ReservationState {
   readonly firstType: string;
   /** The attempt binding persisted with the authorization. */
   readonly originalBinding: unknown;
+  /** CI-05B: financial expiry of the hold (NULL = never auto-expires). Separate from the worker lease. */
+  readonly expiresAt: Date | null;
+  /** CI-05B: the latest worker lease id bound at dispatch; operational, never a financial release trigger. */
+  readonly workerLeaseId: string | null;
+  /** CI-05B: the latest worker lease expiry; a lapse here never releases the hold. */
+  readonly workerLeaseExpiresAt: Date | null;
+  /** CI-05B: the most recent activity timestamp, used for bounded recovery aging. */
+  readonly lastRecordedAt: Date | null;
+}
+
+function toDate(value: unknown): Date | null {
+  if (value === null || value === undefined) return null;
+  const date = value instanceof Date ? value : new Date(String(value));
+  return Number.isFinite(date.getTime()) ? date : null;
 }
 
 async function loadReservation(client: BudgetTransactionPort, scope: TrustedScope, reservationId: string): Promise<ReservationState | null> {
@@ -847,7 +902,11 @@ async function loadReservation(client: BudgetTransactionPort, scope: TrustedScop
             (array_agg(usage_finality ORDER BY event_sequence DESC))[1] AS last_finality,
             bool_or(event_type = 'dispatched') AS ever_dispatched,
             (array_agg(event_type ORDER BY event_sequence ASC))[1] AS first_type,
-            (array_agg(attempt_binding ORDER BY event_sequence ASC))[1] AS original_binding
+            (array_agg(attempt_binding ORDER BY event_sequence ASC))[1] AS original_binding,
+            max(expires_at) AS expires_at,
+            (array_agg(worker_lease_id ORDER BY event_sequence DESC) FILTER (WHERE worker_lease_id IS NOT NULL))[1] AS worker_lease_id,
+            (array_agg(worker_lease_expires_at ORDER BY event_sequence DESC) FILTER (WHERE worker_lease_expires_at IS NOT NULL))[1] AS worker_lease_expires_at,
+            max(recorded_at) AS last_recorded_at
      FROM cost_intelligence.budget_reservation_events
      WHERE tenant_id = $1 AND project_id = $2 AND environment = $3 AND billing_mode = $4 AND reservation_id = $5
      GROUP BY currency, policy_version_id`,
@@ -865,6 +924,10 @@ async function loadReservation(client: BudgetTransactionPort, scope: TrustedScop
     everDispatched: row.ever_dispatched === true,
     firstType: fromRow(row, 'first_type') ?? '',
     originalBinding: row.original_binding ?? null,
+    expiresAt: toDate(row.expires_at),
+    workerLeaseId: row.worker_lease_id === null || row.worker_lease_id === undefined ? null : asString(row.worker_lease_id),
+    workerLeaseExpiresAt: toDate(row.worker_lease_expires_at),
+    lastRecordedAt: toDate(row.last_recorded_at),
   };
 }
 
@@ -892,13 +955,14 @@ function outcomeFrom(requestId: string, status: ReservationCommandOutcome['statu
   };
 }
 
-type CommandKind = 'mark_dispatched' | 'settle' | 'release';
+type CommandKind = 'mark_dispatched' | 'settle' | 'release' | 'expire';
 
 /** The normalized identity of a lifecycle command, compared against the stored event on replay. */
 interface CommandIdentity {
-  readonly eventType: 'dispatched' | 'settled' | 'released';
-  readonly consumed: bigint;
-  readonly released: bigint;
+  readonly eventType: 'dispatched' | 'settled' | 'released' | 'expired';
+  readonly consumed: bigint | null;
+  /** Null means the released amount is derived at apply time (e.g. expiry of the whole remaining hold) and is not compared on replay. */
+  readonly released: bigint | null;
   readonly usageFinality: 'unknown' | 'partial' | 'final' | null;
   readonly settlementSequence: number | null;
 }
@@ -908,6 +972,8 @@ async function applyCommand(args: {
   currency: string; actorReference: string; sourceAuthorityRef: VersionedReference; attemptBinding: Record<string, unknown>;
   logicalOperationId: string; billableAttemptId: string; kind: CommandKind; identity: CommandIdentity;
   ports: BudgetRuntimePorts; operation: string; authority: FinanceOperation;
+  /** CI-05B: worker lease persisted at dispatch, kept strictly separate from the financial expiry. */
+  workerLeaseId?: string | null; workerLeaseExpiresAt?: string | null;
   compute(state: ReservationState): { eventType: string; consumed: bigint; released: bigint; usageFinality: 'unknown' | 'partial' | 'final'; settlementSequence: number | null } | { reject: ErrorEnvelope };
 }): Promise<ApiResult<ReservationCommandOutcome>> {
   const { ports, scope, requestId } = args;
@@ -964,8 +1030,8 @@ async function applyCommand(args: {
           && fromRow(row, 'currency') === effectiveCurrency
           && Number(row.expected_revision) === args.expectedRevision
           && sameJson(row.attempt_binding, args.attemptBinding)
-          && parseScaledDecimal(fromRow(row, 'consumed_amount') ?? '-1') === identity.consumed
-          && parseScaledDecimal(fromRow(row, 'released_amount') ?? '-1') === identity.released
+          && (identity.consumed === null || parseScaledDecimal(fromRow(row, 'consumed_amount') ?? '-1') === identity.consumed)
+          && (identity.released === null || parseScaledDecimal(fromRow(row, 'released_amount') ?? '-1') === identity.released)
           && (identity.usageFinality === null || fromRow(row, 'usage_finality') === identity.usageFinality)
           && (identity.settlementSequence === null ? row.settlement_sequence === null || row.settlement_sequence === undefined
             : Number(row.settlement_sequence) === identity.settlementSequence);
@@ -1012,21 +1078,27 @@ async function applyCommand(args: {
            event_type, decision_status, held_amount, consumed_amount, released_amount, estimate_completeness, known_subtotal,
            bounded_maximum, allow_partial, partial_allowed_amount, usage_finality, settlement_sequence, policy_version_id,
            rate_card_ref, policy_ref, idempotency_key, expected_revision, actor_reference, source_authority_ref,
-           attempt_binding, logical_operation_id, billable_attempt_id, content_hash)
+           attempt_binding, logical_operation_id, billable_attempt_id, content_hash,
+           worker_lease_id, worker_lease_expires_at)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NULL,0,$10::numeric,$11::numeric,NULL,NULL,NULL,false,NULL,$12,$13,$14,
-           NULL,$15::jsonb,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22,$23)`,
+           NULL,$15::jsonb,$16,$17,$18,$19::jsonb,$20::jsonb,$21,$22,$23,$24,$25::timestamptz)`,
         [eventId, scope.tenantId, scope.projectId, scope.environment, scope.billingMode, effectiveCurrency, args.reservationId, nextSequence,
           computed.eventType, formatScaledDecimal(computed.consumed), formatScaledDecimal(computed.released), computed.usageFinality,
           computed.settlementSequence, state.policyVersionId, JSON.stringify(args.sourceAuthorityRef), args.idempotencyKey,
           args.expectedRevision, args.actorReference, JSON.stringify(args.sourceAuthorityRef), JSON.stringify(args.attemptBinding),
-          args.logicalOperationId, args.billableAttemptId, contentHash],
+          args.logicalOperationId, args.billableAttemptId, contentHash,
+          args.workerLeaseId ?? null, args.workerLeaseExpiresAt ?? null],
       );
       const refreshed = await loadReservation(client, scope, args.reservationId);
       gate.beginCommit();
       await client.query('COMMIT'); inTransaction = false;
       return { ok: true, value: outcomeFrom(requestId, 'applied', args.reservationId, refreshed ?? state) };
-    } catch {
+    } catch (error) {
       if (client && inTransaction) await rollback(client);
+      if (isUniqueViolation(error)) {
+        return failure(makeError(args.operation, 'IDEMPOTENCY_CONFLICT', requestId,
+          `A concurrent reservation command already bound this idempotency or attempt key (${uniqueViolationConstraint(error)}); retry the identical request to replay or reconcile.`));
+      }
       return unavailable();
     } finally {
       client?.release();
@@ -1045,6 +1117,10 @@ export async function markReservationDispatched(value: unknown, ports: BudgetRun
     attemptBinding: request.attemptBinding as unknown as Record<string, unknown>,
     logicalOperationId: request.attemptBinding.logicalOperationId, billableAttemptId: request.attemptBinding.billableAttemptId,
     kind: 'mark_dispatched', ports, operation: 'markDispatched', authority: 'budgets.markDispatched',
+    // Persist the operational worker lease SEPARATELY from the financial expiry.
+    // A lapse of this lease never releases the hold; only an authoritative
+    // financial event (settle/release/expire) changes the budget disposition.
+    workerLeaseId: request.workerLeaseId, workerLeaseExpiresAt: request.workerLeaseExpiresAt,
     identity: { eventType: 'dispatched', consumed: 0n, released: 0n, usageFinality: 'unknown', settlementSequence: null },
     compute(state) {
       if (state.lastType !== 'authorized' && state.lastType !== 'partially_authorized') {
@@ -1168,6 +1244,567 @@ export async function releaseReservation(value: unknown, ports: BudgetRuntimePor
       }
       return { eventType: 'released', consumed: 0n, released: releaseAmount, usageFinality: state.usageFinality, settlementSequence: null };
     },
+  });
+}
+
+/* ------------------------------------------------------------------ *
+ * CI-05B settlement, expiry, recovery and reconciliation.
+ * ------------------------------------------------------------------ */
+
+const LifecycleScopeSchema = Type.Object({
+  tenantId: Type.String({ minLength: 1, maxLength: 128 }), projectId: Type.String({ minLength: 1, maxLength: 128 }),
+  environment: Type.Union([Type.Literal('development'), Type.Literal('test'), Type.Literal('production')]),
+  billingMode: Type.Union([Type.Literal('live'), Type.Literal('sandbox'), Type.Literal('simulated')]),
+  actorId: Type.String({ minLength: 1, maxLength: 128 }),
+}, { additionalProperties: false });
+
+const LifecycleAttemptBindingSchema = Type.Object({
+  logicalOperationId: Type.String({ minLength: 1 }), transportAttemptId: Type.String({ minLength: 1 }),
+  providerRequestId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]), providerAttemptId: Type.String({ minLength: 1 }),
+  billableAttemptId: Type.String({ minLength: 1 }),
+}, { additionalProperties: false });
+
+/** The current lifecycle state exposed to consumers for revalidation (CI-05B consumer gap 1). */
+export type ReservationViewState =
+  'held' | 'dispatched' | 'outcome_unknown' | 'partially_settled' | 'settled' | 'released' | 'expired' | 'absent';
+
+export interface ReservationStateView {
+  readonly schemaVersion: '1.0.0';
+  readonly requestId: string;
+  readonly reservationId: string;
+  readonly exists: boolean;
+  /** The CURRENT state projected from the whole event log, never the first (authorization) event. */
+  readonly state: ReservationViewState;
+  readonly currency: string | null;
+  readonly heldAmount: string;
+  readonly consumedAmount: string;
+  readonly releasedAmount: string;
+  readonly outstandingHold: string;
+  readonly overrunAmount: string;
+  readonly usageFinality: 'unknown' | 'partial' | 'final';
+  readonly revision: number;
+  readonly everDispatched: boolean;
+  readonly financialExpiresAt: string | null;
+  readonly financialExpiryMatured: boolean;
+  readonly workerLeaseId: string | null;
+  readonly workerLeaseExpiresAt: string | null;
+  /** True once the operational worker lease has lapsed; this NEVER releases the hold on its own. */
+  readonly workerLeaseExpired: boolean;
+}
+
+/** The current snapshot state, deriving `outcome_unknown` for a dispatched hold whose worker lease has lapsed. */
+function currentViewState(state: ReservationState, now: Date | null): ReservationViewState {
+  const base = stateFor(state.lastType, state.usageFinality);
+  if (base === 'dispatched' && now && state.workerLeaseExpiresAt && now.getTime() >= state.workerLeaseExpiresAt.getTime()) {
+    return 'outcome_unknown';
+  }
+  return base;
+}
+
+/**
+ * CI-05B consumer gap 1: a scoped, read-only current-state read for ONE
+ * reservation. Unlike the authorization idempotency replay (which reports the
+ * ORIGINAL first-event decision), this projects the whole event log, so a
+ * settled or released reservation reads `settled`/`released`, never `held`.
+ */
+export async function readReservationState(
+  scope: TrustedScope,
+  reservationId: string,
+  requestId: string,
+  ports: BudgetRuntimePorts,
+): Promise<ApiResult<ReservationStateView>> {
+  const waitMs = resolveWaitMs(ports);
+  if (waitMs === null) return invalidWaitFailure('readReservationState', requestId);
+  const unavailable = (): ApiResult<ReservationStateView> => failure(makeError('readReservationState', 'BUDGET_UNAVAILABLE', requestId,
+    'The reservation state read is temporarily unavailable; retry.', true));
+
+  return runBounded(waitMs, unavailable, async gate => {
+    let client: BudgetTransactionPort | undefined;
+    let inTransaction = false;
+    try {
+      const authorizationError = await authorizeScope(scope, requestId, ports, 'readReservationState', 'budgets.authorize');
+      gate.checkpoint();
+      if (authorizationError) return failure(authorizationError);
+      const now = trustedNow(ports);
+      client = await ports.database.connect();
+      gate.checkpoint();
+      await client.query('BEGIN');
+      inTransaction = true;
+      await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+      await bindFinancialDatabaseScope(client, scope);
+      await bindDeadline(client, gate);
+      const state = await loadReservation(client, scope, reservationId);
+      gate.beginCommit();
+      await client.query('COMMIT'); inTransaction = false;
+      if (!state) {
+        return {
+          ok: true,
+          value: {
+            schemaVersion: '1.0.0', requestId, reservationId, exists: false, state: 'absent', currency: null,
+            heldAmount: '0', consumedAmount: '0', releasedAmount: '0', outstandingHold: '0', overrunAmount: '0',
+            usageFinality: 'unknown', revision: 0, everDispatched: false, financialExpiresAt: null, financialExpiryMatured: false,
+            workerLeaseId: null, workerLeaseExpiresAt: null, workerLeaseExpired: false,
+          },
+        };
+      }
+      const outstanding = state.held - state.released - state.consumed;
+      const leaseExpired = Boolean(now && state.workerLeaseExpiresAt && now.getTime() >= state.workerLeaseExpiresAt.getTime());
+      const financialMatured = Boolean(now && state.expiresAt && now.getTime() >= state.expiresAt.getTime());
+      return {
+        ok: true,
+        value: {
+          schemaVersion: '1.0.0', requestId, reservationId, exists: true, state: currentViewState(state, now),
+          currency: state.currency, heldAmount: formatScaledDecimal(state.held), consumedAmount: formatScaledDecimal(state.consumed),
+          releasedAmount: formatScaledDecimal(state.released),
+          outstandingHold: formatScaledDecimal(outstanding > 0n ? outstanding : 0n),
+          overrunAmount: formatScaledDecimal(state.consumed > state.held ? state.consumed - state.held : 0n),
+          usageFinality: state.usageFinality, revision: state.revision, everDispatched: state.everDispatched,
+          financialExpiresAt: state.expiresAt ? state.expiresAt.toISOString() : null, financialExpiryMatured: financialMatured,
+          workerLeaseId: state.workerLeaseId, workerLeaseExpiresAt: state.workerLeaseExpiresAt ? state.workerLeaseExpiresAt.toISOString() : null,
+          workerLeaseExpired: leaseExpired,
+        },
+      };
+    } catch {
+      if (client && inTransaction) await rollback(client);
+      return unavailable();
+    } finally {
+      client?.release();
+    }
+  });
+}
+
+export const ExpireReservationCommandSchema = Type.Object({
+  schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1, maxLength: 128 }),
+  idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }), scope: LifecycleScopeSchema,
+  reservationId: Type.String({ minLength: 1 }), expectedRevision: Type.Integer({ minimum: 0 }),
+  currency: Type.String({ pattern: '^[A-Z]{3}$' }),
+  actorReference: Type.String({ minLength: 1, maxLength: 200 }), sourceAuthorityRef: VersionedReferenceSchema,
+  attemptBinding: LifecycleAttemptBindingSchema,
+  // `financial_expiry` releases only a never-dispatched hold whose financial expiry has matured;
+  // `operator_revocation` cancels a never-dispatched hold under explicit authority. Neither can
+  // ever touch a dispatched/unknown hold.
+  reason: Type.Union([Type.Literal('financial_expiry'), Type.Literal('operator_revocation')]),
+  evidenceRefs: Type.Array(VersionedReferenceSchema, { minItems: 1, maxItems: 100 }),
+}, { additionalProperties: false });
+export type ExpireReservationCommand = Static<typeof ExpireReservationCommandSchema>;
+
+/**
+ * CI-05B.3 / consumer gap 2: expire (or operator-revoke) a hold. This is the
+ * only authoritative path that frees a never-dispatched hold, and it requires
+ * no-dispatch fencing: the durable state must still be `held` with no dispatch
+ * ever recorded, and the whole remaining hold is released so a late worker is
+ * fenced out. A dispatched or outcome-unknown hold is NEVER expired; a lapsed
+ * worker lease never reaches here. The financial expiry (`expires_at`) is honored
+ * independently of any worker lease TTL.
+ */
+export async function expireReservation(value: unknown, ports: BudgetRuntimePorts): Promise<ApiResult<ReservationCommandOutcome>> {
+  const { Value } = requireValue();
+  if (!Value.Check(ExpireReservationCommandSchema, value)) {
+    return failure(makeError('expire', 'VALIDATION_ERROR', requestIdOf(value), 'The expire command does not match the published schema.'));
+  }
+  const request = value as ExpireReservationCommand;
+  const now = trustedNow(ports);
+  return applyCommand({
+    requestId: request.requestId, idempotencyKey: request.idempotencyKey, scope: request.scope as unknown as TrustedScope,
+    reservationId: request.reservationId, expectedRevision: request.expectedRevision, currency: request.currency,
+    actorReference: request.actorReference, sourceAuthorityRef: request.sourceAuthorityRef as VersionedReference,
+    attemptBinding: request.attemptBinding as unknown as Record<string, unknown>,
+    logicalOperationId: request.attemptBinding.logicalOperationId, billableAttemptId: request.attemptBinding.billableAttemptId,
+    kind: 'expire', ports, operation: 'expire', authority: 'budgets.release',
+    identity: { eventType: 'expired', consumed: 0n, released: null, usageFinality: null, settlementSequence: null },
+    compute(state) {
+      if (!sameJson(state.originalBinding, request.attemptBinding)) return attemptMismatch('expire', request.requestId);
+      const remaining = state.held - state.released - state.consumed;
+      const floorRemaining = remaining > 0n ? remaining : 0n;
+      const preserved = (message: string) => ({ reject: makeError('expire', 'BUDGET_UNAVAILABLE', request.requestId, `${message} The hold is preserved.`) });
+      if (state.lastType === 'released' || state.lastType === 'expired') {
+        return { reject: makeError('expire', 'VALIDATION_ERROR', request.requestId, 'A released or expired reservation has no outstanding hold to expire.') };
+      }
+      const held = state.lastType === 'authorized' || state.lastType === 'partially_authorized';
+      // No-dispatch fencing: only a never-dispatched, still-held reservation may expire.
+      if (state.everDispatched || !held) {
+        return preserved('Expiry is refused: the durable state shows dispatch or an unresolved outcome; an in-flight or unknown hold is never expired.');
+      }
+      if (request.reason === 'financial_expiry') {
+        if (!state.expiresAt) return { reject: makeError('expire', 'VALIDATION_ERROR', request.requestId, 'No financial expiry is configured for this hold; financial_expiry is not applicable.') };
+        if (!now || now.getTime() < state.expiresAt.getTime()) return preserved('The financial expiry has not matured.');
+      }
+      return { eventType: 'expired', consumed: 0n, released: floorRemaining, usageFinality: state.usageFinality, settlementSequence: null };
+    },
+  });
+}
+
+/* -------------------------------- recovery scan + reconciliation queue -------------------------------- */
+
+export const RecoveryScanRequestSchema = Type.Object({
+  schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1, maxLength: 128 }), scope: LifecycleScopeSchema,
+  agingThresholdMs: Type.Integer({ minimum: 0, maximum: 2_147_483_647 }),
+  maxReservations: Type.Integer({ minimum: 1, maximum: 10_000 }),
+  ownerRole: Type.String({ minLength: 1, maxLength: 120 }), actorReference: Type.String({ minLength: 1, maxLength: 200 }),
+}, { additionalProperties: false });
+export type RecoveryScanRequest = Static<typeof RecoveryScanRequestSchema>;
+
+export interface RecoveryScanEntry {
+  readonly reservationId: string;
+  readonly currency: string;
+  readonly state: ReservationViewState;
+  readonly category: string;
+  readonly severity: 'review' | 'variance' | 'blocking';
+  readonly disposition: 'opened' | 'already_open';
+  readonly outstandingHold: string;
+}
+
+export interface RecoveryScanResult {
+  readonly schemaVersion: '1.0.0';
+  readonly requestId: string;
+  readonly scanId: string;
+  readonly scannedReservations: number;
+  readonly opened: number;
+  readonly alreadyOpen: number;
+  readonly bounded: boolean;
+  readonly entries: readonly RecoveryScanEntry[];
+}
+
+interface RecoveryCandidate {
+  reservationId: string; currency: string; held: bigint; released: bigint; consumed: bigint;
+  lastType: string; lastFinality: 'unknown' | 'partial' | 'final'; everDispatched: boolean;
+  lastRecordedAt: Date | null; expiresAt: Date | null; workerLeaseExpiresAt: Date | null; ageMs: number;
+}
+
+/**
+ * CI-05B.4: a bounded, durable, rerunnable recovery scan. It ages unresolved
+ * holds (in-flight/unknown, and never-dispatched holds whose financial expiry
+ * has matured) into the append-only reconciliation queue with owner, next
+ * action and evidence. It NEVER releases a hold: a worker crash, cancellation,
+ * lease lapse, timeout or missing usage only produces a reconciliation record.
+ * Rerunning is a no-op for a reservation that already has an open exception.
+ */
+export async function runRecoveryScan(value: unknown, ports: BudgetRuntimePorts): Promise<ApiResult<RecoveryScanResult>> {
+  const { Value } = requireValue();
+  if (!Value.Check(RecoveryScanRequestSchema, value)) {
+    return failure(makeError('recoveryScan', 'VALIDATION_ERROR', requestIdOf(value), 'The recovery scan request does not match the published schema.'));
+  }
+  const request = value as RecoveryScanRequest;
+  const scope = request.scope as unknown as TrustedScope;
+  const requestId = request.requestId;
+  const waitMs = resolveWaitMs(ports);
+  if (waitMs === null) return invalidWaitFailure('recoveryScan', requestId);
+  const unavailable = (): ApiResult<RecoveryScanResult> => failure(makeError('recoveryScan', 'BUDGET_UNAVAILABLE', requestId,
+    'The recovery scan is temporarily unavailable; rerun the identical bounded scan.', true));
+
+  return runBounded(waitMs, unavailable, async gate => {
+    let client: BudgetTransactionPort | undefined;
+    let inTransaction = false;
+    try {
+      const authorizationError = await authorizeScope(scope, requestId, ports, 'recoveryScan', 'budgets.release');
+      gate.checkpoint();
+      if (authorizationError) return failure(authorizationError);
+      const now = trustedNow(ports);
+      if (!now) return failure(makeError('recoveryScan', 'BUDGET_UNAVAILABLE', requestId, 'The trusted budget clock is unavailable.', true));
+      client = await ports.database.connect();
+      gate.checkpoint();
+      await client.query('BEGIN');
+      inTransaction = true;
+      await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+      await bindFinancialDatabaseScope(client, scope);
+      await bindDeadline(client, gate);
+
+      const candidates = await client.query(
+        `WITH per_reservation AS (
+           SELECT reservation_id, currency,
+                  sum(held_amount)::text AS held, sum(released_amount)::text AS released, max(consumed_amount)::text AS consumed,
+                  (array_agg(event_type ORDER BY event_sequence DESC))[1] AS last_type,
+                  (array_agg(usage_finality ORDER BY event_sequence DESC))[1] AS last_finality,
+                  bool_or(event_type = 'dispatched') AS ever_dispatched,
+                  max(recorded_at) AS last_recorded_at,
+                  max(expires_at) AS expires_at,
+                  (array_agg(worker_lease_expires_at ORDER BY event_sequence DESC) FILTER (WHERE worker_lease_expires_at IS NOT NULL))[1] AS worker_lease_expires_at
+           FROM cost_intelligence.budget_reservation_events
+           WHERE tenant_id = $1 AND project_id = $2 AND environment = $3 AND billing_mode = $4
+           GROUP BY reservation_id, currency
+         )
+         SELECT *, (extract(epoch FROM (now() - last_recorded_at)) * 1000)::bigint AS age_ms FROM per_reservation
+         WHERE last_type = 'dispatched'
+            OR (last_type IN ('authorized', 'partially_authorized') AND expires_at IS NOT NULL AND expires_at <= $5)
+         ORDER BY last_recorded_at ASC NULLS FIRST
+         LIMIT $6`,
+        [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, now.toISOString(), request.maxReservations + 1],
+      );
+      const rows = candidates.rows as Record<string, unknown>[];
+      const bounded = rows.length > request.maxReservations;
+      const considered = rows.slice(0, request.maxReservations).map((row): RecoveryCandidate => ({
+        reservationId: asString(row.reservation_id), currency: asString(row.currency),
+        held: parseScaledDecimal(fromRow(row, 'held') ?? '0'), released: parseScaledDecimal(fromRow(row, 'released') ?? '0'),
+        consumed: parseScaledDecimal(fromRow(row, 'consumed') ?? '0'), lastType: asString(row.last_type),
+        lastFinality: ((): 'unknown' | 'partial' | 'final' => { const f = fromRow(row, 'last_finality'); return f === 'partial' || f === 'final' ? f : 'unknown'; })(),
+        everDispatched: row.ever_dispatched === true, lastRecordedAt: toDate(row.last_recorded_at),
+        expiresAt: toDate(row.expires_at), workerLeaseExpiresAt: toDate(row.worker_lease_expires_at),
+        ageMs: Number(fromRow(row, 'age_ms') ?? '0'),
+      }));
+
+      const scanId = globalThis.crypto.randomUUID();
+      const entries: RecoveryScanEntry[] = [];
+      let opened = 0; let alreadyOpen = 0;
+      for (const candidate of considered) {
+        // Aging is measured against the database clock (the same clock that
+        // stamps recorded_at), so a hold must have been unresolved for at least
+        // the threshold before recovery acts on it.
+        const aged = candidate.ageMs >= request.agingThresholdMs;
+        if (!aged) continue;
+        const outstanding = candidate.held - candidate.released - candidate.consumed;
+        const floorOutstanding = outstanding > 0n ? outstanding : 0n;
+        const leaseLapsed = candidate.workerLeaseExpiresAt !== null && now.getTime() >= candidate.workerLeaseExpiresAt.getTime();
+        const financiallyExpired = candidate.lastType !== 'dispatched';
+        const state: ReservationViewState = financiallyExpired ? 'held' : (leaseLapsed ? 'outcome_unknown' : 'dispatched');
+        const category = financiallyExpired ? 'never_dispatched_financial_expiry'
+          : leaseLapsed ? 'outcome_unknown_in_flight' : 'dispatched_unresolved';
+        const severity: 'review' | 'variance' | 'blocking' = leaseLapsed ? 'blocking' : 'review';
+        const nextAction = financiallyExpired
+          ? 'Fence no-dispatch and expire the never-dispatched hold, or re-authorize; never release without fencing.'
+          : 'Obtain the provider outcome; settle the confirmed expense or release only on verified no-bill. Do not release an unknown hold.';
+        const evidence = {
+          scanId, observedAt: now.toISOString(), lastActivityAt: candidate.lastRecordedAt ? candidate.lastRecordedAt.toISOString() : null,
+          lastEventType: candidate.lastType, everDispatched: candidate.everDispatched,
+          financialExpiresAt: candidate.expiresAt ? candidate.expiresAt.toISOString() : null,
+          workerLeaseExpiresAt: candidate.workerLeaseExpiresAt ? candidate.workerLeaseExpiresAt.toISOString() : null,
+          workerLeaseLapsed: leaseLapsed, outstandingHold: formatScaledDecimal(floorOutstanding),
+        };
+        const exceptionId = globalThis.crypto.randomUUID();
+        const contentHash = await hashValue({ reservationId: candidate.reservationId, category, scanId });
+        gate.checkpoint();
+        const inserted = await client.query(
+          `INSERT INTO cost_intelligence.budget_reconciliation_exceptions
+            (exception_id, tenant_id, project_id, environment, billing_mode, currency, reservation_id, status, category,
+             severity, owner_role, next_action, evidence, hold_amount, consumed_amount, outstanding_amount, reservation_state,
+             scan_id, actor_reference, content_hash)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,'open',$8,$9,$10,$11,$12::jsonb,$13::numeric,$14::numeric,$15::numeric,$16,$17,$18,$19)
+           ON CONFLICT (tenant_id, project_id, environment, billing_mode, reservation_id) WHERE status = 'open' DO NOTHING
+           RETURNING exception_id`,
+          [exceptionId, scope.tenantId, scope.projectId, scope.environment, scope.billingMode, candidate.currency,
+            candidate.reservationId, category, severity, request.ownerRole, nextAction, JSON.stringify(evidence),
+            formatScaledDecimal(candidate.held), formatScaledDecimal(candidate.consumed), formatScaledDecimal(floorOutstanding),
+            state, scanId, request.actorReference, contentHash],
+        );
+        const wasOpened = (inserted.rowCount ?? 0) > 0;
+        if (wasOpened) opened += 1; else alreadyOpen += 1;
+        entries.push({ reservationId: candidate.reservationId, currency: candidate.currency, state, category, severity, disposition: wasOpened ? 'opened' : 'already_open', outstandingHold: formatScaledDecimal(floorOutstanding) });
+      }
+      gate.beginCommit();
+      await client.query('COMMIT'); inTransaction = false;
+      return {
+        ok: true,
+        value: { schemaVersion: '1.0.0', requestId, scanId, scannedReservations: considered.length, opened, alreadyOpen, bounded, entries },
+      };
+    } catch {
+      if (client && inTransaction) await rollback(client);
+      return unavailable();
+    } finally {
+      client?.release();
+    }
+  });
+}
+
+export interface ReconciliationExceptionRecord {
+  readonly exceptionId: string;
+  readonly reservationId: string;
+  readonly currency: string;
+  readonly status: 'open' | 'resolved';
+  readonly category: string;
+  readonly severity: string;
+  readonly ownerRole: string;
+  readonly nextAction: string;
+  readonly reservationState: string;
+  readonly outstandingHold: string;
+  readonly evidence: unknown;
+  readonly recordedAt: string;
+}
+
+/** CI-05B.4: the open reconciliation/exception queue — the latest disposition per reservation that is still open. */
+export async function listReconciliationExceptions(
+  scope: TrustedScope,
+  requestId: string,
+  ports: BudgetRuntimePorts,
+): Promise<ApiResult<{ readonly schemaVersion: '1.0.0'; readonly requestId: string; readonly exceptions: readonly ReconciliationExceptionRecord[] }>> {
+  const waitMs = resolveWaitMs(ports);
+  if (waitMs === null) return invalidWaitFailure('listReconciliation', requestId);
+  const unavailable = () => failure(makeError('listReconciliation', 'BUDGET_UNAVAILABLE', requestId, 'The reconciliation queue read is temporarily unavailable.', true));
+
+  return runBounded(waitMs, unavailable, async gate => {
+    let client: BudgetTransactionPort | undefined;
+    let inTransaction = false;
+    try {
+      const authorizationError = await authorizeScope(scope, requestId, ports, 'listReconciliation', 'budgets.authorize');
+      gate.checkpoint();
+      if (authorizationError) return failure(authorizationError);
+      client = await ports.database.connect();
+      gate.checkpoint();
+      await client.query('BEGIN');
+      inTransaction = true;
+      await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+      await bindFinancialDatabaseScope(client, scope);
+      await bindDeadline(client, gate);
+      const result = await client.query(
+        `SELECT DISTINCT ON (reservation_id)
+                exception_id, reservation_id, currency, status, category, severity, owner_role, next_action,
+                reservation_state, outstanding_amount::text AS outstanding_amount, evidence, recorded_at
+         FROM cost_intelligence.budget_reconciliation_exceptions
+         WHERE tenant_id = $1 AND project_id = $2 AND environment = $3 AND billing_mode = $4
+         ORDER BY reservation_id, recorded_at DESC, exception_id DESC`,
+        [scope.tenantId, scope.projectId, scope.environment, scope.billingMode],
+      );
+      gate.beginCommit();
+      await client.query('COMMIT'); inTransaction = false;
+      const exceptions = (result.rows as Record<string, unknown>[])
+        .filter(row => fromRow(row, 'status') === 'open')
+        .map((row): ReconciliationExceptionRecord => ({
+          exceptionId: asString(row.exception_id), reservationId: asString(row.reservation_id), currency: asString(row.currency),
+          status: 'open', category: asString(row.category), severity: asString(row.severity), ownerRole: asString(row.owner_role),
+          nextAction: asString(row.next_action), reservationState: asString(row.reservation_state),
+          outstandingHold: formatScaledDecimal(parseScaledDecimal(fromRow(row, 'outstanding_amount') ?? '0')),
+          evidence: typeof row.evidence === 'string' ? JSON.parse(row.evidence) : row.evidence,
+          recordedAt: toDate(row.recorded_at)?.toISOString() ?? '',
+        }));
+      return { ok: true, value: { schemaVersion: '1.0.0', requestId, exceptions } };
+    } catch {
+      if (client && inTransaction) await rollback(client);
+      return unavailable();
+    } finally {
+      client?.release();
+    }
+  });
+}
+
+export const ResolveReconciliationRequestSchema = Type.Object({
+  schemaVersion: Type.Literal('1.0.0'), requestId: Type.String({ minLength: 1, maxLength: 128 }),
+  idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }), scope: LifecycleScopeSchema,
+  reservationId: Type.String({ minLength: 1 }),
+  disposition: Type.Union([
+    Type.Literal('verified_no_bill_released'), Type.Literal('confirmed_expense_settled'),
+    Type.Literal('over_cap_variance_recorded'), Type.Literal('held_for_reconciliation'),
+  ]),
+  resolution: Type.String({ minLength: 1, maxLength: 480 }), ownerRole: Type.String({ minLength: 1, maxLength: 120 }),
+  nextAction: Type.String({ minLength: 1, maxLength: 240 }), actorReference: Type.String({ minLength: 1, maxLength: 200 }),
+  evidenceRefs: Type.Array(VersionedReferenceSchema, { minItems: 1, maxItems: 100 }),
+}, { additionalProperties: false });
+export type ResolveReconciliationRequest = Static<typeof ResolveReconciliationRequestSchema>;
+
+export interface ReconciliationResolutionReceipt {
+  readonly schemaVersion: '1.0.0';
+  readonly requestId: string;
+  readonly status: 'resolved' | 'replay' | 'not_open';
+  readonly reservationId: string;
+  readonly disposition: ResolveReconciliationRequest['disposition'];
+  readonly reservationState: string;
+  readonly outstandingHold: string;
+}
+
+/**
+ * CI-05B.4: record a reconciliation resolution (append-only) against an open
+ * exception. The resolution links the owner's disposition and evidence; the
+ * actual financial change (settle/release/expire) is performed through the
+ * lifecycle commands, and the current hold+spend snapshot is captured here so
+ * the queue reflects verified no-bill releases, confirmed expenses, and
+ * recorded over-cap variances without ever truncating real spend.
+ */
+export async function resolveReconciliationException(value: unknown, ports: BudgetRuntimePorts): Promise<ApiResult<ReconciliationResolutionReceipt>> {
+  const { Value } = requireValue();
+  if (!Value.Check(ResolveReconciliationRequestSchema, value)) {
+    return failure(makeError('resolveReconciliation', 'VALIDATION_ERROR', requestIdOf(value), 'The reconciliation resolution does not match the published schema.'));
+  }
+  const request = value as ResolveReconciliationRequest;
+  const scope = request.scope as unknown as TrustedScope;
+  const requestId = request.requestId;
+  const waitMs = resolveWaitMs(ports);
+  if (waitMs === null) return invalidWaitFailure('resolveReconciliation', requestId);
+  const unavailable = (): ApiResult<ReconciliationResolutionReceipt> => failure(makeError('resolveReconciliation', 'BUDGET_UNAVAILABLE', requestId,
+    'The reconciliation resolution is temporarily unavailable; retry the identical idempotent request.', true));
+
+  return runBounded(waitMs, unavailable, async gate => {
+    let client: BudgetTransactionPort | undefined;
+    let inTransaction = false;
+    try {
+      const authorizationError = await authorizeScope(scope, requestId, ports, 'resolveReconciliation', 'budgets.release');
+      gate.checkpoint();
+      if (authorizationError) return failure(authorizationError);
+      const now = trustedNow(ports);
+      if (!now) return failure(makeError('resolveReconciliation', 'BUDGET_UNAVAILABLE', requestId, 'The trusted budget clock is unavailable.', true));
+      client = await ports.database.connect();
+      gate.checkpoint();
+      await client.query('BEGIN');
+      inTransaction = true;
+      await client.query('SET TRANSACTION ISOLATION LEVEL READ COMMITTED');
+      await bindFinancialDatabaseScope(client, scope);
+      await bindDeadline(client, gate);
+      if (!(await acquirePartitionLock(client, scope, '*', gate))) {
+        await rollback(client); inTransaction = false;
+        return failure(makeError('resolveReconciliation', 'BUDGET_UNAVAILABLE', requestId, 'The reconciliation partition is busy; retry.', true));
+      }
+
+      // Idempotent replay: the same key must re-describe the same resolution.
+      const replay = await client.query(
+        `SELECT reservation_id, resolution_disposition FROM cost_intelligence.budget_reconciliation_exceptions
+         WHERE tenant_id = $1 AND project_id = $2 AND environment = $3 AND billing_mode = $4 AND status = 'resolved'
+           AND evidence ->> 'idempotencyKey' = $5
+         ORDER BY recorded_at DESC LIMIT 1`,
+        [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, request.idempotencyKey],
+      );
+      const state = await loadReservation(client, scope, request.reservationId);
+      const outstanding = state ? state.held - state.released - state.consumed : 0n;
+      const floorOutstanding = outstanding > 0n ? outstanding : 0n;
+      const reservationState = state ? currentViewState(state, now) : 'absent';
+      if (replay.rows.length) {
+        const row = replay.rows[0] as Record<string, unknown>;
+        if (fromRow(row, 'reservation_id') !== request.reservationId || fromRow(row, 'resolution_disposition') !== request.disposition) {
+          await rollback(client); inTransaction = false;
+          return failure(makeError('resolveReconciliation', 'IDEMPOTENCY_CONFLICT', requestId, 'The idempotency key was already used for a different reconciliation resolution.'));
+        }
+        gate.beginCommit();
+        await client.query('COMMIT'); inTransaction = false;
+        return { ok: true, value: { schemaVersion: '1.0.0', requestId, status: 'replay', reservationId: request.reservationId, disposition: request.disposition, reservationState, outstandingHold: formatScaledDecimal(floorOutstanding) } };
+      }
+
+      const open = await client.query(
+        `SELECT DISTINCT ON (reservation_id) status
+         FROM cost_intelligence.budget_reconciliation_exceptions
+         WHERE tenant_id = $1 AND project_id = $2 AND environment = $3 AND billing_mode = $4 AND reservation_id = $5
+         ORDER BY reservation_id, recorded_at DESC, exception_id DESC`,
+        [scope.tenantId, scope.projectId, scope.environment, scope.billingMode, request.reservationId],
+      );
+      const latest = open.rows[0] as Record<string, unknown> | undefined;
+      if (!latest || fromRow(latest, 'status') !== 'open') {
+        await rollback(client); inTransaction = false;
+        return { ok: true, value: { schemaVersion: '1.0.0', requestId, status: 'not_open', reservationId: request.reservationId, disposition: request.disposition, reservationState, outstandingHold: formatScaledDecimal(floorOutstanding) } };
+      }
+
+      const exceptionId = globalThis.crypto.randomUUID();
+      const evidence = { idempotencyKey: request.idempotencyKey, resolvedAt: now.toISOString(), evidenceRefs: request.evidenceRefs, disposition: request.disposition };
+      const contentHash = await hashValue({ reservationId: request.reservationId, disposition: request.disposition, idempotencyKey: request.idempotencyKey });
+      gate.checkpoint();
+      await client.query(
+        `INSERT INTO cost_intelligence.budget_reconciliation_exceptions
+          (exception_id, tenant_id, project_id, environment, billing_mode, currency, reservation_id, status, category,
+           severity, owner_role, next_action, evidence, hold_amount, consumed_amount, outstanding_amount, reservation_state,
+           resolution, resolution_disposition, actor_reference, content_hash)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,'resolved',$8,$9,$10,$11,$12::jsonb,$13::numeric,$14::numeric,$15::numeric,$16,$17,$18,$19,$20)`,
+        [exceptionId, scope.tenantId, scope.projectId, scope.environment, scope.billingMode, state ? state.currency : 'USD',
+          request.reservationId, `resolution:${request.disposition}`, request.disposition === 'held_for_reconciliation' ? 'review' : 'variance',
+          request.ownerRole, request.nextAction, JSON.stringify(evidence),
+          state ? formatScaledDecimal(state.held) : '0', state ? formatScaledDecimal(state.consumed) : '0',
+          formatScaledDecimal(floorOutstanding), reservationState, request.resolution, request.disposition, request.actorReference, contentHash],
+      );
+      gate.beginCommit();
+      await client.query('COMMIT'); inTransaction = false;
+      return { ok: true, value: { schemaVersion: '1.0.0', requestId, status: 'resolved', reservationId: request.reservationId, disposition: request.disposition, reservationState, outstandingHold: formatScaledDecimal(floorOutstanding) } };
+    } catch (error) {
+      if (client && inTransaction) await rollback(client);
+      if (isUniqueViolation(error)) {
+        return failure(makeError('resolveReconciliation', 'IDEMPOTENCY_CONFLICT', requestId,
+          `A concurrent reconciliation resolution already recorded this disposition (${uniqueViolationConstraint(error)}).`));
+      }
+      return unavailable();
+    } finally {
+      client?.release();
+    }
   });
 }
 

@@ -47,7 +47,12 @@ test('foundation suites name nonempty real evidence and integration/release fail
   assert.deepEqual(integration.deferredDomainSuites, deferredDomainSuites);
   assert.deepEqual(integration.deferredDomainSuites, [{ suite: 'budgets', selector: 'nested-scopes', issue: 17, priority: 'P1', status: 'assigned_not_v1' }]);
   assert.ok(integration.missingFiles.some(file => file.startsWith('tests/metering/')));
-  assert.ok(release.missingFiles.some(file => file.startsWith('tests/recovery/')));
+  // CI-05B delivers the recovery and reconciliation leaves, so they resolve to
+  // present, selected test files; the fail-closed-on-missing gate is still
+  // proven by the yet-undelivered metering/adapters/reporting leaves above.
+  assert.ok(!release.missingFiles.some(file => file.startsWith('tests/recovery/')), 'CI-05B delivers the recovery leaf');
+  assert.ok(release.selectedFiles.includes('tests/recovery/recovery.test.mjs'));
+  assert.ok(release.selectedFiles.includes('tests/reconciliation/reconciliation.test.mjs'));
   assert.equal(suitePlan('release', new Set()).selectedFiles.length, 0);
   assert.ok(suitePlan('release', new Set()).missingFiles.length > 0);
 
