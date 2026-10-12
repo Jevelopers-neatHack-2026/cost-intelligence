@@ -1,3 +1,5 @@
+import './collector-evidence.test.mjs';
+import './reported-cost.test.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
@@ -672,7 +674,7 @@ test('CI-05A.4 a COMMIT acknowledged only after the deadline leaves one hold tha
 const api = await import('../../dist/index.js');
 function publicPorts(pool, scope, options={}) {
   const low=makePorts(pool,scope,options);
-  return {...low,storage:{isAvailable:async()=>true},providerSource:{isAvailable:async()=>true},budgets:{database:low.database,authorityWaitMs:low.authorityWaitMs,reservationAuthority:low.reservationAuthority,budgetEvidence:low.budgetEvidence}};
+  return {...low,storage:{isAvailable:async()=>true},providerSource:{isAvailable:async()=>true},budgets:{database:low.database,authorityWaitMs:low.authorityWaitMs,reservationAuthority:low.reservationAuthority,budgetEvidence:low.budgetEvidence,sourceCollector:low.sourceCollector,reportedCostContractMode:low.reportedCostContractMode}};
 }
 function currentQuery(scope,request,id,phase='preparation',extra={}) {
   return {schemaVersion:'1.0.0',requestId:randomUUID(),scope,reservationId:id,attemptBinding:request.attemptBinding,authorityBinding:request.authorityBinding,phase,...extra};
@@ -711,12 +713,11 @@ test('public unknown-price authority preserves provenance and requires current e
   const pool=reservationPool();const scope=makeScope('maximum');const fixture=await fixturePromise;
   try{
     await setBudgetLimit(pool,scope,'2');const maxRef=authorityRefForTest();
-    const req=reservationRequest(scope,fixture,{amount:'0.75',estimate:{completeness:'unknown',knownSubtotal:'0',currency:'USD',rateCardRef:null,missingDimensions:['output_image_tokens'],boundedConservativeMaximum:'0.75',maximumPolicyRef:maxRef}});
-    req.authorityBinding.provider='openrouter';
     const maximum={policyRef:maxRef,authorizedCap:'0.75',currency:'USD'};
+    const req=reservationRequest(scope,fixture,{amount:'0.75',provider:'openrouter',trustedMaximum:maximum,estimate:{completeness:'unknown',knownSubtotal:'0',currency:'USD',rateCardRef:null,missingDimensions:['output_image_tokens'],boundedConservativeMaximum:'0.75',maximumPolicyRef:maxRef}});
     const granted=await api.authorize(req,publicPorts(pool,scope,{maximum}));assert.equal(granted.value.status,'authorized');assert.equal(granted.value.estimateCompleteness,'unknown');assert.equal(granted.value.finance.authorized_cap.amount,'0.75');
     for(const bad of [{...maximum,authorizedCap:'1'},{...maximum,currency:'EUR'},{...maximum,policyRef:{...maxRef,revision:2}}]){
-      const newReq=reservationRequest(scope,fixture,{amount:'0.75',estimate:req.estimate});newReq.authorityBinding.provider='openrouter';
+      const newReq=reservationRequest(scope,fixture,{amount:'0.75',estimate:req.estimate,provider:'openrouter',trustedMaximum:maximum});
       const denied=await api.authorize(newReq,publicPorts(pool,scope,{maximum:bad}));assert.equal(denied.value.status,'denied');
     }
     const untrusted=await api.authorize(reservationRequest(scope,fixture),publicPorts(pool,scope,{budgetEvidence:{verifyCurrent:async()=>({status:'verified',queryDigest:`sha256:${'a'.repeat(64)}`,verifiedAt:'2026-10-12T04:00:00Z',expiresAt:'2026-10-12T05:00:00Z'})}}));assert.equal(untrusted.ok,false);
@@ -835,7 +836,7 @@ test('R1-002 expired final host or maximum-source proof rejects admission before
   try{for(const mode of ['host','maximum']){
     const scope=makeScope(`r1-admission-${mode}`);await setBudgetLimit(pool,scope,'2');let now=Date.parse('2026-10-12T04:00:00Z');const clock={now:()=>new Date(now)};const maximumRef=authorityRefForTest();
     const estimate={completeness:'unknown',knownSubtotal:'0',currency:'USD',rateCardRef:null,missingDimensions:['output_image_tokens'],boundedConservativeMaximum:'0.75',maximumPolicyRef:maximumRef};
-    const req=reservationRequest(scope,fixture,mode==='maximum'?{amount:'0.75',estimate}:{amount:'0.75'});const ordinary=makePorts(pool,scope,{clock,maximum:{policyRef:maximumRef,authorizedCap:'0.75',currency:'USD'}});let sourceCalls=0,financeCalls=0;
+    const req=reservationRequest(scope,fixture,mode==='maximum'?{amount:'0.75',estimate,trustedMaximum:{policyRef:maximumRef,authorizedCap:'0.75',currency:'USD'}}:{amount:'0.75'});const ordinary=makePorts(pool,scope,{clock,maximum:{policyRef:maximumRef,authorizedCap:'0.75',currency:'USD'}});let sourceCalls=0,financeCalls=0;
     const ports=publicPorts(pool,scope,{clock,financeAuthority:{authorizeCurrent:async q=>{financeCalls++;const d=await ordinary.financeAuthority.authorizeCurrent(q);if(mode==='maximum'&&financeCalls===3)now+=10;return d;}},reservationAuthority:{verifyCurrent:async q=>{const d=await ordinary.reservationAuthority.verifyCurrent(q);if(mode==='host')d.expiresAt=new Date(now+1).toISOString();return d;}},budgetEvidence:{verifyCurrent:async q=>{sourceCalls++;const d=await ordinary.budgetEvidence.verifyCurrent(q);if(sourceCalls===2){if(mode==='host')now+=10;else d.expiresAt=new Date(now+1).toISOString();}return d;}}});
     assertNoCurrentAuthority(await api.authorize(req,ports),mode);assert.equal(await countEvents(pool,scope),0,'rejected pre-commit proof cannot create a hold');
   }}finally{await pool.end();}

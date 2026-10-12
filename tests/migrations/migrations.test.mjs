@@ -139,7 +139,7 @@ async function verifyDurability(prefix) {
     assertDisposableMarker(marker.rows);
     const health = await client.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
     assert.equal(health.rows[0].migrations_ready, true);
-    assert.equal(Number(health.rows[0].required_migrations_present), 10);
+    assert.equal(Number(health.rows[0].required_migrations_present), 11);
     await client.query('CREATE TABLE IF NOT EXISTS ci_test.foundation_durable_probe (probe_id uuid PRIMARY KEY, payload text NOT NULL)');
     await client.query('INSERT INTO ci_test.foundation_durable_probe(probe_id, payload) VALUES ($1, $2)', [probeId, `verified:${prefix}`]);
   } finally {
@@ -476,7 +476,21 @@ async function dropTestDatabase(name, base) {
   }
 }
 
-test('fresh and previous foundation schemas apply checksummed upgrades, survive reconnect, and expose health', async () => {
+const reportedValuationReplacements=[
+  {schema:'cost_intelligence',table:'financial_ledger_events',constraint:'financial_ledger_events_valuation_check',column:'valuation'},
+  {schema:'cost_intelligence',table:'usage_intake_inbox',constraint:'usage_intake_inbox_valuation_basis_check',column:'valuation_basis'},
+  {schema:'cost_intelligence',table:'usage_intake_attempts',constraint:'usage_intake_attempts_valuation_basis_check',column:'valuation_basis'},
+];
+function approvedReportedValuationReplacements(filename,sql){
+  if(filename!=='0011_budget_settlement_reconciliation.sql')return [];
+  for(const {schema,table,constraint,column} of reportedValuationReplacements){
+    const exact=`ALTER TABLE ${schema}.${table} DROP CONSTRAINT ${constraint};\nALTER TABLE ${schema}.${table} ADD CONSTRAINT ${constraint} CHECK (${column} IN ('unknown', 'estimated', 'provider_confirmed', 'provider_reported_unsettled'));`;
+    if(sql.split(exact).length!==2)return [];
+  }
+  return reportedValuationReplacements;
+}
+
+function assertDestructiveMigrationGuard(){
   assert.equal(hasDestructiveMigrationStatement('CREATE TRIGGER guard BEFORE TRUNCATE ON schema.table FOR EACH STATEMENT EXECUTE FUNCTION guard_fn();'), false,
     'append-only TRUNCATE trigger declarations are not destructive migration statements');
   assert.equal(hasDestructiveMigrationStatement('CREATE TRIGGER guard BEFORE /* rationale */ TRUNCATE /* event */ ON schema.table FOR EACH STATEMENT EXECUTE FUNCTION guard_fn();'), false,
@@ -531,6 +545,10 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
   assert.ok(process.env.CI_TEST_DB_HOST, 'with-postgres lifecycle must provide split connection settings for its validated disposable database');
   assert.equal(process.env.CI_TEST_PREVIOUS_FIXTURE_LOADED, '1', 'previous-version upgrade fixture must be installed before this suite starts');
 
+}
+
+test('fresh and previous foundation schemas apply checksummed upgrades, survive reconnect, and expose health', async () => {
+  assertDestructiveMigrationGuard();
   const migrations = JSON.parse(process.env.CI_TEST_MIGRATIONS ?? 'null');
   const previousMigrations = JSON.parse(process.env.CI_TEST_PREVIOUS_MIGRATIONS ?? 'null');
   assert.ok(Array.isArray(migrations) && migrations.length > 0, 'fresh database migration outcomes must be recorded');
@@ -547,6 +565,7 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
     { version: '0008_budget_reservations', status: 'applied' },
     { version: '0009_usage_intake', status: 'applied' },
     { version: '0010_budget_authority_bindings', status: 'applied' },
+    { version: '0011_budget_settlement_reconciliation', status: 'applied' },
   ]);
 
   const names = (await readdir(join(root, 'migrations'))).filter(name => name.endsWith('.sql')).sort();
@@ -554,9 +573,9 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
     '0001_foundation.sql', '0002_foundation_health.sql', '0003_financial_ledger.sql',
     '0004_pricing_catalog.sql', '0005_pricing_valuation_history.sql',
     '0006_finance_security_roles.sql', '0007_accounting_projection_snapshots.sql',
-    '0008_budget_reservations.sql', '0009_usage_intake.sql', '0010_budget_authority_bindings.sql',
+    '0008_budget_reservations.sql', '0009_usage_intake.sql', '0010_budget_authority_bindings.sql', '0011_budget_settlement_reconciliation.sql',
   ], 'the current migration set is additive through accounting projections, budget reservations, and usage intake and preserves every earlier migration');
-  assert.equal(names.length, 10, 'foundation migration suite must exercise fresh creation, an additive security upgrade, the additive accounting projection and CI-05A budget reservation migrations, and usage intake');
+  assert.equal(names.length, 11, 'foundation migration suite must exercise fresh creation, an additive security upgrade, the additive accounting projection and CI-05A budget reservation migrations, and usage intake');
   for (const prefix of ['CI_TEST_DB', 'CI_TEST_PREVIOUS_DB']) {
     const client = new Client(databaseConfigFromEnvironment(prefix));
     await client.connect();
@@ -569,7 +588,7 @@ test('fresh and previous foundation schemas apply checksummed upgrades, survive 
         const sql = await readFile(join(root, 'migrations', names[index]), 'utf8');
         const safeConstraintReplacements = names[index] === '0009_usage_intake.sql'
           ? [{ schema: 'cost_intelligence', table: 'financial_projection_quantities', constraint: 'financial_projection_quantities_key' }]
-          : [];
+          : approvedReportedValuationReplacements(names[index],sql);
         assert.equal(hasDestructiveMigrationStatement(sql, safeConstraintReplacements), false,
           'incremental migrations must not start destructive DROP or TRUNCATE statements');
         assert.equal(records.rows[index].version, names[index].replace(/\.sql$/, ''));
@@ -2131,7 +2150,7 @@ test('separate migration login applies 0007 accounting, 0008 budget reservations
     const health = await migrator.query(
       'SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health',
     );
-    assert.deepEqual(health.rows[0], { migrations_ready: true, required_migrations_present: 10 });
+    assert.deepEqual(health.rows[0], { migrations_ready: true, required_migrations_present: 11 });
     const intakeProjectionColumns = await migrator.query(
       `SELECT table_name, column_name FROM information_schema.columns
        WHERE table_schema='cost_intelligence' AND (
@@ -2994,4 +3013,15 @@ test('legacy financial privacy upgrade preserves immutable economics and fails a
     await admin?.end();
     await dropTestDatabase(name, base);
   }
+});
+
+test('0011 reported valuation exceptions require exact filename, three named constraints and preserving enum sequence',async()=>{
+  assertDestructiveMigrationGuard();
+  const sql=await readFile(join(root,'migrations/0011_budget_settlement_reconciliation.sql'),'utf8');
+  assert.equal(hasDestructiveMigrationStatement(sql,approvedReportedValuationReplacements('0011_budget_settlement_reconciliation.sql',sql)),false);
+  for(const filename of ['0010_budget_authority_bindings.sql','0012_arbitrary.sql'])assert.equal(hasDestructiveMigrationStatement(sql,approvedReportedValuationReplacements(filename,sql)),true);
+  for(const old of ['provider_reported_unsettled','provider_confirmed','financial_ledger_events_valuation_check']){
+    const altered=sql.replace(old,'unreviewed');assert.equal(hasDestructiveMigrationStatement(altered,approvedReportedValuationReplacements('0011_budget_settlement_reconciliation.sql',altered)),true);
+  }
+  assert.equal(hasDestructiveMigrationStatement(sql+'\nDROP TABLE cost_intelligence.financial_ledger_events;',approvedReportedValuationReplacements('0011_budget_settlement_reconciliation.sql',sql)),true);
 });

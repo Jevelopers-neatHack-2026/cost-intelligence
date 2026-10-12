@@ -1,6 +1,7 @@
 import { type CurrentReservationRequest, type PartialAcknowledgementRequest, ReservationAuthorityBindingSchema, ReservationWorkPlanSchema, BudgetReferenceSchema, FinanceReservationAuthoritySchema } from './authority.js';
-import { authorizeReservation, changeBudgetPolicy, markReservationDispatched, readReservationSnapshot, revalidateReservation, acknowledgePartialReservation, type BudgetRuntimePorts } from './reservation-store.js';
+import { authorizeReservation, changeBudgetPolicy, markReservationDispatched, settleReservation, releaseReservation, readReservationSnapshot, revalidateReservation, acknowledgePartialReservation, type BudgetRuntimePorts } from './reservation-store.js';
 import { Type, type Static } from '@sinclair/typebox';
+import { Value } from '@sinclair/typebox/value';
 import { authorizeFinanceOperation, blockedBoundary, CurrencySchema, NonNegativeDecimalAmountSchema, errorEnvelope, failure, TrustedScopeSchema, validateRequest, type ApiResult, type FinanceOperation, type RuntimePorts, type Validation } from '../shared/contracts.js';
 import { validateCanonical, type SharedBudgetReservation, type SharedReleaseRequest, type SharedReserveRequest, type SharedSettleRequest } from '../shared/canonical.js';
 
@@ -27,6 +28,7 @@ export const ReservationRequestSchema = Type.Object({
   scope: TrustedScopeSchema, canonicalRequest: Type.Unknown(), estimate: EstimateEvidenceSchema,
   allowPartialAuthorization: Type.Boolean(), attemptBinding: AttemptBindingSchema,
   authorityBinding: Type.Optional(ReservationAuthorityBindingSchema), sourceAuthorityRef: Type.Optional(BudgetReferenceSchema),
+  pricingProfileRef: Type.Optional(BudgetReferenceSchema),
   workPlan: Type.Optional(ReservationWorkPlanSchema),
 }, { additionalProperties: false });
 export type ReservationRequest = Omit<Static<typeof ReservationRequestSchema>, 'canonicalRequest'> & { readonly canonicalRequest: SharedReserveRequest };
@@ -82,8 +84,43 @@ export const SettleReservationCommandSchema = Type.Object({
     sequence: Type.Integer({ minimum: 1 }), cumulativeAmount: NonNegativeDecimalAmountSchema, currency: CurrencySchema,
     usageCompleteness: Type.Union([Type.Literal('unknown'), Type.Literal('incomplete'), Type.Literal('complete')]),
     sourceObservationRefs: EvidenceReferenceArray, allowObservedOverrun: Type.Literal(true),
+    finalityEvidenceRef: Type.Optional(BudgetReferenceSchema),
   }, { additionalProperties: false }),
 }, { additionalProperties: false });
+/** Finance v2 maps exact USD18 verified cumulative cost without mislabelling it as a legacy canonical SettleRequest. */
+export const VerifiedSettlementRequestSchema=Type.Object({
+  ...CommandBase,schemaVersion:Type.Literal('2.0.0'),action:Type.Literal('settle'),
+  reconciliationContext:Type.Optional(Type.Object({requestDigest:Type.String({pattern:'^sha256:[a-f0-9]{64}$'}),ownerReference:Type.String({minLength:1,maxLength:200}),
+    actionReference:Type.String({minLength:1,maxLength:240})},{additionalProperties:false})),
+  settlement:Type.Object({measure:Type.Literal('cumulative'),finality:Type.Union([Type.Literal('partial'),Type.Literal('final')]),
+    sequence:Type.Integer({minimum:1}),cumulativeAmount:NonNegativeDecimalAmountSchema,currency:Type.Literal('USD'),
+    usageCompleteness:Type.Union([Type.Literal('unknown'),Type.Literal('incomplete'),Type.Literal('complete')]),
+    sourceObservationRefs:EvidenceReferenceArray,allowObservedOverrun:Type.Literal(true),finalityEvidenceRef:Type.Optional(BudgetReferenceSchema),
+  },{additionalProperties:false}),
+},{additionalProperties:false});
+export type VerifiedSettlementRequest=Static<typeof VerifiedSettlementRequestSchema>;
+export const VerifiedExpenseCorrectionRequestSchema=Type.Object({
+  ...VerifiedSettlementRequestSchema.properties,action:Type.Literal('record_expense_adjustment'),
+  correction:Type.Object({originalSourceObservationId:Type.String({minLength:1}),reasonReference:Type.String({minLength:1,maxLength:240})},{additionalProperties:false}),
+},{additionalProperties:false});
+export type VerifiedExpenseCorrectionRequest=Static<typeof VerifiedExpenseCorrectionRequestSchema>;
+export const VerifiedSettlementReceiptSchema=Type.Object({
+  schemaVersion:Type.Literal('2.0.0'),requestId:Type.String({minLength:1}),reservationId:Type.String({minLength:1}),
+  status:Type.Union([Type.Literal('applied'),Type.Literal('replay'),Type.Literal('conflict'),Type.Literal('stale_revision')]),
+  state:Type.Union([Type.Literal('held'),Type.Literal('dispatched'),Type.Literal('outcome_unknown'),Type.Literal('held_for_reconciliation'),
+    Type.Literal('partially_settled'),Type.Literal('settled'),Type.Literal('released'),Type.Literal('expired')]),
+  heldAmount:NonNegativeDecimalAmountSchema,consumedAmount:NonNegativeDecimalAmountSchema,releasedAmount:NonNegativeDecimalAmountSchema,
+  outstandingHold:NonNegativeDecimalAmountSchema,overrunAmount:NonNegativeDecimalAmountSchema,currency:Type.Literal('USD'),
+  revision:Type.Integer({minimum:1}),usageFinality:Type.Union([Type.Literal('unknown'),Type.Literal('partial'),Type.Literal('final')]),
+},{additionalProperties:false});
+export type VerifiedSettlementReceipt=Static<typeof VerifiedSettlementReceiptSchema>;
+export const VerifiedReservationReadRequestSchema=Type.Object({schemaVersion:Type.Literal('2.0.0'),requestId:Type.String({minLength:1}),
+  scope:TrustedScopeSchema,reservationId:Type.String({minLength:1})},{additionalProperties:false});
+export type VerifiedReservationReadRequest=Static<typeof VerifiedReservationReadRequestSchema>;
+const {status:receiptStatus,...ReadFinancialFields}=VerifiedSettlementReceiptSchema.properties;
+export const VerifiedReservationSnapshotSchema=Type.Object({...ReadFinancialFields,asOf:Type.String({format:'date-time'}),
+  attemptBinding:AttemptBindingSchema,dispatchEligible:Type.Literal(false)},{additionalProperties:false});
+export type VerifiedReservationSnapshot=Static<typeof VerifiedReservationSnapshotSchema>;
 export const ReleaseReservationCommandSchema = Type.Object({
   ...CommandBase, action: Type.Literal('release'), canonicalCommand: Type.Unknown(),
   release: Type.Object({
@@ -95,6 +132,9 @@ export const ReservationCommandSchema = Type.Union([MarkDispatchedCommandSchema,
 export type MarkDispatchedCommand = Static<typeof MarkDispatchedCommandSchema>;
 export type SettleReservationCommand = Omit<Static<typeof SettleReservationCommandSchema>, 'canonicalCommand'> & { readonly canonicalCommand: SharedSettleRequest };
 export type ReleaseReservationCommand = Omit<Static<typeof ReleaseReservationCommandSchema>, 'canonicalCommand'> & { readonly canonicalCommand: SharedReleaseRequest };
+export const VerifiedReleaseRequestSchema=Type.Object({...CommandBase,schemaVersion:Type.Literal('2.0.0'),action:Type.Literal('release'),
+  release:Type.Object({...ReleaseReservationCommandSchema.properties.release.properties,currency:Type.Literal('USD')},{additionalProperties:false})},{additionalProperties:false});
+export type VerifiedReleaseRequest=Static<typeof VerifiedReleaseRequestSchema>;
 export type ReservationCommand = MarkDispatchedCommand | SettleReservationCommand | ReleaseReservationCommand;
 
 /** Validate the lifecycle command against its operation and exact pinned nested payload. */
@@ -149,6 +189,7 @@ export const ReservationSnapshotSchema = Type.Object({
   finance: Type.Optional(FinanceReservationAuthoritySchema),
   dispatchEligible: Type.Optional(Type.Boolean()),
   commandOutcome: Type.Optional(Type.Union([Type.Literal('applied'), Type.Literal('replay'), Type.Literal('stale_revision'), Type.Literal('conflict')])),
+  commandReceipt: Type.Optional(Type.Unknown()),
 }, { additionalProperties: false });
 export type ReservationSnapshot = Omit<Static<typeof ReservationSnapshotSchema>, 'reservation'> & { readonly reservation: SharedBudgetReservation };
 
@@ -243,10 +284,47 @@ export async function markDispatched(request: MarkDispatchedCommand, ports: Runt
     return result.ok ? { ok: true, value: result.value } : result;
   } });
 }
-export async function settle(request: SettleReservationCommand, ports: RuntimePorts): Promise<ApiResult<ReservationSnapshot>> {
+export function settle(request:VerifiedSettlementRequest,ports:RuntimePorts):Promise<ApiResult<VerifiedSettlementReceipt>>;
+export function settle(request:SettleReservationCommand,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot>>;
+export async function settle(request: SettleReservationCommand|VerifiedSettlementRequest, ports: RuntimePorts): Promise<ApiResult<ReservationSnapshot|VerifiedSettlementReceipt>> {
+  const engine=budgetPorts(ports);
+  if(engine){
+    const result=await settleReservation(request,engine);if(!result.ok)return result;
+    if(request.schemaVersion==='2.0.0')return {ok:true,value:{...result.value,schemaVersion:'2.0.0',currency:'USD'}};
+    const snapshot=await readReservationSnapshot({schemaVersion:'1.0.0',requestId:request.requestId,scope:request.scope,reservationId:request.reservationId},engine);
+    return snapshot.ok?{ok:true,value:{...snapshot.value,commandOutcome:result.value.status,commandReceipt:result.value}}:snapshot;
+  }
+  if(request.schemaVersion==='2.0.0'){
+    const requestId=request.requestId;
+    if(!Value.Check(VerifiedSettlementRequestSchema,request))return failure(errorEnvelope('budgets','settle','VALIDATION_ERROR',requestId,'The Finance settlement request is malformed.'));
+    const auth=await authorizeFinanceOperation({module:'budgets',requestOperation:'settle',operation:'budgets.settle',scope:request.scope,requestId:request.requestId,clock:ports.clock,
+      ...(ports.financeAuthority?{financeAuthority:ports.financeAuthority}:{})});
+    if(!auth.ok)return failure(auth.error);
+    return failure(errorEnvelope('budgets','settle','BUDGET_UNAVAILABLE',request.requestId,'The settlement authority is not configured.',true));
+  }
   return reservationCommand({ request, ports, operation: 'settle', authorityOperation: 'budgets.settle', expectedAction: 'settle', schema: SettleReservationCommandSchema, validate: value => validateSettleReservationCommandBoundary(value) });
 }
-export async function release(request: ReleaseReservationCommand, ports: RuntimePorts): Promise<ApiResult<ReservationSnapshot>> {
+export function release(request:VerifiedReleaseRequest,ports:RuntimePorts):Promise<ApiResult<VerifiedSettlementReceipt>>;
+export function release(request:ReleaseReservationCommand,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot>>;
+export async function release(request:ReleaseReservationCommand|VerifiedReleaseRequest,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot|VerifiedSettlementReceipt>>{
+  const engine=budgetPorts(ports);
+  if(engine){
+    const result=await releaseReservation(request,engine);if(!result.ok)return result;
+    if(request.schemaVersion==='2.0.0'){
+      const receipt={...result.value,schemaVersion:'2.0.0'};
+      return Value.Check(VerifiedSettlementReceiptSchema,receipt)?{ok:true,value:receipt}:failure(errorEnvelope('budgets','release','SOURCE_UNAVAILABLE',request.requestId,'The release receipt cannot be represented at this versioned USD boundary.',true));
+    }
+    const snapshot=await readReservationSnapshot({schemaVersion:'1.0.0',requestId:request.requestId,scope:request.scope,reservationId:request.reservationId},engine);
+    return snapshot.ok?{ok:true,value:{...snapshot.value,commandOutcome:result.value.status,commandReceipt:result.value}}:snapshot;
+  }
+  if(request.schemaVersion==='2.0.0'){
+    const requestId=request.requestId;
+    if(!Value.Check(VerifiedReleaseRequestSchema,request))return failure(errorEnvelope('budgets','release','VALIDATION_ERROR',requestId,'The Finance release request is malformed.'));
+    const auth=await authorizeFinanceOperation({module:'budgets',requestOperation:'release',operation:'budgets.release',scope:request.scope,requestId,clock:ports.clock,
+      ...(ports.financeAuthority?{financeAuthority:ports.financeAuthority}:{})});
+    if(!auth.ok)return failure(auth.error);
+    return failure(errorEnvelope('budgets','release','BUDGET_UNAVAILABLE',requestId,'The durable release authority is not configured.',true));
+  }
   return reservationCommand({ request, ports, operation: 'release', authorityOperation: 'budgets.release', expectedAction: 'release', schema: ReleaseReservationCommandSchema, validate: value => validateReleaseReservationCommandBoundary(value) });
 }
 export async function changeBudget(request: BudgetChangeRequest, ports: RuntimePorts): Promise<ApiResult<BudgetChangeReceipt>> {
@@ -267,19 +345,34 @@ export async function changeBudget(request: BudgetChangeRequest, ports: RuntimeP
     alertThresholdPercent: 80, decisionPolicyVersion: 'ci-budget-policy-1.0.0', decisionReference: r.policyRef, ...(r.replayedStatus?{replayedStatus:r.replayedStatus}:{}) } };
 }
 
-export async function recordExpenseAdjustment(request: ExpenseAdjustmentRequest, ports: RuntimePorts): Promise<ApiResult<PostingReceipt>> {
+export async function recordExpenseAdjustment(request:VerifiedExpenseCorrectionRequest,ports:RuntimePorts):Promise<ApiResult<VerifiedSettlementReceipt>>;
+export async function recordExpenseAdjustment(request:ExpenseAdjustmentRequest,ports:RuntimePorts):Promise<ApiResult<PostingReceipt>>;
+export async function recordExpenseAdjustment(request:ExpenseAdjustmentRequest|VerifiedExpenseCorrectionRequest,ports:RuntimePorts):Promise<ApiResult<PostingReceipt|VerifiedSettlementReceipt>>{
+  if(request.schemaVersion==='2.0.0'){
+    const engine=budgetPorts(ports);
+    if(!engine)return failure(errorEnvelope('budgets','recordExpenseAdjustment','BUDGET_UNAVAILABLE',request.requestId,'The durable budget authority is not configured.',true));
+    const result=await import('./reservation-store.js').then(module=>module.correctReservationExpense(request,engine));
+    if(!result.ok)return result;
+    const receipt={...result.value,schemaVersion:'2.0.0'};
+    return Value.Check(VerifiedSettlementReceiptSchema,receipt)?{ok:true,value:receipt}:failure(errorEnvelope('budgets','recordExpenseAdjustment','SOURCE_UNAVAILABLE',request.requestId,'The persisted correction does not match the USD18 receipt boundary.',true));
+  }
   return blockedBoundary<ExpenseAdjustmentRequest, PostingReceipt>({ module: 'budgets', operation: 'recordExpenseAdjustment', authorityOperation: 'budgets.recordExpenseAdjustment', schema: ExpenseAdjustmentRequestSchema, request, ports, unavailableCode: 'SOURCE_UNAVAILABLE', safeMessage: 'Expense adjustment posting is not available until the accounting leaf is delivered.', retryable: true });
 }
 
 // Explicit host composition connects the public CI05A facades to this engine.
-// CI05B public settlement/release remain unavailable pending accepted lifecycle evidence.
+// Reported settlement additionally requires the explicit private development decoder mount.
 export * from './reservation-store.js';
 export * from './authority.js';
+export * from './evidence.js';
+export * from './reported-cost.js';
 
 /** Host composition still supplies the separate genuine access grant; Finance never manufactures it. */
-export async function getReservationSnapshot(request: import('./reservation-store.js').ReservationSnapshotRequest, ports: RuntimePorts): Promise<ApiResult<ReservationSnapshot>> {
+export async function getReservationSnapshot(request:VerifiedReservationReadRequest,ports:RuntimePorts):Promise<ApiResult<VerifiedReservationSnapshot>>;
+export async function getReservationSnapshot(request:import('./reservation-store.js').ReservationSnapshotRequest,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot>>;
+export async function getReservationSnapshot(request:import('./reservation-store.js').ReservationSnapshotRequest|VerifiedReservationReadRequest,ports:RuntimePorts):Promise<ApiResult<ReservationSnapshot|VerifiedReservationSnapshot>>{
   const engine=budgetPorts(ports);
   if(!engine)return failure(errorEnvelope('budgets','getReservationSnapshot','BUDGET_UNAVAILABLE',request.requestId,'The host has not configured the budget authority.',true));
+  if(request.schemaVersion==='2.0.0')return import('./reservation-store.js').then(module=>module.readVerifiedReservationSnapshot(request,engine));
   return readReservationSnapshot(request,engine);
 }
 export async function revalidateAuthorization(request: CurrentReservationRequest, ports: RuntimePorts) {
@@ -291,4 +384,28 @@ export async function acknowledgePartial(request: PartialAcknowledgementRequest,
   const engine=budgetPorts(ports);
   if(!engine)return failure(errorEnvelope('budgets','acknowledgePartial','BUDGET_UNAVAILABLE',request.requestId,'The host has not configured the budget authority.',true));
   return acknowledgePartialReservation(request,engine);
+}
+export async function retainUnknownOutcome(request:import('./reservation-store.js').RetainUnknownOutcomeRequest,ports:RuntimePorts){
+  const engine=budgetPorts(ports);
+  if(engine)return import('./reservation-store.js').then(module=>module.retainReservationUnknown(request,engine));
+  const auth=await authorizeFinanceOperation({module:'budgets',requestOperation:'retainUnknown',operation:'budgets.markDispatched',scope:request.scope,
+    requestId:request.requestId,clock:ports.clock,...(ports.financeAuthority?{financeAuthority:ports.financeAuthority}:{})});
+  if(!auth.ok)return failure(auth.error);
+  return failure(errorEnvelope('budgets','retainUnknown','BUDGET_UNAVAILABLE',request.requestId,'The durable outcome queue is not configured.',true));
+}
+export async function expireAuthorization(request:import('./reservation-store.js').ExpireReservationRequest,ports:RuntimePorts){
+  const engine=budgetPorts(ports);if(!engine)return failure(errorEnvelope('budgets','expireAuthorization','BUDGET_UNAVAILABLE',request.requestId,'The durable lifecycle authority is not configured.',true));
+  return import('./reservation-store.js').then(module=>module.expireReservation(request,engine));
+}
+export async function recoverReservations(request:import('./reservation-store.js').BudgetRecoveryRequest,ports:RuntimePorts){
+  const engine=budgetPorts(ports);if(!engine)return failure(errorEnvelope('budgets','recoverReservations','BUDGET_UNAVAILABLE',request.requestId,'The durable recovery queue is not configured.',true));
+  return import('./reservation-store.js').then(module=>module.recoverReservationBatch(request,engine));
+}
+export async function acknowledgeException(request:import('./reservation-store.js').BudgetExceptionActionRequest,ports:RuntimePorts){
+  const engine=budgetPorts(ports);if(!engine)return failure(errorEnvelope('budgets','acknowledgeException','RECONCILIATION_PENDING',request.requestId,'The durable reconciliation queue is not configured.',true));
+  return import('./reservation-store.js').then(module=>module.actOnBudgetException(request,engine));
+}
+export async function getExceptions(request:import('./reservation-store.js').BudgetExceptionQuery,ports:RuntimePorts){
+  const engine=budgetPorts(ports);if(!engine)return failure(errorEnvelope('budgets','getExceptions','RECONCILIATION_PENDING',request.requestId,'The durable reconciliation queue is not configured.',true));
+  return import('./reservation-store.js').then(module=>module.readBudgetExceptions(request,engine));
 }
