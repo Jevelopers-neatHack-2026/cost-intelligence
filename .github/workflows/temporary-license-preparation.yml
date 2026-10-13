@@ -1,0 +1,12 @@
+name: Temporary licensing candidate preparation
+on:
+  push:
+    branches: ["docs/jevelopers-license-preparation-20261013"]
+    paths: [".github/workflows/temporary-license-preparation.yml"]
+permissions:
+  contents: write
+jobs:
+  prepare:
+    uses: Jevelopers-neatHack-2026/.github/.github/workflows/temporary-license-worker.yml@4b0356e8d6c0014ecd2ce356d45e225ce7d9d14b
+    with:
+      base_sha: 2d8ab3aa787a34e1005a6e2398ddbbcdd905c2e4
