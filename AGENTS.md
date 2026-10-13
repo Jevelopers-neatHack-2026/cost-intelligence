@@ -49,4 +49,4 @@ The existing repository workflow gate remains unchanged: installation and
 execution stay disabled until a compatible source, release, immutable digest,
 and generated-file contract are independently reviewed. This guidance supplies
 none of that approval and does not activate checkpoint publishing; see
-[the session-capture policy](.entire/README.md).
+[the session-capture policy](https://github.com/Jevelopers-neatHack-2026/cost-intelligence/blob/main/.entire/README.md).
