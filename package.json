@@ -1,4 +1,5 @@
 {
+  "license": "MIT",
   "name": "@jevelopers/cost-intelligence",
   "version": "0.1.0",
   "private": true,
@@ -55,7 +56,7 @@
       "import": "./dist/reporting/index.js"
     }
   },
-  "files": ["dist", "schemas", "migrations", "README.md", "docs/api", "examples", "fixtures", "vendor", "contracts.lock.json"],
+  "files": ["dist", "schemas", "migrations", "README.md", "docs/api", "examples", "fixtures", "vendor", "contracts.lock.json", "LICENSE", "COPYRIGHT.md", "THIRD_PARTY_NOTICES.md"],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/export-schemas.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",

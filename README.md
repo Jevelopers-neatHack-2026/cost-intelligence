@@ -140,4 +140,4 @@ Read [AGENTS.md](AGENTS.md) and follow the organization [contributor guidance](h
 
 ## License
 
-No license file is present in this repository; no license terms are asserted here.
+Original project code and technical documentation are licensed under the [MIT License](LICENSE). See [COPYRIGHT.md](COPYRIGHT.md) for team attribution, scope and preserved third-party rights.
