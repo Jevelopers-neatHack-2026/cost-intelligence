@@ -1,4 +1,6 @@
 import './partition-binding-selected.test.mjs';
+import './database-snapshot-clock.test.mjs';
+import { databaseSnapshotClock } from './database-snapshot-clock.mjs';
 import assert from 'node:assert/strict';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
@@ -180,7 +182,8 @@ await test('CI-08 real scoped PostgreSQL public query and immutable financial or
       const results=await Promise.all([root.authorizeReservation(reservationRequest(next,reserve,{amount:'0.75'}),bp),root.authorizeReservation(reservationRequest(next,reserve,{amount:'0.75'}),bp)]);assert.equal(results.filter(result=>result.ok&&result.value.status==='authorized').length,1);assert.equal(results.filter(result=>result.ok&&result.value.status==='denied').length,1);
       const authorized=results.find(result=>result.ok&&result.value.status==='authorized').value;
       await checked(root.markReservationDispatched(markDispatchedCommand(next,authorized.reservationId,1,{attemptBinding:authorized.attemptBinding}),bp));
-      const {ports:p}=makePorts(pool,next,clock);const page=await checked(root.querySummary(query(next,{filters:{environments:['test'],billingModes:['live'],currency:'USD'}}),p));await writeFile(new URL('../../artifacts/reporting/producer-budget-v2-page.json',import.meta.url),JSON.stringify(page,null,2)+'\n');const budget=page.summary.budgets[0];assert.equal(budget.limit,'1');assert.equal(budget.held,'0.75');assert.equal(budget.lifecycleConsumed,'0');assert.equal(budget.ledgerExpense,'0');assert.equal(budget.remainingAuthorizedCapacity,'0.25');assert.equal(page.summary.currencies[0].metrics.expense.total,null);assert.equal(page.detailCount,0);
+      // PostgreSQL stamps policy/hold writes with its own clock, not the fixed ledger clock.
+      const {ports:p}=makePorts(pool,next,await databaseSnapshotClock(pool,clock.value));const page=await checked(root.querySummary(query(next,{filters:{environments:['test'],billingModes:['live'],currency:'USD'}}),p));await writeFile(new URL('../../artifacts/reporting/producer-budget-v2-page.json',import.meta.url),JSON.stringify(page,null,2)+'\n');const budget=page.summary.budgets[0];assert.equal(budget.limit,'1');assert.equal(budget.held,'0.75');assert.equal(budget.lifecycleConsumed,'0');assert.equal(budget.ledgerExpense,'0');assert.equal(budget.remainingAuthorizedCapacity,'0.25');assert.equal(page.summary.currencies[0].metrics.expense.total,null);assert.equal(page.detailCount,0);
       const capacity=await checked(root.readCapacity(next,'USD','synthetic-capacity-read',bp));assert.equal(capacity.outstandingHolds,budget.held);assert.equal(capacity.availableCapacity,budget.remainingAuthorizedCapacity);
     });
     await run('accepted unposted unknown usage and duplicate observations remain visible without manufactured charges',async()=>{
@@ -189,7 +192,8 @@ await test('CI-08 real scoped PostgreSQL public query and immutable financial or
       observation.usageEvent.tenant_id=next.tenantId;observation.usageEvent.project_id=next.projectId;observation.usageEvent.environment=next.environment;observation.usageEvent.billing_mode=next.billingMode;
       observation.usageEvent.event_id=randomUUID();observation.usageEvent.source_observation_id=randomUUID();observation.usageEvent.completeness='unknown';observation.usageEvent.usage_units=null;observation.usageEvent.missing_fields=['all'];observation.usageEvent.valuation={basis:'unknown',money:null,rate_card_ref:null};
       const receipt=await checked(root.ingestUsage(observation,p));assert.equal(receipt.outboxStatus,'awaiting_evidence');assert.equal((await checked(root.ingestUsage(observation,p))).status,'duplicate');
-      const page=await checked(root.querySummary(query(next,{filters:{environments:['test'],billingModes:['live'],currency:'USD'}}),p));assert.equal(page.detailCount,0);assert.equal(page.summary.coverage.unpostedAttemptCount,1);assert.equal(page.summary.coverage.awaitingEvidenceAttemptCount,1);assert.equal(page.summary.currencies[0].metrics.directCosts.total,null);
+      const {ports:snapshotPorts}=makePorts(pool,next,await databaseSnapshotClock(pool,clock.value));
+      const page=await checked(root.querySummary(query(next,{filters:{environments:['test'],billingModes:['live'],currency:'USD'}}),snapshotPorts));assert.equal(page.detailCount,0);assert.equal(page.summary.coverage.unpostedAttemptCount,1);assert.equal(page.summary.coverage.awaitingEvidenceAttemptCount,1);assert.equal(page.summary.currencies[0].metrics.directCosts.total,null);
     });
     await run('exact cost per approved design preserves rational numerator and denominator without division rounding',async()=>{
       const next=scope();const productEvidence={resolveSnapshot:async(q,asOf)=>{const content={version:'1.0.0',queryContentHash:reporting.reportingEvidenceQueryHash(q,asOf),scope:next,period:q.period,asOf,denominators:[{kind:'design',status:'complete',count:'3',approvalReference:{id:'synthetic-three-approvals',revision:1,contentHash:hash('three-approved-designs')}}],sourceCoverage:[{currency:'USD',source:'expense',status:'complete',expected:1}]};return {...content,reference:{id:'synthetic-product-snapshot',revision:1,contentHash:hash(content)}};}};
@@ -215,8 +219,9 @@ await test('CI-08 real scoped PostgreSQL public query and immutable financial or
       for(const cash of [{classification:'operating_expense',amount:'-5'},{classification:'payout_transfer',amount:'5'}]){
         const next=scope();const {ports:p}=makePorts(pool,next,clock);await setBudgetLimit(pool,next,'10');
         await checked(root.appendLedgerEvent(appendRequest(next,'recognized',{amount:'1'}),p));await checked(root.appendLedgerEvent(appendRequest(next,'cash-payment',{eventType:'cash_movement',...cash}),p));
-        const page=await checked(root.querySummaryV2(query(next),p));const row=page.summary.currencies[0];assert.equal(row.metrics.expense.knownSubtotal,'1');assert.equal(row.metrics.directCosts.knownSubtotal,'1');assert.equal(row.metrics.cashPayouts.knownSubtotal,'5');assert.equal(page.summary.budgets[0].ledgerExpense,'1');assert.equal(page.summary.budgets[0].remainingAuthorizedCapacity,'9');
-        const details=await allDetails(page,query(next),p);assert.equal(details.find(row=>row.eventType==='cash_movement').metrics.expense,'0');
+        const {ports:snapshotPorts}=makePorts(pool,next,await databaseSnapshotClock(pool,clock.value));
+        const page=await checked(root.querySummaryV2(query(next),snapshotPorts));const row=page.summary.currencies[0];assert.equal(row.metrics.expense.knownSubtotal,'1');assert.equal(row.metrics.directCosts.knownSubtotal,'1');assert.equal(row.metrics.cashPayouts.knownSubtotal,'5');assert.equal(page.summary.budgets[0].ledgerExpense,'1');assert.equal(page.summary.budgets[0].remainingAuthorizedCapacity,'9');
+        const details=await allDetails(page,query(next),snapshotPorts);assert.equal(details.find(row=>row.eventType==='cash_movement').metrics.expense,'0');
       }
     });
     await run('simulated unknown cost retains unknown totals and separates known subtotals from complete zero',async()=>{

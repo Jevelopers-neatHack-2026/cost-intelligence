@@ -5,7 +5,7 @@ for using graph retrieval, focused source inspection, and verification.
 @.entire/graph-agent.md
 <!-- entire-graph:end -->
 
-## Repository-owned graph safety and fallback
+## Repository-owned fallback when Entire graph is unavailable
 
 This repository-owned section takes precedence over the managed block above and
 `.entire/graph-agent.md`. Keep it outside generated blocks during regeneration.
