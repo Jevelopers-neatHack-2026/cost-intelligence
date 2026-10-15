@@ -3,8 +3,10 @@ import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import test from 'node:test';
+import registerTest from 'node:test';
+import {AsyncLocalStorage} from 'node:async_hooks';
 import pg from 'pg';
+import { EXPECTED_MIGRATIONS } from '../migrations/migration-catalog.mjs';
 import {
   appendLedgerEvent,
   ingestUsage,
@@ -21,6 +23,40 @@ import {
 } from '../../scripts/test-db-lifecycle.mjs';
 
 const { Client, Pool } = pg;
+const diagnosticContext=new AsyncLocalStorage();const diagnosticCases=[];
+const diagnosticCodes=new Set(['ERR_ASSERTION','42P01','42703','42883','42501','23505','23514','SOURCE_UNAVAILABLE','VALIDATION_ERROR']);
+const caseName=name=>name.startsWith('legacy ledger-only 0006')?'legacy6':name.startsWith('legacy ledger-only 0007')?'legacy7':
+ name.startsWith('legacy ledger-only 0008')?'legacy8':name.startsWith('CI02 ledger persists')?'ledger-main':
+ name.startsWith('CI02 issue 7')?'ledger-review':name.startsWith('partial current 0009')?'partial9':
+ name.startsWith('exact integrated health10')?'authority10':name.startsWith('exact schema11')?'settlement11':'known-fixture-case';
+function test(name,...args){const body=args.pop();return registerTest(name,...args,async context=>{
+ const entry={case:caseName(name),status:'running',sqlStates:[],capabilityMetadata:[]};diagnosticCases.push(entry);
+ try{await diagnosticContext.run(entry,()=>body(context));entry.status='passed';}
+ catch(error){entry.status='failed';entry.errorCode=diagnosticCodes.has(error?.code)?error.code:'bounded_other';
+   if(typeof error?.actual==='boolean')entry.actualBoolean=error.actual;if(typeof error?.expected==='boolean')entry.expectedBoolean=error.expected;
+   if(Number.isSafeInteger(error?.actual)&&Math.abs(error.actual)<=100000)entry.actualCount=error.actual;
+   if(Number.isSafeInteger(error?.expected)&&Math.abs(error.expected)<=100000)entry.expectedCount=error.expected;
+   const location=String(error?.stack??'').match(/ledger\.test\.mjs:(\d+):(\d+)/);if(location)entry.fixtureLocation={file:'tests/ledger/ledger.test.mjs',line:Number(location[1]),column:Number(location[2])};throw error;}
+ finally{await mkdir(join(root,'artifacts','test-manifests'),{recursive:true});await writeFile(join(root,'artifacts','test-manifests','ci05b-ledger-static-diagnostics.json'),JSON.stringify({version:'1.0.0',cases:diagnosticCases})+'\n');}
+});}
+function recordCapabilityMetadata(sql,rows){
+ const current=diagnosticContext.getStore();if(!current||current.capabilityMetadata.length>=64)return;
+ if(sql.includes('SELECT conname,convalidated,pg_get_constraintdef'))current.capabilityMetadata.push({tag:'settlement-enum',count:rows.length,
+   validated:rows.map(row=>row.convalidated===true),definitionHashes:rows.map(row=>createHash('sha256').update(String(row.definition)).digest('hex'))});
+ else if(sql.includes('AS append_guards'))current.capabilityMetadata.push({tag:'settlement-security',count:rows.length,
+   guards:rows.map(row=>Number(row.append_guards)),owner:rows.map(row=>row.owner==='ci_finance_owner'),rls:rows.map(row=>row.relrowsecurity===true&&row.relforcerowsecurity===true)});
+ else if(sql.includes('SELECT tablename,roles::text[]'))current.capabilityMetadata.push({tag:'settlement-policies',count:rows.length,
+   roleMatch:rows.map(row=>JSON.stringify(row.roles)===JSON.stringify(['ci_finance_runtime'])),expressionHashes:rows.map(row=>createHash('sha256').update(String(row.qual)).digest('hex'))});
+ else if(sql.includes('SELECT c.relname,t.tgname,p.proname'))current.capabilityMetadata.push({tag:'settlement-guards',count:rows.length,
+   masks:rows.map(row=>Number(row.tgtype)),invoker:rows.map(row=>row.prosecdef===false)});
+ else if(sql.includes('k.condeferrable,pg_get_constraintdef'))current.capabilityMetadata.push({tag:'settlement-bindings',count:rows.length,
+   definitionHashes:rows.map(row=>createHash('sha256').update(String(row.definition)).digest('hex'))});
+}
+function diagnosticClient(client){return {release:()=>client.release(),query:async(...input)=>{
+ try{const result=await client.query(...input);if(typeof input[0]==='string')recordCapabilityMetadata(input[0],result.rows??[]);return result;}
+ catch(error){const entry=diagnosticContext.getStore();if(entry&&entry.sqlStates.length<32)entry.sqlStates.push(diagnosticCodes.has(error?.code)?error.code:'bounded_other');throw error;}
+}};}
+
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const fixturePath = join(root, 'fixtures/ledger/ci02-synthetic-acceptance.json');
 const intakeFixturePath = join(root, 'fixtures/metering/usage-observation.request.json');
@@ -160,7 +196,7 @@ function makeRequest(scope, options = {}) {
 
 function makePorts(pool, scope, clock) {
   return {
-    database: { connect: () => pool.connect() },
+    database: { connect: async () => diagnosticClient(await pool.connect()) },
     trustedContext: { resolve: async () => ({ ...scope }) },
     clock: { now: () => new Date(clock.value) },
     // Synthetic service authority for isolated PostgreSQL regressions; this is not a production trust root.
@@ -369,8 +405,13 @@ test('CI02 ledger persists exact immutable records and rebuilds scoped projectio
     assert.equal(postgresVersion.slice(0, 2), '16', 'ledger acceptance must run on PostgreSQL 16');
     const health = await pool.query('SELECT migrations_ready, required_migrations_present FROM cost_intelligence.foundation_health');
     assert.equal(health.rows[0].migrations_ready, true);
-    assert.equal(Number(health.rows[0].required_migrations_present), 10,
-      'the additive pricing history, accounting projection, CI-05A budget reservation, and usage intake migrations extend the complete foundation set');
+    assert.equal(Number(health.rows[0].required_migrations_present), 11,
+      'the exact additive settlement capability extends the known core foundation to 0011; reporting 0012 remains a separate capability');
+    const installed=await pool.query('SELECT version,checksum_sha256 FROM cost_intelligence.schema_migrations ORDER BY version');
+    const expectedVersions=EXPECTED_MIGRATIONS.map(name=>name.replace(/\.sql$/,''));
+    assert.deepEqual(installed.rows.map(row=>row.version),expectedVersions,'only the exact known core11 and independent reporting, coverage and evidence migrations are installed');
+    for(const row of installed.rows)assert.equal(row.checksum_sha256,createHash('sha256').update(await readFile(join(root,'migrations',`${row.version}.sql`))).digest('hex'),'installed known migration bytes match their source commitments');
+    assert.equal((await pool.query('SELECT migrations_ready FROM cost_intelligence.reporting_health')).rows[0].migrations_ready,true);
 
     const scope = makeScope('union');
     const eventCases = [
@@ -2105,4 +2146,35 @@ test('exact integrated health10 requires complete authority artifacts and never 
     finally{await observer.query('ALTER TABLE cost_intelligence.budget_reservation_events ENABLE TRIGGER budget_reservation_events_revision_guard');}
     assert.equal((await rebuildLedgerProjection(request(),ports)).ok,true,'restored exact supported artifacts recover without changing ledger economics');
   }finally{await runtime?.end().catch(()=>{});await observer?.end().catch(()=>{});if(database)await dropProjectionCapabilityDatabase(database.name,database.base);}
+});
+
+test('exact schema11 preserves genuine legacy authority and rejects weakened enum/append/source/queue/unique artifacts',async()=>{
+ let database,runtime,observer;
+ try{
+  database=await createProjectionCapabilityDatabase(11);runtime=new Pool({...runtimeDatabaseConfigFromEnvironment(),database:database.name,max:3});
+  observer=new Client({...databaseConfigFromEnvironment('CI_TEST_DB'),database:database.name});await observer.connect();
+  const scope=makeScope('settlement-health11'),clock={value:fixedTime},ports=makePorts(runtime,scope,clock);
+  const request=()=>({schemaVersion:'1.0.0',requestId:randomId('settlement-capability'),scope,asOf:'2026-10-11T04:00:00.000Z'});
+  const positive=await rebuildLedgerProjection(request(),ports);assert.equal(positive.ok,true,positive.ok?'':positive.error.code);
+  const constraints=await observer.query(`SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='cost_intelligence.financial_ledger_events'::regclass AND conname='financial_ledger_events_valuation_check'`);
+  assert.equal(constraints.rows.length,1);const expectedConstraint=constraints.rows[0].definition;
+  const refuse=async()=>{const result=await rebuildLedgerProjection(request(),ports);assert.equal(result.ok,false);assert.equal(result.error.code,'SOURCE_UNAVAILABLE');};
+  await observer.query('ALTER TABLE cost_intelligence.financial_ledger_events DROP CONSTRAINT financial_ledger_events_valuation_check');
+  await observer.query(`ALTER TABLE cost_intelligence.financial_ledger_events ADD CONSTRAINT financial_ledger_events_valuation_check CHECK(valuation IN ('unknown','estimated','provider_confirmed','provider_reported_unsettled') OR true)`);
+  try{await refuse();}finally{await observer.query('ALTER TABLE cost_intelligence.financial_ledger_events DROP CONSTRAINT financial_ledger_events_valuation_check');await observer.query(`ALTER TABLE cost_intelligence.financial_ledger_events ADD CONSTRAINT financial_ledger_events_valuation_check ${expectedConstraint}`);}
+  for(const [table,guard,duplicateTable,fn] of [
+   ['budget_source_observations','budget_source_observations_no_truncate','budget_source_observations','reject_ledger_projection_mutation'],
+   ['budget_recovery_cursors','budget_recovery_cursors_revision_guard','budget_source_observations','guard_budget_source_append'],
+  ]){
+   const definitions=await observer.query(`SELECT pg_get_triggerdef(oid) AS definition FROM pg_trigger WHERE tgrelid=$1::regclass AND tgname=$2`,[`cost_intelligence.${table}`,guard]);assert.equal(definitions.rows.length,1);
+   await observer.query(`DROP TRIGGER ${guard} ON cost_intelligence.${table}`);
+   const events=fn==='reject_ledger_projection_mutation'?'UPDATE OR DELETE':'INSERT';
+   await observer.query(`CREATE TRIGGER duplicate_guard_test BEFORE ${events} ON cost_intelligence.${duplicateTable} FOR EACH ROW EXECUTE FUNCTION cost_intelligence.${fn}()`);
+   try{await refuse();}finally{await observer.query(`DROP TRIGGER duplicate_guard_test ON cost_intelligence.${duplicateTable}`);await observer.query(definitions.rows[0].definition);}
+  }
+  const unique=await observer.query(`SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='cost_intelligence.budget_command_receipts'::regclass AND contype='u'`);assert.equal(unique.rows.length,1);
+  await observer.query(`ALTER TABLE cost_intelligence.budget_command_receipts DROP CONSTRAINT ${unique.rows[0].conname}`);
+  try{await refuse();}finally{await observer.query(`ALTER TABLE cost_intelligence.budget_command_receipts ADD CONSTRAINT ${unique.rows[0].conname} ${unique.rows[0].definition}`);}
+  const restored=await rebuildLedgerProjection(request(),ports);assert.equal(restored.ok,true,restored.ok?'':restored.error.code);
+ }finally{await runtime?.end().catch(()=>{});await observer?.end().catch(()=>{});if(database)await dropProjectionCapabilityDatabase(database.name,database.base);}
 });

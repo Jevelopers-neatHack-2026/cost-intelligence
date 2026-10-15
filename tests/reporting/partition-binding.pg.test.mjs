@@ -19,6 +19,8 @@ await test('Finance binding actual restricted PG initial source and governed own
  function publish(records,operation){const db=new DatabaseSync(f.path);try{db.exec('BEGIN IMMEDIATE');db.prepare('UPDATE finance_binding_custody_snapshots SET body=? WHERE binding_id=?').run(canonical(records),records.binding.unsigned.id);db.prepare("UPDATE finance_binding_source_intents SET state='published' WHERE operation_id=?").run(operation);db.exec('COMMIT');Object.assign(f.records,records);Object.assign(f.request,{bindingReference:records.bindingReference});f.frame.signedMaintainerActionCanonicalBytes=canonical(records.action);}finally{db.close();}}
  try{
   assertDisposableMarker((await admin.query('SELECT marker FROM ci_test.disposable_database_marker')).rows);
+  assert.deepEqual((await pool.query('SELECT migrations_ready,required_migrations_present FROM cost_intelligence.foundation_health')).rows,
+   [{migrations_ready:true,required_migrations_present:11}],'the actual selected PG source exposes exact core11; independent feature migrations do not increase this count');
   const scope=fixtureScope({actorId:'synthetic-binding-source-owner',billingMode:'simulated'}),{ports}=hostPorts(scope,pool),databaseName=(await pool.query('SELECT current_database() AS name')).rows[0].name;
   // This PG writer is held only by this owner fixture, and ALWAYS commits changing intent before append.
   f=ownerFixture(makeStoredRecords({scope,backendName:databaseName}),{database:pool,databaseName});
