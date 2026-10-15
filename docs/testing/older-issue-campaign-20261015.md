@@ -85,3 +85,28 @@ PostgreSQL `now()` and compares the persisted schedule to the independent
 2/4/8/16-second policy oracle. It no longer compares database time to host wall
 time or test elapsed time. Five attempts, exact retry counts, dead-letter state,
 retained evidence and zero partial charges remain enforced.
+
+## Final executed qualification
+
+Implementation revision `306a0289ae62e58bdc4a565c727fa8ce29ec9083`:
+`npm run test:release -- --offline` executed all1,006 selected registrations,
+1,006 passed, zero failed/skipped/TODO/cancelled. The command exits1 with
+`required_test_files_missing` for exactly `tests/adapters/adapters.test.mjs` and
+`tests/reconciliation/reconciliation.test.mjs`; status is blocked, never passed.
+This superset includes authorization76, contention5, lifecycle38 (including the
+three new real-PG regressions), recovery12, reporting96+4, ledger8, migrations35,
+security6, actual PostgreSQL audit/coverage readers and the packed package tests.
+Counts include nested/repeated registrations and are not unique scenarios.
+
+The [structured results](older-issue-campaign-20261015-results.json) preserve
+actual aggregate outcomes and SHA-256 references for earlier failures and the
+final run. PR64 is the focused main-based projection candidate; PR65 composes
+its source with the preserved held settlement candidate and repair. Required
+review is independent and supervisor-owned; neither PR is merged. No issue is
+reported wholly complete or eligible for closure before merge and required
+post-merge/owner evidence.
+
+Current #14 source availability was rechecked: local `git cat-file -t` cannot
+resolve7210be783bf8694b1cde6bb07866d5250fd6aca8, and the configured GitHub commit
+API returns404. This is a concrete source/access handoff gap, not proof that the
+owner's preserved repairs have been lost.

@@ -1,0 +1,3243 @@
+{
+  "version": "1.0.0",
+  "defaultBaseline": "2d8ab3aa787a34e1005a6e2398ddbbcdd905c2e4",
+  "implementationHead": "306a0289ae62e58bdc4a565c727fa8ce29ec9083",
+  "sourceMode": "synthetic_sources_and_authority_actual_disposable_postgresql",
+  "runtime": {
+    "node": "22.23.3",
+    "npm": "10.9.9"
+  },
+  "providerCalls": 0,
+  "runs": [
+    {
+      "manifest": "artifacts/test-manifests/reporting-2026-10-15T054625453Z-67536.json",
+      "sha256": "197cbed7683df5378b7688ea31a40d10d692135b10353909d1524fac7eafd6b2",
+      "suite": "reporting",
+      "status": "passed",
+      "exitCode": 0,
+      "blocker": null,
+      "selector": null,
+      "testCount": 87,
+      "passedTestCount": 87,
+      "failedTestCount": 0,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [],
+      "recordedAt": "2026-10-15T05:46:38.162Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/reporting/reporting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 83,
+          "completedTestCaseCount": 83,
+          "passedTestCaseCount": 83,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 83,
+              "failed": 0,
+              "passed": 83,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reported-unsettled.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/contracts-2026-10-15T054806475Z-97351.json",
+      "sha256": "20b112517504d853d2d0bc26930d7265a5fb8113e430ef8e121ed01af7e57b07",
+      "suite": "contracts",
+      "status": "passed",
+      "exitCode": 0,
+      "blocker": null,
+      "selector": null,
+      "testCount": 13,
+      "passedTestCount": 13,
+      "failedTestCount": 0,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [],
+      "recordedAt": "2026-10-15T05:48:07.044Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/contracts/shared-contracts.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 3,
+          "completedTestCaseCount": 3,
+          "passedTestCaseCount": 3,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 3,
+              "failed": 0,
+              "passed": 3,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/contracts/api-contract-shapes.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 10,
+          "completedTestCaseCount": 10,
+          "passedTestCaseCount": 10,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 10,
+              "failed": 0,
+              "passed": 10,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/exports-2026-10-15T054712660Z-80996.json",
+      "sha256": "cfce484d40d775775d3e94869127e53b01327f6f39f8350481e6a5b0472bc373",
+      "suite": "exports",
+      "status": "passed",
+      "exitCode": 0,
+      "blocker": null,
+      "selector": null,
+      "testCount": 317,
+      "passedTestCount": 317,
+      "failedTestCount": 0,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [],
+      "recordedAt": "2026-10-15T05:47:48.967Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/exports/public-exports.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 309,
+          "completedTestCaseCount": 309,
+          "passedTestCaseCount": 309,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 309,
+              "failed": 0,
+              "passed": 309,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/exports/csv-encoding.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 8,
+          "completedTestCaseCount": 8,
+          "passedTestCaseCount": 8,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 8,
+              "failed": 0,
+              "passed": 8,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/exports-2026-10-15T054711125Z-80414.json",
+      "sha256": "14bd36044cb1c1fe258bf47dcf942bbdf3200ef3e50ccfcabdff2eb10204e00b",
+      "suite": "exports",
+      "status": "passed",
+      "exitCode": 0,
+      "blocker": null,
+      "selector": "postgres",
+      "testCount": 10,
+      "passedTestCount": 10,
+      "failedTestCount": 0,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [],
+      "recordedAt": "2026-10-15T05:47:34.392Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/exports/query-export-pg.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 10,
+          "completedTestCaseCount": 10,
+          "passedTestCaseCount": 10,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 10,
+              "failed": 0,
+              "passed": 10,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/traceability-2026-10-15T054926801Z-17100.json",
+      "sha256": "5fb9f7134468fecd0df50a2f2e7050a58b8d38012a8e91180b197a84da7576f7",
+      "suite": "traceability",
+      "status": "passed",
+      "exitCode": 0,
+      "blocker": null,
+      "selector": null,
+      "testCount": 209,
+      "passedTestCount": 209,
+      "failedTestCount": 0,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [],
+      "recordedAt": "2026-10-15T05:49:38.831Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/traceability/release-gates.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 16,
+          "completedTestCaseCount": 16,
+          "passedTestCaseCount": 16,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 16,
+              "failed": 0,
+              "passed": 16,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/migration-policy.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 18,
+          "completedTestCaseCount": 18,
+          "passedTestCaseCount": 18,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 18,
+              "failed": 0,
+              "passed": 18,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/stored-lineage-migration-policy.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 25,
+          "completedTestCaseCount": 25,
+          "passedTestCaseCount": 25,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 25,
+              "failed": 0,
+              "passed": 25,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/evidence.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 41,
+          "completedTestCaseCount": 41,
+          "passedTestCaseCount": 41,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 41,
+              "failed": 0,
+              "passed": 41,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 40,
+          "completedTestCaseCount": 40,
+          "passedTestCaseCount": 40,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 40,
+              "failed": 0,
+              "passed": 40,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 69,
+          "completedTestCaseCount": 69,
+          "passedTestCaseCount": 69,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 69,
+              "failed": 0,
+              "passed": 69,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/budgets-2026-10-15T055121900Z-50491.json",
+      "sha256": "1a617afd5aeaecce0ebc8ae10ea3b739212236f60b9581c857c0a1cc2c039eb0",
+      "suite": "budgets",
+      "status": "failed",
+      "exitCode": 1,
+      "blocker": "test_file_evidence_failed",
+      "selector": "lifecycle",
+      "testCount": 37,
+      "passedTestCount": 35,
+      "failedTestCount": 2,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [],
+      "recordedAt": "2026-10-15T05:51:43.881Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/budgets/lifecycle.test.mjs",
+          "passed": false,
+          "reason": "test_case_failed",
+          "exitCode": 1,
+          "registeredTestCaseCount": 37,
+          "completedTestCaseCount": 37,
+          "passedTestCaseCount": 35,
+          "failedTestCaseCount": 2,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": false,
+            "counts": {
+              "tests": 37,
+              "failed": 2,
+              "passed": 35,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [
+            {
+              "titleHash": "778a237cd8dfd4d2f7e7f376e394a671e2e018af7097b1746538cebd5b7b366b",
+              "registrationLine": 10,
+              "registrationColumn": 9,
+              "code": "ERR_ASSERTION"
+            },
+            {
+              "titleHash": "adff7638734664e1cdc6759b8499ce24f4623687fbe5b97268ee28d791398fcd",
+              "registrationLine": 10,
+              "registrationColumn": 9,
+              "code": "ERR_ASSERTION"
+            }
+          ],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/budgets-2026-10-15T055210248Z-59377.json",
+      "sha256": "75c7f0756c9888ffbc5c1b4b245978d906833d174e4b4211c3485c29a61cedd8",
+      "suite": "budgets",
+      "status": "failed",
+      "exitCode": 1,
+      "blocker": "test_file_evidence_failed",
+      "selector": "lifecycle",
+      "testCount": 37,
+      "passedTestCount": 36,
+      "failedTestCount": 1,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [],
+      "recordedAt": "2026-10-15T05:52:24.632Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/budgets/lifecycle.test.mjs",
+          "passed": false,
+          "reason": "test_case_failed",
+          "exitCode": 1,
+          "registeredTestCaseCount": 37,
+          "completedTestCaseCount": 37,
+          "passedTestCaseCount": 36,
+          "failedTestCaseCount": 1,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": false,
+            "counts": {
+              "tests": 37,
+              "failed": 1,
+              "passed": 36,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [
+            {
+              "titleHash": "adff7638734664e1cdc6759b8499ce24f4623687fbe5b97268ee28d791398fcd",
+              "registrationLine": 10,
+              "registrationColumn": 9,
+              "code": "ERR_ASSERTION"
+            }
+          ],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/integration-2026-10-15T055333463Z-68447.json",
+      "sha256": "0090a0fc0d0f7fbc2ab4b1523a1c8012d18f73dd77e8500808c4875858bdab13",
+      "suite": "integration",
+      "status": "failed",
+      "exitCode": 1,
+      "blocker": "test_file_evidence_failed",
+      "selector": null,
+      "testCount": 913,
+      "passedTestCount": 911,
+      "failedTestCount": 2,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [
+        "tests/adapters/adapters.test.mjs",
+        "tests/reconciliation/reconciliation.test.mjs"
+      ],
+      "recordedAt": "2026-10-15T05:57:03.890Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/contracts/shared-contracts.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 3,
+          "completedTestCaseCount": 3,
+          "passedTestCaseCount": 3,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 3,
+              "failed": 0,
+              "passed": 3,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/contracts/api-contract-shapes.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 10,
+          "completedTestCaseCount": 10,
+          "passedTestCaseCount": 10,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 10,
+              "failed": 0,
+              "passed": 10,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/exports/public-exports.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 309,
+          "completedTestCaseCount": 309,
+          "passedTestCaseCount": 309,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 309,
+              "failed": 0,
+              "passed": 309,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/smoke/api-boundaries.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 2,
+          "completedTestCaseCount": 2,
+          "passedTestCaseCount": 2,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 2,
+              "failed": 0,
+              "passed": 2,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/release-gates.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 16,
+          "completedTestCaseCount": 16,
+          "passedTestCaseCount": 16,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 16,
+              "failed": 0,
+              "passed": 16,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/migrations/migrations.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 35,
+          "completedTestCaseCount": 35,
+          "passedTestCaseCount": 35,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 35,
+              "failed": 0,
+              "passed": 35,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-reader.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 21,
+          "completedTestCaseCount": 21,
+          "passedTestCaseCount": 21,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 21,
+              "failed": 0,
+              "passed": 21,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-postgres.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 38,
+          "completedTestCaseCount": 38,
+          "passedTestCaseCount": 38,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 38,
+              "failed": 0,
+              "passed": 38,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reconciliation/coverage.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 51,
+          "completedTestCaseCount": 51,
+          "passedTestCaseCount": 51,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 51,
+              "failed": 0,
+              "passed": 51,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reconciliation/coverage-pg.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 18,
+          "completedTestCaseCount": 18,
+          "passedTestCaseCount": 18,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 18,
+              "failed": 0,
+              "passed": 18,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/accounting/accounting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 11,
+          "completedTestCaseCount": 11,
+          "passedTestCaseCount": 11,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 11,
+              "failed": 0,
+              "passed": 11,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/authorization.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 76,
+          "completedTestCaseCount": 76,
+          "passedTestCaseCount": 76,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 76,
+              "failed": 0,
+              "passed": 76,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/contention.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 5,
+          "completedTestCaseCount": 5,
+          "passedTestCaseCount": 5,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 5,
+              "failed": 0,
+              "passed": 5,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/lifecycle.test.mjs",
+          "passed": false,
+          "reason": "test_case_failed",
+          "exitCode": 1,
+          "registeredTestCaseCount": 38,
+          "completedTestCaseCount": 38,
+          "passedTestCaseCount": 37,
+          "failedTestCaseCount": 1,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": false,
+            "counts": {
+              "tests": 38,
+              "failed": 1,
+              "passed": 37,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [
+            {
+              "titleHash": "fd43ffb192cd7bd1d530228c1747b1c62b8a2f21954bbdb0a06603e865cfae9f",
+              "registrationLine": 10,
+              "registrationColumn": 9,
+              "code": "23505"
+            }
+          ],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/evidence.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 41,
+          "completedTestCaseCount": 41,
+          "passedTestCaseCount": 41,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 41,
+              "failed": 0,
+              "passed": 41,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 40,
+          "completedTestCaseCount": 40,
+          "passedTestCaseCount": 40,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 40,
+              "failed": 0,
+              "passed": 40,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 69,
+          "completedTestCaseCount": 69,
+          "passedTestCaseCount": 69,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 69,
+              "failed": 0,
+              "passed": 69,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/ledger/ledger.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 8,
+          "completedTestCaseCount": 8,
+          "passedTestCaseCount": 8,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 8,
+              "failed": 0,
+              "passed": 8,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/metering/metering.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 6,
+          "completedTestCaseCount": 6,
+          "passedTestCaseCount": 6,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 6,
+              "failed": 0,
+              "passed": 6,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/pricing/pricing.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reporting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 96,
+          "completedTestCaseCount": 96,
+          "passedTestCaseCount": 96,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 96,
+              "failed": 0,
+              "passed": 96,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reported-unsettled.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/recovery/recovery.test.mjs",
+          "passed": false,
+          "reason": "test_case_failed",
+          "exitCode": 1,
+          "registeredTestCaseCount": 12,
+          "completedTestCaseCount": 12,
+          "passedTestCaseCount": 11,
+          "failedTestCaseCount": 1,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": false,
+            "counts": {
+              "tests": 12,
+              "failed": 1,
+              "passed": 11,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [
+            {
+              "titleHash": "526370d7351f816fd045d08ea7bdce2f3957c137f490b87cf94943ad10d8fdad",
+              "registrationLine": 680,
+              "registrationColumn": 1,
+              "code": "ERR_ASSERTION"
+            }
+          ],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/release-2026-10-15T055649201Z-7019.json",
+      "sha256": "df4b013a3763b7f9464b8caab166197946f6e999b32f833a5f00bda3ce02473c",
+      "suite": "release",
+      "status": "failed",
+      "exitCode": 1,
+      "blocker": "test_file_evidence_failed",
+      "selector": null,
+      "testCount": 1006,
+      "passedTestCount": 1005,
+      "failedTestCount": 1,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [
+        "tests/adapters/adapters.test.mjs",
+        "tests/reconciliation/reconciliation.test.mjs"
+      ],
+      "recordedAt": "2026-10-15T05:59:13.410Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/contracts/shared-contracts.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 3,
+          "completedTestCaseCount": 3,
+          "passedTestCaseCount": 3,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 3,
+              "failed": 0,
+              "passed": 3,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/contracts/api-contract-shapes.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 10,
+          "completedTestCaseCount": 10,
+          "passedTestCaseCount": 10,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 10,
+              "failed": 0,
+              "passed": 10,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/exports/public-exports.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 309,
+          "completedTestCaseCount": 309,
+          "passedTestCaseCount": 309,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 309,
+              "failed": 0,
+              "passed": 309,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/smoke/api-boundaries.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 2,
+          "completedTestCaseCount": 2,
+          "passedTestCaseCount": 2,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 2,
+              "failed": 0,
+              "passed": 2,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/release-gates.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 16,
+          "completedTestCaseCount": 16,
+          "passedTestCaseCount": 16,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 16,
+              "failed": 0,
+              "passed": 16,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/migrations/migrations.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 35,
+          "completedTestCaseCount": 35,
+          "passedTestCaseCount": 35,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 35,
+              "failed": 0,
+              "passed": 35,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-reader.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 21,
+          "completedTestCaseCount": 21,
+          "passedTestCaseCount": 21,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 21,
+              "failed": 0,
+              "passed": 21,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-postgres.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 38,
+          "completedTestCaseCount": 38,
+          "passedTestCaseCount": 38,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 38,
+              "failed": 0,
+              "passed": 38,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reconciliation/coverage.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 51,
+          "completedTestCaseCount": 51,
+          "passedTestCaseCount": 51,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 51,
+              "failed": 0,
+              "passed": 51,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reconciliation/coverage-pg.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 18,
+          "completedTestCaseCount": 18,
+          "passedTestCaseCount": 18,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 18,
+              "failed": 0,
+              "passed": 18,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/accounting/accounting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 11,
+          "completedTestCaseCount": 11,
+          "passedTestCaseCount": 11,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 11,
+              "failed": 0,
+              "passed": 11,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/authorization.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 76,
+          "completedTestCaseCount": 76,
+          "passedTestCaseCount": 76,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 76,
+              "failed": 0,
+              "passed": 76,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/contention.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 5,
+          "completedTestCaseCount": 5,
+          "passedTestCaseCount": 5,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 5,
+              "failed": 0,
+              "passed": 5,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/lifecycle.test.mjs",
+          "passed": false,
+          "reason": "test_case_failed",
+          "exitCode": 1,
+          "registeredTestCaseCount": 38,
+          "completedTestCaseCount": 38,
+          "passedTestCaseCount": 37,
+          "failedTestCaseCount": 1,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": false,
+            "counts": {
+              "tests": 38,
+              "failed": 1,
+              "passed": 37,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [
+            {
+              "titleHash": "fd43ffb192cd7bd1d530228c1747b1c62b8a2f21954bbdb0a06603e865cfae9f",
+              "registrationLine": 10,
+              "registrationColumn": 9,
+              "code": "23505"
+            }
+          ],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/evidence.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 41,
+          "completedTestCaseCount": 41,
+          "passedTestCaseCount": 41,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 41,
+              "failed": 0,
+              "passed": 41,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 40,
+          "completedTestCaseCount": 40,
+          "passedTestCaseCount": 40,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 40,
+              "failed": 0,
+              "passed": 40,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 69,
+          "completedTestCaseCount": 69,
+          "passedTestCaseCount": 69,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 69,
+              "failed": 0,
+              "passed": 69,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/ledger/ledger.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 8,
+          "completedTestCaseCount": 8,
+          "passedTestCaseCount": 8,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 8,
+              "failed": 0,
+              "passed": 8,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/metering/metering.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 6,
+          "completedTestCaseCount": 6,
+          "passedTestCaseCount": 6,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 6,
+              "failed": 0,
+              "passed": 6,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/pricing/pricing.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reporting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 96,
+          "completedTestCaseCount": 96,
+          "passedTestCaseCount": 96,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 96,
+              "failed": 0,
+              "passed": 96,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reported-unsettled.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/recovery/recovery.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 12,
+          "completedTestCaseCount": 12,
+          "passedTestCaseCount": 12,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 12,
+              "failed": 0,
+              "passed": 12,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/security/security.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 6,
+          "completedTestCaseCount": 6,
+          "passedTestCaseCount": 6,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 6,
+              "failed": 0,
+              "passed": 6,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/migration-policy.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 62,
+          "completedTestCaseCount": 62,
+          "passedTestCaseCount": 62,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 62,
+              "failed": 0,
+              "passed": 62,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/stored-lineage-migration-policy.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 25,
+          "completedTestCaseCount": 25,
+          "passedTestCaseCount": 25,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 25,
+              "failed": 0,
+              "passed": 25,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/release-2026-10-15T055953905Z-35302.json",
+      "sha256": "19606eaa79005e0de99468a31c1a69f7ffd198c01e01b85b5a39ede8a637ceb8",
+      "suite": "release",
+      "status": "failed",
+      "exitCode": 1,
+      "blocker": "test_file_evidence_failed",
+      "selector": null,
+      "testCount": 1006,
+      "passedTestCount": 1004,
+      "failedTestCount": 2,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [
+        "tests/adapters/adapters.test.mjs",
+        "tests/reconciliation/reconciliation.test.mjs"
+      ],
+      "recordedAt": "2026-10-15T06:01:34.694Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/contracts/shared-contracts.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 3,
+          "completedTestCaseCount": 3,
+          "passedTestCaseCount": 3,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 3,
+              "failed": 0,
+              "passed": 3,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/contracts/api-contract-shapes.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 10,
+          "completedTestCaseCount": 10,
+          "passedTestCaseCount": 10,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 10,
+              "failed": 0,
+              "passed": 10,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/exports/public-exports.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 309,
+          "completedTestCaseCount": 309,
+          "passedTestCaseCount": 309,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 309,
+              "failed": 0,
+              "passed": 309,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/smoke/api-boundaries.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 2,
+          "completedTestCaseCount": 2,
+          "passedTestCaseCount": 2,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 2,
+              "failed": 0,
+              "passed": 2,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/release-gates.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 16,
+          "completedTestCaseCount": 16,
+          "passedTestCaseCount": 16,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 16,
+              "failed": 0,
+              "passed": 16,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/migrations/migrations.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 35,
+          "completedTestCaseCount": 35,
+          "passedTestCaseCount": 35,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 35,
+              "failed": 0,
+              "passed": 35,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-reader.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 21,
+          "completedTestCaseCount": 21,
+          "passedTestCaseCount": 21,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 21,
+              "failed": 0,
+              "passed": 21,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-postgres.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 38,
+          "completedTestCaseCount": 38,
+          "passedTestCaseCount": 38,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 38,
+              "failed": 0,
+              "passed": 38,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reconciliation/coverage.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 51,
+          "completedTestCaseCount": 51,
+          "passedTestCaseCount": 51,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 51,
+              "failed": 0,
+              "passed": 51,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reconciliation/coverage-pg.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 18,
+          "completedTestCaseCount": 18,
+          "passedTestCaseCount": 18,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 18,
+              "failed": 0,
+              "passed": 18,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/accounting/accounting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 11,
+          "completedTestCaseCount": 11,
+          "passedTestCaseCount": 11,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 11,
+              "failed": 0,
+              "passed": 11,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/authorization.test.mjs",
+          "passed": false,
+          "reason": "test_case_failed",
+          "exitCode": 1,
+          "registeredTestCaseCount": 76,
+          "completedTestCaseCount": 76,
+          "passedTestCaseCount": 75,
+          "failedTestCaseCount": 1,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": false,
+            "counts": {
+              "tests": 76,
+              "failed": 1,
+              "passed": 75,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [
+            {
+              "titleHash": "16024eafb961e6e3247f507e8acaab7a6c8d6c2864b7d4fed46232becf1a9105",
+              "registrationLine": 10,
+              "registrationColumn": 9,
+              "code": "bounded_other"
+            }
+          ],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/contention.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 5,
+          "completedTestCaseCount": 5,
+          "passedTestCaseCount": 5,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 5,
+              "failed": 0,
+              "passed": 5,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/lifecycle.test.mjs",
+          "passed": false,
+          "reason": "test_case_failed",
+          "exitCode": 1,
+          "registeredTestCaseCount": 38,
+          "completedTestCaseCount": 38,
+          "passedTestCaseCount": 37,
+          "failedTestCaseCount": 1,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": false,
+            "counts": {
+              "tests": 38,
+              "failed": 1,
+              "passed": 37,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [
+            {
+              "titleHash": "fd43ffb192cd7bd1d530228c1747b1c62b8a2f21954bbdb0a06603e865cfae9f",
+              "registrationLine": 10,
+              "registrationColumn": 9,
+              "code": "23505"
+            }
+          ],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/evidence.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 41,
+          "completedTestCaseCount": 41,
+          "passedTestCaseCount": 41,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 41,
+              "failed": 0,
+              "passed": 41,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 40,
+          "completedTestCaseCount": 40,
+          "passedTestCaseCount": 40,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 40,
+              "failed": 0,
+              "passed": 40,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 69,
+          "completedTestCaseCount": 69,
+          "passedTestCaseCount": 69,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 69,
+              "failed": 0,
+              "passed": 69,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/ledger/ledger.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 8,
+          "completedTestCaseCount": 8,
+          "passedTestCaseCount": 8,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 8,
+              "failed": 0,
+              "passed": 8,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/metering/metering.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 6,
+          "completedTestCaseCount": 6,
+          "passedTestCaseCount": 6,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 6,
+              "failed": 0,
+              "passed": 6,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/pricing/pricing.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reporting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 96,
+          "completedTestCaseCount": 96,
+          "passedTestCaseCount": 96,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 96,
+              "failed": 0,
+              "passed": 96,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reported-unsettled.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/recovery/recovery.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 12,
+          "completedTestCaseCount": 12,
+          "passedTestCaseCount": 12,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 12,
+              "failed": 0,
+              "passed": 12,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/security/security.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 6,
+          "completedTestCaseCount": 6,
+          "passedTestCaseCount": 6,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 6,
+              "failed": 0,
+              "passed": 6,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/migration-policy.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 62,
+          "completedTestCaseCount": 62,
+          "passedTestCaseCount": 62,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 62,
+              "failed": 0,
+              "passed": 62,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/stored-lineage-migration-policy.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 25,
+          "completedTestCaseCount": 25,
+          "passedTestCaseCount": 25,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 25,
+              "failed": 0,
+              "passed": 25,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/recovery-2026-10-15T055755129Z-11528.json",
+      "sha256": "60c672f2ee68f730106c12f216070c7872d458ed8b37be1747844cf1b1273187",
+      "suite": "recovery",
+      "status": "passed",
+      "exitCode": 0,
+      "blocker": null,
+      "selector": null,
+      "testCount": 12,
+      "passedTestCount": 12,
+      "failedTestCount": 0,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [],
+      "recordedAt": "2026-10-15T05:57:57.093Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/recovery/recovery.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 12,
+          "completedTestCaseCount": 12,
+          "passedTestCaseCount": 12,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 12,
+              "failed": 0,
+              "passed": 12,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    },
+    {
+      "manifest": "artifacts/test-manifests/release-2026-10-15T060151868Z-46218.json",
+      "sha256": "c6d399c450953690ac9553ed8e54f7690815ce000290c76a2d61557907ba2f3d",
+      "suite": "release",
+      "status": "blocked",
+      "exitCode": 1,
+      "blocker": "required_test_files_missing",
+      "selector": null,
+      "testCount": 1006,
+      "passedTestCount": 1006,
+      "failedTestCount": 0,
+      "skippedTestCount": 0,
+      "todoTestCount": 0,
+      "cancelledTestCount": 0,
+      "missingRequiredTestFiles": [
+        "tests/adapters/adapters.test.mjs",
+        "tests/reconciliation/reconciliation.test.mjs"
+      ],
+      "recordedAt": "2026-10-15T06:03:25.035Z",
+      "testFileEvidence": [
+        {
+          "path": "tests/contracts/shared-contracts.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 3,
+          "completedTestCaseCount": 3,
+          "passedTestCaseCount": 3,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 3,
+              "failed": 0,
+              "passed": 3,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/contracts/api-contract-shapes.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 10,
+          "completedTestCaseCount": 10,
+          "passedTestCaseCount": 10,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 10,
+              "failed": 0,
+              "passed": 10,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/exports/public-exports.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 309,
+          "completedTestCaseCount": 309,
+          "passedTestCaseCount": 309,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 309,
+              "failed": 0,
+              "passed": 309,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/smoke/api-boundaries.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 2,
+          "completedTestCaseCount": 2,
+          "passedTestCaseCount": 2,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 2,
+              "failed": 0,
+              "passed": 2,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/release-gates.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 16,
+          "completedTestCaseCount": 16,
+          "passedTestCaseCount": 16,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 16,
+              "failed": 0,
+              "passed": 16,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/migrations/migrations.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 35,
+          "completedTestCaseCount": 35,
+          "passedTestCaseCount": 35,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 35,
+              "failed": 0,
+              "passed": 35,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-reader.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 21,
+          "completedTestCaseCount": 21,
+          "passedTestCaseCount": 21,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 21,
+              "failed": 0,
+              "passed": 21,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-postgres.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 38,
+          "completedTestCaseCount": 38,
+          "passedTestCaseCount": 38,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 38,
+              "failed": 0,
+              "passed": 38,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reconciliation/coverage.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 51,
+          "completedTestCaseCount": 51,
+          "passedTestCaseCount": 51,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 51,
+              "failed": 0,
+              "passed": 51,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reconciliation/coverage-pg.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 18,
+          "completedTestCaseCount": 18,
+          "passedTestCaseCount": 18,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 18,
+              "failed": 0,
+              "passed": 18,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/accounting/accounting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 11,
+          "completedTestCaseCount": 11,
+          "passedTestCaseCount": 11,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 11,
+              "failed": 0,
+              "passed": 11,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/authorization.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 76,
+          "completedTestCaseCount": 76,
+          "passedTestCaseCount": 76,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 76,
+              "failed": 0,
+              "passed": 76,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/contention.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 5,
+          "completedTestCaseCount": 5,
+          "passedTestCaseCount": 5,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 5,
+              "failed": 0,
+              "passed": 5,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/budgets/lifecycle.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 38,
+          "completedTestCaseCount": 38,
+          "passedTestCaseCount": 38,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 38,
+              "failed": 0,
+              "passed": 38,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/evidence.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 41,
+          "completedTestCaseCount": 41,
+          "passedTestCaseCount": 41,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 41,
+              "failed": 0,
+              "passed": 41,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/postgres-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 40,
+          "completedTestCaseCount": 40,
+          "passedTestCaseCount": 40,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 40,
+              "failed": 0,
+              "passed": 40,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/evidence/stored-lineage-model.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 69,
+          "completedTestCaseCount": 69,
+          "passedTestCaseCount": 69,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 69,
+              "failed": 0,
+              "passed": 69,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/ledger/ledger.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 8,
+          "completedTestCaseCount": 8,
+          "passedTestCaseCount": 8,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 8,
+              "failed": 0,
+              "passed": 8,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/metering/metering.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 6,
+          "completedTestCaseCount": 6,
+          "passedTestCaseCount": 6,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 6,
+              "failed": 0,
+              "passed": 6,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/pricing/pricing.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reporting.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 96,
+          "completedTestCaseCount": 96,
+          "passedTestCaseCount": 96,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 96,
+              "failed": 0,
+              "passed": 96,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/reporting/reported-unsettled.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 4,
+          "completedTestCaseCount": 4,
+          "passedTestCaseCount": 4,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 4,
+              "failed": 0,
+              "passed": 4,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/recovery/recovery.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 12,
+          "completedTestCaseCount": 12,
+          "passedTestCaseCount": 12,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 12,
+              "failed": 0,
+              "passed": 12,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/security/security.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 6,
+          "completedTestCaseCount": 6,
+          "passedTestCaseCount": 6,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 6,
+              "failed": 0,
+              "passed": 6,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/migration-policy.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 62,
+          "completedTestCaseCount": 62,
+          "passedTestCaseCount": 62,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 62,
+              "failed": 0,
+              "passed": 62,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        },
+        {
+          "path": "tests/traceability/stored-lineage-migration-policy.test.mjs",
+          "passed": true,
+          "reason": null,
+          "exitCode": 0,
+          "registeredTestCaseCount": 25,
+          "completedTestCaseCount": 25,
+          "passedTestCaseCount": 25,
+          "failedTestCaseCount": 0,
+          "skippedTestCaseCount": 0,
+          "todoTestCaseCount": 0,
+          "fileSummary": {
+            "success": true,
+            "counts": {
+              "tests": 25,
+              "failed": 0,
+              "passed": 25,
+              "skipped": 0,
+              "todo": 0,
+              "cancelled": 0
+            }
+          },
+          "failedTestCases": [],
+          "omittedFailedTestCaseCount": 0
+        }
+      ]
+    }
+  ],
+  "finalQualification": "All 1006 selected registrations pass; aggregate exits 1 for missing adapters and full reconciliation files. This is not whole financial acceptance. Earlier failures remain failed.",
+  "remaining": [
+    "independent whole-money review and supervisor merge/postmerge evidence",
+    "strict reporting/export consumer ACK",
+    "authentic host issuer/source/finality adoption",
+    "missing accounting R4 source packet",
+    "agreed producer usage/rate/callback mappings",
+    "actual CFO delivery/import",
+    "full adapters and financial reconciliation implementation after prerequisites"
+  ]
+}
