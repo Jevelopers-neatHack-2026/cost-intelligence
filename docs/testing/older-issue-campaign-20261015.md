@@ -69,3 +69,19 @@ a numeric serialization assertion; a mistakenly edited quarantine SQL alias
 reruns do not erase those results. Test manifests retain each aggregate run.
 No required independent approval, historical ACK or human gate was supplied by
 these self-authored tests. No issues were closed and no PR was merged or deployed.
+
+
+## Aggregate fixture corrections
+
+The full selection exposed a PostgreSQL23505 collision at the foreign-quarantine
+fixture: its fixed record hash had already been inserted by an earlier selected
+suite. The record now receives a unique synthetic hash; the actual quarantined
+ledger hash, foreign-scope positive, release refusal and hold-conservation
+assertions are unchanged. This resolves the observed isolated/aggregate outcome
+difference without changing runtime quarantine logic.
+
+The retry-backoff regression samples the actual failed posting transaction's
+PostgreSQL `now()` and compares the persisted schedule to the independent
+2/4/8/16-second policy oracle. It no longer compares database time to host wall
+time or test elapsed time. Five attempts, exact retry counts, dead-letter state,
+retained evidence and zero partial charges remain enforced.

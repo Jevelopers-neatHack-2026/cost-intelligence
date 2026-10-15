@@ -199,7 +199,7 @@ test('CI05B privacy-quarantined scoped financial history refuses admission repla
   const expense=expenseFixture(f.scope,{amount:'0.5',billableAttemptId:f.request.attemptBinding.billableAttemptId,logicalOperationId:f.request.attemptBinding.logicalOperationId});
   const posted=await appendLedgerEvent(expense,f.ports);assert.equal(posted.ok,true,JSON.stringify(posted));
   const quarantine=async(project,hash)=>f.pool.query(`INSERT INTO cost_intelligence.financial_privacy_quarantine(record_kind,record_hash,tenant_id,project_id,environment,billing_mode,reason_code) VALUES('ledger_event',$1,$2,$3,$4,$5,'legacy_sensitive_event_data')`,[hash,f.scope.tenantId,project,f.scope.environment,f.scope.billingMode]);
-  await quarantine(randomUUID(),`sha256:${'1'.repeat(64)}`);
+  await quarantine(randomUUID(),await api.budgetDigest({fixture:'foreign-quarantine',identity:randomUUID()}));
   assert.equal((await api.readCapacity(f.scope,'USD','foreign-quarantine-control',{...f.ports,...f.ports.budgets})).ok,true);
   const row=await f.pool.query('SELECT event_hash FROM cost_intelligence.financial_ledger_events WHERE event_id=$1',[expense.eventId]);await quarantine(f.scope.projectId,row.rows[0].event_hash);
   assert.equal((await api.readCapacity(f.scope,'USD','quarantined-capacity',{...f.ports,...f.ports.budgets})).ok,false);
