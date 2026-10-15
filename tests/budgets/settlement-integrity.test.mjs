@@ -3,7 +3,7 @@ const test=diagnosticTest('settlement-integrity.test.mjs');
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
-import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {mkdir,mkdtemp,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -19,7 +19,7 @@ import {loadReserveFixture,setBudgetLimit,reservationPool,makeScope,makePorts,re
 import {signedSourceHarness} from './signed-source-harness.mjs';
 
 async function fixture(label,options={}){
- const pool=reservationPool(),scope=makeScope(label);if(options.production)scope.environment='production';await setBudgetLimit(pool,scope,options.limit??'10');
+ const pool=reservationPool(),scope=makeScope(label);if(options.production)scope.environment='production';if(options.live)scope.billingMode='live';await setBudgetLimit(pool,scope,options.limit??'10');
  const request=reservationRequest(scope,await loadReserveFixture(),{amount:options.amount??'1.00',...(options.partial?{allowPartialAuthorization:true,workPlan:{requestedUnits:2,unit:'image',unitMaximumAmount:'1'}}:{})});
  request.attemptBinding.providerAttemptId=randomUUID();request.attemptBinding.transportAttemptId=randomUUID();
  let currentTime=Date.parse(FIXED_TIME);const clock={now:()=>new Date(currentTime)};
@@ -28,7 +28,10 @@ async function fixture(label,options={}){
  const digest=await api.pricingEconomicRequestDigest(request);
  request.pricingProfileRef=await source.publish('pricing_profile',{schemaVersion:'ci-budget-pricing-1.0.0',pricingUnit:'fixed_per_attempt',currency:'USD',economicRequestDigest:digest,fixedAttemptAmount:options.amount??'1.00',maximumPolicyRef:null},JSON.stringify({financial_pricing_policy:{schemaVersion:'ci-budget-pricing-1.0.0',pricingUnit:'fixed_per_attempt',currency:'USD',economicRequestDigest:digest,fixedAttemptAmount:options.amount??'1.00',maximumPolicyRef:null}}));
  const ports={...low,budgets:{database:low.database,budgetEvidence:low.budgetEvidence,reservationAuthority:low.reservationAuthority,sourceCollector:source.backend,reportedCostContractMode:options.native?'finance_collector_v1':'development_0_10_1'}};
- const reserved=await api.authorize(request,ports);assert.equal(reserved.ok,true);assert.equal(reserved.value.status,options.partial?'partial':'authorized');
+ const originalHost=low.reservationAuthority.verifyCurrent;
+ if(options.admissionExpiryMs)low.reservationAuthority.verifyCurrent=async q=>({...await originalHost(q),expiresAt:new Date(currentTime+options.admissionExpiryMs).toISOString()});
+ const reserved=await api.authorize(request,ports);
+ low.reservationAuthority.verifyCurrent=originalHost;assert.equal(reserved.ok,true);assert.equal(reserved.value.status,options.partial?'partial':'authorized');
  const dispatch=markDispatchedCommand(scope,reserved.value.reservationId,1,{attemptBinding:request.attemptBinding});
  if(!options.skipDispatch){const dispatched=await api.markDispatched(dispatch,ports);assert.equal(dispatched.ok,true);}
  return {pool,scope,request,ports,source,reservationId:reserved.value.reservationId,dispatch,grant:reserved.value,advance:ms=>{currentTime+=ms;}};
@@ -205,7 +208,7 @@ test('CI05B privacy-quarantined scoped financial history refuses admission repla
   const release=native(releaseCommand(f.scope,f.reservationId,2,{amount:'1',proof:'final_usage_known',attemptBinding:f.request.attemptBinding}));release.sourceAuthorityRef=finality;release.release.evidenceRefs=[finality];assert.equal(Value.Check(api.VerifiedReleaseRequestSchema,release),true);
   const refusedRelease=await api.release(release,f.ports);assert.equal(refusedRelease.ok,false);assert.equal(refusedRelease.error.code,'BUDGET_UNAVAILABLE');
   const held=await f.pool.query('SELECT sum(held_amount)::text AS held,sum(released_amount)::text AS released,count(*)::int AS events FROM cost_intelligence.budget_reservation_events WHERE reservation_id=$1',[f.reservationId]);assert.equal(held.rows[0].held,'1');assert.equal(held.rows[0].released,'0');assert.equal(held.rows[0].events,2);
- }finally{await f.pool.end();}
+ }catch(error){await writeFile(new URL('../../artifacts/test-manifests/quarantine-failure.json',import.meta.url),JSON.stringify({code:error.code,location:String(error.stack).match(/settlement-integrity.test.mjs:\d+:\d+/)?.[0],actual:/^[0-9.]+$/.test(String(error.actual))?String(error.actual):null,expected:/^[0-9.]+$/.test(String(error.expected))?String(error.expected):null})+'\n');throw error;}finally{await f.pool.end();}
 });
 test('CI05B quarantine insertion serializes fresh admission and no-bill release before either can mutate financial commitments',{timeout:20000},async()=>{
  for(const action of ['admission','no_bill_release']){
@@ -366,4 +369,62 @@ test('CI05B interrupted committed discovery run preserves expense, exposes chang
   const final=await api.getReservationSnapshot({schemaVersion:'2.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId},f.ports);assert.equal(final.value.consumedAmount,'0.8');assert.equal(final.value.releasedAmount,'0.2');assert.equal(final.value.outstandingHold,'0');
   const heads=await f.pool.query(`SELECT sum(e.amount)::text AS amount,count(*)::int AS n FROM cost_intelligence.financial_ledger_events e JOIN cost_intelligence.financial_source_revision_heads h ON h.current_event_id=e.event_id WHERE e.tenant_id=$1 AND e.project_id=$2 AND e.financial_effect`,[f.scope.tenantId,f.scope.projectId]);assert.equal(heads.rows[0].amount,'0.800000000000000000');assert.equal(heads.rows[0].n,1);
  }finally{unblock?.();if(call)await call.catch(()=>{});await f.pool.end();}
+});
+
+test('persisted financial expiry cannot widen during fresh current-state revalidation',async()=>{
+ const f=await fixture('immutable-expiry',{skipDispatch:true,admissionExpiryMs:100});try{
+  const req={schemaVersion:'1.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId,
+   attemptBinding:f.request.attemptBinding,authorityBinding:f.request.authorityBinding,phase:'preparation',expectedRevision:1};
+  f.advance(50);
+  const result=await api.revalidateAuthorization(req,f.ports);assert.equal(result.ok,true,JSON.stringify(result));
+  assert.equal(result.value.status,'authorized');
+  assert.equal(result.value.finance.expires_at,f.grant.finance.expires_at,'a fresh proof cannot renew the immutable persisted admission lifetime');
+ }finally{await f.pool.end();}
+});
+
+test('expiry crossed during final authority await refuses current dispatch grant and retains exposure',async()=>{
+ const f=await fixture('final-await-expiry',{skipDispatch:true,admissionExpiryMs:100});try{
+  const authority=f.ports.financeAuthority.authorizeCurrent;let calls=0;
+  f.ports.financeAuthority.authorizeCurrent=async q=>{if(++calls===3)f.advance(200);return authority(q);};
+  const result=await api.revalidateAuthorization({schemaVersion:'1.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId,
+   attemptBinding:f.request.attemptBinding,authorityBinding:f.request.authorityBinding,phase:'preparation',expectedRevision:1},f.ports);
+  assert.ok(!result.ok||result.value.status==='denied');assert.equal(result.value?.finance,undefined);
+  const rows=await f.pool.query('SELECT count(*)::int AS count,sum(held_amount)=1::numeric AS held_one FROM cost_intelligence.budget_reservation_events WHERE tenant_id=$1 AND project_id=$2',[f.scope.tenantId,f.scope.projectId]);
+  assert.equal(rows.rows[0].count,1);assert.equal(rows.rows[0].held_one,true);
+ }finally{await f.pool.end();}
+});
+
+
+test('Finance-native reported USD18 persists through actual PostgreSQL query and verified export without releasing unknown hold',async()=>{
+ const f=await fixture('reported-query-export',{native:true,live:true});try{
+  const amount='0.800000000000000001',cost=await f.source.nativeCost(amount);
+  const command=native(settleCommand(f.scope,f.reservationId,2,{cumulativeAmount:amount,finality:'partial',attemptBinding:f.request.attemptBinding}));
+  command.sourceAuthorityRef=cost;command.settlement.sourceObservationRefs=[cost];command.settlement.usageCompleteness='unknown';
+  const settled=await api.settle(command,f.ports);assert.equal(settled.ok,true,JSON.stringify(settled));
+  assert.equal(settled.value.consumedAmount,amount);assert.equal(settled.value.releasedAmount,'0');
+  const finance=await import('../../dist/index.js');
+  const {hostPorts,query,exportRequest,checked}=await import('../exports/query-export-fixtures.mjs');
+  const {databaseSnapshotClock}=await import('../reporting/database-snapshot-clock.mjs');
+  const stamp=await databaseSnapshotClock(f.pool,'2026-10-12T22:00:00.000Z');
+  const host=hostPorts(f.scope,f.pool,stamp.value);
+  const q=query(f.scope,{period:{start:'2026-10-12T00:00:00.000Z',end:'2026-10-13T00:00:00.000Z'}});
+  const page=await checked(finance.querySummaryV2(q,host.ports));
+  assert.equal(page.detailCount,1);assert.equal(page.details[0].valuation,'provider_reported_unsettled');
+  assert.equal(page.summary.currencies[0].valuation.reportedUnsettled.knownSubtotal,amount);
+  assert.equal(page.canonicalSummaries[0].valuation_basis,'unknown');
+  const directory=await mkdtemp(join(tmpdir(),'ci-reported-export-'));
+  try{
+   const options={directory,receiptKey:new Uint8Array(32).fill(31)};
+   const ports=finance.createReportingExportRuntimePorts(host.ports,finance.createFileExportArtifactStore(options),finance.createFileReportingExportArtifactStore(options),host.fence);
+   const receipt=await checked(finance.exportSummaryV2({...exportRequest(page,f.scope),requestedAt:stamp.value},ports));
+   const doc=JSON.parse(receipt.artifacts.find(a=>a.fileName==='summary.json').content);
+   assert.equal(doc.currencies[0].expenseValuation.reportedUnsettled.knownSubtotal,amount);
+   const current=await api.getReservationSnapshot({schemaVersion:'2.0.0',requestId:randomUUID(),scope:f.scope,reservationId:f.reservationId},f.ports);
+   assert.equal(current.ok,true);assert.equal(current.value.releasedAmount,'0');assert.notEqual(current.value.outstandingHold,'0');
+   await mkdir(new URL('../../artifacts/reporting/',import.meta.url),{recursive:true});
+   await writeFile(new URL('../../artifacts/reporting/reported-unsettled-pg-chain.json',import.meta.url),JSON.stringify({fixtureMode:'synthetic_signed_source_and_authority_actual_postgresql',expectedAmount:amount,settled:current.value,query:{snapshotId:page.snapshotId,queryContentHash:page.queryContentHash,summaryContentHash:page.summaryContentHash,detailCount:page.detailCount,valuation:page.details[0].valuation,reportedUnsettled:page.summary.currencies[0].valuation.reportedUnsettled,canonicalValuation:page.canonicalSummaries[0].valuation_basis},exportValuation:doc.currencies[0].expenseValuation,artifactHashes:receipt.artifacts.map(({fileName,contentHash,byteLength})=>({fileName,contentHash,byteLength})),limitations:['No real provider or issuer','No consumer ACK','No CFO delivery or release acceptance']},null,2)+'\n');
+  }finally{await rm(directory,{recursive:true,force:true});}
+ }catch(error){
+  await writeFile(new URL('../../artifacts/test-manifests/reported-query-export-failure.json',import.meta.url),JSON.stringify({code:error.code??'unknown',location:String(error.stack).match(/settlement-integrity.test.mjs:\d+:\d+/)?.[0],actual:typeof error.actual==='number'||typeof error.actual==='boolean'?error.actual:null,expected:typeof error.expected==='number'||typeof error.expected==='boolean'?error.expected:null})+'\n');throw error;
+ }finally{await f.pool.end();}
 });

@@ -1362,6 +1362,11 @@ async function applyCommand(args: {
 
       const finalScope=await refreshScopeProof(scope,requestId,ports,args.operation,args.authority,gate,proofs);if(!finalScope.ok)return finalScope;
       const lifetimeRequest=args.kind==='mark_dispatched'||args.kind==='acknowledge_partial'?state.authorizationRequest??undefined:undefined;
+      // Fresh authority may narrow, but cannot renew, the persisted admission lifetime.
+      if(lifetimeRequest && state.financialExpiresAt){
+        const verifiedAt=trustedNow(ports);if(!verifiedAt)return unavailable();
+        proofs.push({verifiedAt:verifiedAt.toISOString(),expiresAt:state.financialExpiresAt});
+      }
       if(!currentProofBound(ports,proofs,lifetimeRequest))return failure(makeError(args.operation,'FORBIDDEN_SCOPE',requestId,'The mutation authority chain is no longer current.'));
       const nextSequence = state.revision + 1;
       if(args.appendFinancial){
@@ -2304,6 +2309,7 @@ export async function revalidateReservation(value: unknown, ports: BudgetRuntime
       const now=trustedNow(ports);if(!now)return unavailable();const original=state.authorizationRequest;
       const snapshot=await snapshotFrom(client,request,state,now);
       if(!snapshot||!original?.sourceAuthorityRef||!original.authorityBinding)return unavailable();
+      const financialExpiry=Date.parse(state.financialExpiresAt??original.canonicalRequest.expires_at);
       let allowed=snapshot.dispatchEligible===true && sameJson(request.attemptBinding,original.attemptBinding)
         && sameJson(request.authorityBinding,original.authorityBinding) && (request.expectedRevision===undefined||request.expectedRevision===state.revision);
       if(request.phase==='post_transport_ack'&&(!request.dispatchIntentRef||request.transportAttemptId!==original.attemptBinding.transportAttemptId
@@ -2323,13 +2329,14 @@ export async function revalidateReservation(value: unknown, ports: BudgetRuntime
       // Scope permission is distinct from host/source evidence and must be refreshed after those waits.
       const finalScope=await refreshScopeProof(request.scope,request.requestId,ports,'revalidateReservation','budgets.readReservation',gate,proofs);
       if(!finalScope.ok)return finalScope;
-      allowed=allowed&&!!currentProofBound(ports,proofs,original);
+      const finalBound=currentProofBound(ports,proofs,original);
+      allowed=allowed&&!!finalBound&&Number.isFinite(financialExpiry)&&financialExpiry>finalBound.now.getTime();
       gate.beginCommit();await client.query('COMMIT');transaction=false;
       const acknowledgedScope=await refreshScopeProof(request.scope,request.requestId,ports,'revalidateReservation','budgets.readReservation',gate,proofs);
       if(!acknowledgedScope.ok)return acknowledgedScope;
-      const returnedBound=currentProofBound(ports,proofs,original);allowed=allowed&&!!returnedBound;
+      const returnedBound=currentProofBound(ports,proofs,original);allowed=allowed&&!!returnedBound&&financialExpiry>returnedBound.now.getTime();
       const {finance,...facts}=snapshot;
-      if(allowed&&finance&&returnedBound)finance.expires_at=returnedBound.expiresAt;
+      if(allowed&&finance&&returnedBound)finance.expires_at=new Date(Math.min(Date.parse(finance.expires_at),Date.parse(returnedBound.expiresAt))).toISOString();
       return {ok:true,value:{schemaVersion:'1.0.0',requestId:request.requestId,status:allowed?'authorized':'denied',revoked:!allowed,
         snapshot:{...facts,dispatchEligible:allowed,...(allowed&&finance?{finance}:{})},...(allowed&&finance?{finance}:{})}};
     }catch{if(client&&transaction)await rollback(client);return unavailable();}
@@ -2351,7 +2358,8 @@ async function validateDispatchEvidence(state:ReservationState,request:MarkDispa
   const estimate=await verifySource(ports,original as unknown as Record<string,unknown>,'authorize',original.sourceAuthorityRef);
   const pricing=await verifyPricing(ports,original);
   if(!host||!source||!estimate||!pricing||pricing.amount===null||!maximumMatches(original,estimate,pricing.pricingUnit!=='fixed_per_attempt'))return refuse();
-  const proofs:TimedBudgetProof[]=[host,source,estimate,...pricing.proofs];
+  const proofs:TimedBudgetProof[]=[host,source,estimate,...pricing.proofs,
+    ...(state.financialExpiresAt?[{verifiedAt:now.toISOString(),expiresAt:state.financialExpiresAt}]:[])];
   if(state.firstType==='partially_authorized'){
     const ack=state.acknowledgementEvidence as PartialAcknowledgementRequest|null;
     const plan=ack?await verifySource(ports,ack as unknown as Record<string,unknown>,'acknowledgePartial',ack.sourceAuthorityRef):null;

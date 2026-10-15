@@ -37,8 +37,8 @@ export function exportRequest(page, scope, extra = {}) { return { schemaVersion:
   summarySnapshot: page, summaryContentHash: page.summaryContentHash, destination: 'cfo.ai', format: 'json', requestedAt: FIXTURE_TIME, evidenceMode: 'mocked', requestedBy: 'PRIVATE_NOT_AUTHORITY', ...extra }; }
 export async function checked(result) { const actual = await result; assert.equal(actual.ok, true, JSON.stringify(actual)); return actual.value; }
 
-export function hostPorts(scope, database) {
-  const host = createSyntheticDisclosureHost(scope, FIXTURE_TIME);
+export function hostPorts(scope, database, instant = FIXTURE_TIME) {
+  const host = createSyntheticDisclosureHost(scope, instant);
   const state = host.state;
   const ports = {
     clock: host.clock, storage: { isAvailable: async () => true }, providerSource: { isAvailable: async () => false },
