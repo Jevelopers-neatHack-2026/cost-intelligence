@@ -110,3 +110,76 @@ Current #14 source availability was rechecked: local `git cat-file -t` cannot
 resolve7210be783bf8694b1cde6bb07866d5250fd6aca8, and the configured GitHub commit
 API returns404. This is a concrete source/access handoff gap, not proof that the
 owner's preserved repairs have been lost.
+
+## Independent-review follow-up: unused finality helper and missing suites
+
+The supervisor reports no blocking source defect for PR64 at c81a8c0 and PR65 at
+0390f0a against2d8ab3a; neither is authorized to merge. PR65 contains PR64 and
+remains the integrated candidate. A nonblocking cleanup removed the unused
+`effectiveFinality` function and its stale completeness-only release comment.
+A focused search found no caller. The authenticated `final_billed` path remains
+unchanged: independent finality can settle exact reported cost and release the
+known remainder even while usage completeness remains unknown.
+
+Actual follow-up checks: Node22.23.3/npm10.9.9 `npm run typecheck` exits0;
+`npm run test:budgets -- --offline --suite=lifecycle` exits0,38 registered and38
+passed, zero failures/skips/TODO/cancellations. Manifest
+`artifacts/test-manifests/budgets-2026-10-15T061459874Z-80555.json` retains the
+execution. The existing authenticated native final-billed/unknown-usage test is
+included. This focused follow-up does not rerun or relabel the historical full
+release result: at306a028 all1,006 registrations passed but the command exited1,
+blocked by the two missing required files.
+
+### Read-only missing-file investigation
+
+After refreshing configured origin refs, default main remains
+`2d8ab3aa787a34e1005a6e2398ddbbcdd905c2e4`. `git ls-tree` confirms both required
+files are absent from the integrated candidate. `git log origin/main --` both
+exact paths returns no commits. `scripts/suite-policy.mjs` intentionally requires
+them alongside the separate coverage and budget lifecycle tests.
+
+- **Adapters — Finance #15 / CI-04B.** `git log --all --` the exact file,
+  `src/adapters` and `tests/adapters` finds no implementation in available refs.
+  Live issue15 requires six source classes, pinned field/identity/trust/mode
+  mappings and valid/invalid/duplicate fixtures through the real gateway, plus
+  batch/cursor/replay semantics. Existing generic intake tests do not establish
+  those producer adapters. The current issue's0.10.2 compatibility diagnostic
+  expressly leaves Finance decoder election and acceptance unchanged.
+  **Concrete handoff:** Finance/reliability coordinates agent-harness#5,
+  creative-engine#5 and event-intelligence#4 for exact producer source/tree,
+  sanitized actual observation/delivery rows, independently authenticated scope,
+  operation/provider/billable/transport mapping and retry equivalence; include
+  print/fulfillment/local-development unavailable fields and commerce lineage.
+  Shared-contracts#11 supplies the reviewed versioned local/provider event and
+  delivery/receipt interface when v1 cannot truthfully represent those rows.
+  Finance#14's operational posting source is also a named local prerequisite.
+  No adapter or green required suite is invented from DTO fixture replay.
+- **Full reconciliation — Finance #16 / CI-07.** A same-named historical file is
+  present on the old, unmerged `origin/feat/ci-05b-settlement` head
+  `17a043bbb173d548d4fff9e2d21cb77c941de34e`, with history at872d427 and340a76f.
+  File SHA-256:
+  `a003da8fe04d7868101956c8b4089f63ae602a106591c6915a76b8c541ee4f60`.
+  Its nine tests target older CI05B recovery/exception APIs such as
+  `runRecoveryScan`, `listReconciliationExceptions` and
+  `resolveReconciliationException`, which are not current exports. They do not
+  supply CI07 statement/request matching, aggregate overlap/no-double-posting,
+  correction revisions, financial dry-run/review/apply and durable resumption.
+  Current budget reconciliation and coverage-only runs retain their explicitly
+  narrower boundaries. Restoring this historical filename would misrepresent
+  full-domain coverage and is not an acceptable gate repair.
+  **Concrete handoff:** #16 has local prerequisites #10/#13/#14 and no separate
+  external interface prerequisite beyond its reviewed architecture/catalog.
+  Continue the Finance-owned matching/apply implementation after the operational
+  accounting source and settlement/correction boundary are available; do not
+  substitute host acceptance for missing local implementation. Finance owner
+  must return #14's R4 source7210be783bf8694b1cde6bb07866d5250fd6aca8, its ancestry
+  from83092f1e91ca0d6b5c58fa09e12084a93a9a037c and separately hashed uncommitted
+  repair/review packet, as requested in issue14 comment6131519645. The exact R4
+  object still cannot be resolved locally. Supervisor review/merge of the current
+  settlement candidate remains separate and is not authorized in this task.
+
+No required file was fabricated, no required suite was weakened or removed, and
+no new Finance-owner/consumer acceptance is asserted. Entire CLI/plugin was not
+executed: the repository trust prerequisites remain unsatisfied. Focused source,
+Git history and live issue inspection were used instead. No foreign repository
+was edited and no issue or PR was closed or merged.

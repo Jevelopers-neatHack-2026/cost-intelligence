@@ -1472,16 +1472,6 @@ function attemptMismatch(operation: string, requestId: string): { reject: ErrorE
 }
 
 /**
- * Final usage is authoritative only when the usage is also complete. Reported usage that is
- * incomplete is a lower bound (partial) and unknown usage proves nothing (unknown), so neither can
- * make a hold releasable or present a zero as settled consumption.
- */
-function effectiveFinality(finality: 'partial' | 'final', completeness: 'unknown' | 'incomplete' | 'complete'): 'unknown' | 'partial' | 'final' {
-  if (completeness === 'complete') return finality;
-  return completeness === 'incomplete' ? 'partial' : 'unknown';
-}
-
-/**
  * Record a cumulative settlement observation. The observed cumulative amount is recorded in full:
  * consumption above the hold is a variance (`overrunAmount`), never truncated to the reservation.
  *
