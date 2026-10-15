@@ -30,7 +30,7 @@ const leafPaths = Object.freeze({
   reconciliation: ['tests/reconciliation/reconciliation.test.mjs'],
   recovery: ['tests/recovery/recovery.test.mjs'],
   release: [...foundationTestFiles, ...databaseTestFiles],
-  reporting: ['tests/reporting/reporting.test.mjs'],
+  reporting: ['tests/reporting/reporting.test.mjs', 'tests/reporting/reported-unsettled.test.mjs'],
   security: ['tests/security/security.test.mjs'],
   smoke: ['tests/smoke/api-boundaries.test.mjs', 'tests/smoke/postgres-cleanup.test.mjs'],
   traceability: ['tests/traceability/release-gates.test.mjs', 'tests/traceability/migration-policy.test.mjs', 'tests/traceability/stored-lineage-migration-policy.test.mjs', 'tests/evidence/evidence.test.mjs', 'tests/evidence/postgres-model.test.mjs', 'tests/evidence/stored-lineage-model.test.mjs'],

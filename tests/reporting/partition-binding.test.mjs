@@ -10,6 +10,56 @@ export const partitionBindingSQLiteEvidence=[];
 const count=(f,table)=>f.db.prepare(`SELECT count(*) AS n FROM ${table}`).get().n;
 function worker(f,mode){const signal=new SharedArrayBuffer(4),arr=new Int32Array(signal),w=new Worker(new URL('./partition-binding-worker.mjs',import.meta.url),{workerData:{path:f.path,signal,mode,operationId:'isolated-intent-1'}});const done=new Promise((resolve,reject)=>{w.once('message',resolve);w.once('error',reject);});return {w,arr,done};}
 const ready=async f=>{const held=f.api.guardLifecycle.acquireGuard(f.frame);assert.equal(held.status,'held',JSON.stringify(held));const prepared=await f.api.bindingCurrentness.prepareCurrentness(held.guard,f.request,f.frame);assert.equal(prepared.status,'ready',JSON.stringify(prepared));return {guard:held.guard,handle:prepared.privateBindingHandle};};
+await test('Finance binding exact core11 capability with actual SQLite and synthetic PG metadata',async t=>{
+ const healthSql='SELECT migrations_ready,required_migrations_present FROM cost_intelligence.foundation_health';
+ const healthy=count=>({migrations_ready:true,required_migrations_present:count});
+ const cases=[
+  {name:'exact numeric core11 verifies the signed source',rows:[healthy(11)],accepted:true},
+  {name:'legacy core10 is unavailable for this composed adapter',rows:[healthy(10)]},
+  {name:'legacy core9 is unavailable',rows:[healthy(9)]},
+  {name:'unknown future core12 is unavailable',rows:[healthy(12)]},
+  {name:'all15 installed migrations cannot stand in for the11-migration core',rows:[healthy(15)]},
+  {name:'string core11 is unavailable',rows:[healthy('11')]},
+  {name:'fractional core count is unavailable',rows:[healthy(11.5)]},
+  {name:'null core count is unavailable',rows:[healthy(null)]},
+  {name:'missing core count is unavailable',rows:[{migrations_ready:true}]},
+  {name:'unready core11 is unavailable',rows:[{migrations_ready:false,required_migrations_present:11}]},
+  {name:'missing health row is unavailable',rows:[]},
+  {name:'duplicate core11 health rows are unavailable',rows:[healthy(11),healthy(11)]},
+ ];
+ for(const {name,rows,accepted=false} of cases)await t.test(name,{timeout:5000},async()=>{
+  const records=makeStoredRecords(),base=syntheticAnchorDatabase(records),queries=[];
+  let acquisitions=0,releases=0;
+  const database={async connect(){
+   acquisitions++;const client=await base.connect();
+   return {release(){releases++;client.release();},async query(sql,values){
+    queries.push(sql);
+    return sql===healthSql?{rows:structuredClone(rows)}:client.query(sql,values);
+   }};
+  }};
+  const f=ownerFixture(records,{database});
+  const mappingEpoch=f.db.prepare('SELECT epoch FROM owner_mapping_epochs').get().epoch;
+  const custodyEpoch=f.db.prepare('SELECT epoch FROM finance_binding_custody_state').get().epoch;
+  try{
+   const result=await f.api.bindingVerifier.verifyCurrentBinding(f.request);
+   if(accepted){assert.equal(result.status,'verified');assert.equal(result.provenance,'isolated_fixture');}
+   else assert.deepEqual(result,{status:'unavailable',reason:'unsupported_schema'});
+   assert.equal(acquisitions,1);assert.equal(releases,1);
+   assert.equal(queries.filter(sql=>sql===healthSql).length,1,'the selected health metadata is read exactly once');
+   assert.equal(queries.filter(sql=>sql==='BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY').length,1);
+   assert.equal(queries.filter(sql=>sql.includes('FROM pg_class')).length,accepted?1:0,'unsupported health cannot reach source-table proof');
+   assert.equal(queries.filter(sql=>sql.includes('JOIN cost_intelligence.financial_ledger_events')).length,accepted?1:0,'unsupported health cannot reach source-lineage proof');
+   assert.equal(queries.filter(sql=>sql==='COMMIT').length,accepted?1:0);
+   assert.equal(queries.filter(sql=>sql==='ROLLBACK').length,accepted?0:1);
+   assert.equal(queries.at(-1),accepted?'COMMIT':'ROLLBACK');
+   assert.equal(count(f,'owner_mappings'),0);assert.equal(count(f,'owner_receipts'),0);
+   assert.equal(count(f,'owner_mapping_epochs'),1);
+   assert.equal(f.db.prepare('SELECT epoch FROM owner_mapping_epochs').get().epoch,mappingEpoch);
+   assert.equal(f.db.prepare('SELECT epoch FROM finance_binding_custody_state').get().epoch,custodyEpoch);
+   assert.equal(f.db.isTransaction,false);
+  }finally{f.cleanup();}
+ });
+});
 await test('Finance binding closed native authority and actual owned SQLite fixture protocol',async t=>{
  await t.test('unconfigured and fabricated custody sources unavailable without PG access',async()=>{const api=reporting.createFinanceLedgerPartitionBindingVerifier();assert.equal((await api.bindingVerifier.verifyCurrentBinding({})).status,'unavailable');assert.equal(api.guardLifecycle.acquireGuard({}).status,'unavailable');assert.throws(()=>reporting.createIsolatedFinanceSqliteCustodySource({}));});
  await t.test('native SQLite branding, readonly observation, and caller method overrides cannot fake source reads',async()=>{assert.throws(()=>reporting.createIsolatedFinanceSqliteCustodySource(Object.create(DatabaseSync.prototype)));const f=ownerFixture(makeStoredRecords());let reader;try{reader=new DatabaseSync(f.path,{readOnly:true});const api=reporting.createFinanceLedgerPartitionBindingVerifier({custodySource:reporting.createIsolatedFinanceSqliteCustodySource(reader),selectedBackend:{reference:f.records.backendReference,databaseName:'isolated-test-pg',database:f.database},clock:{now:()=>new Date(f.clock.value)}});assert.equal((await api.bindingVerifier.verifyCurrentBinding(f.request)).status,'verified');assert.throws(()=>reader.prepare('INSERT INTO owner_mappings VALUES(?,?,?,?)').run('cannot-write',1,'{}','x'));reader.exec=()=>{throw Error('override callback must not run');};reader.prepare=()=>{throw Error('override callback must not run');};assert.equal((await api.bindingVerifier.verifyCurrentBinding(f.request)).status,'verified');api.guardLifecycle.destroy();}finally{reader?.close();f.cleanup();}});

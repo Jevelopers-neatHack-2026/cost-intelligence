@@ -510,6 +510,39 @@
             "allowObservedOverrun": {
               "const": true,
               "type": "boolean"
+            },
+            "finalityEvidenceRef": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "contract",
+                "schema_version",
+                "id",
+                "revision",
+                "content_hash"
+              ],
+              "properties": {
+                "contract": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "schema_version": {
+                  "const": "1.0.0",
+                  "type": "string"
+                },
+                "id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "revision": {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "content_hash": {
+                  "pattern": "^sha256:[a-f0-9]{64}$",
+                  "type": "string"
+                }
+              }
             }
           }
         }

@@ -83,7 +83,7 @@ function projectionDocument(page: FinancialSummaryPageV2, request: ReportingExpo
       return { metric, recognition: 'actual', definition: registered.definition.formula, definitionReference: { id: registered.reference.id, revision: registered.reference.revision, contentHash: registered.reference.content_hash },
         status: value.status, knownSubtotal: value.knownSubtotal, total: value.total, unknownCount: value.unknownCount, perMetricValuation: 'not_supplied_by_query' };
     }),
-    expenseValuation: { estimated: { ...row.valuation.estimated }, confirmed: { ...row.valuation.confirmed }, unknownCount: row.valuation.unknownCount, scope: 'currency_expense_axis_only' },
+    expenseValuation: { estimated: { ...row.valuation.estimated }, confirmed: { ...row.valuation.confirmed }, reportedUnsettled: row.valuation.reportedUnsettled ? { ...row.valuation.reportedUnsettled } : { status: 'not_supplied_by_query' as const, knownSubtotal: null, total: null, unknownCount: null }, unknownCount: row.valuation.unknownCount, scope: 'currency_expense_axis_only' },
     reconciliation: { ...row.reconciliation },
     simulated: Object.entries(row.simulated).map(([key, value]) => {
       if (typeof value !== 'object' || value === null) throw new Error('The producer simulation encoding does not retain unknown amounts.');

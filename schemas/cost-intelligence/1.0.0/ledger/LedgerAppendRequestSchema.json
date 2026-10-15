@@ -282,6 +282,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -1305,6 +1309,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]
@@ -2331,6 +2339,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -3355,6 +3367,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]
@@ -4388,6 +4404,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]
@@ -5449,6 +5469,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -6508,6 +6532,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]
@@ -7569,6 +7597,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -8628,6 +8660,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]
@@ -9689,6 +9725,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -10748,6 +10788,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]
@@ -11809,6 +11853,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -12868,6 +12916,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]
@@ -13929,6 +13981,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -14988,6 +15044,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]
@@ -16049,6 +16109,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -17109,6 +17173,10 @@
             {
               "const": "provider_confirmed",
               "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
+              "type": "string"
             }
           ]
         },
@@ -18168,6 +18236,10 @@
             },
             {
               "const": "provider_confirmed",
+              "type": "string"
+            },
+            {
+              "const": "provider_reported_unsettled",
               "type": "string"
             }
           ]

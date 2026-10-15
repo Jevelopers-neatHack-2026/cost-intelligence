@@ -55,7 +55,17 @@
       "import": "./dist/reporting/index.js"
     }
   },
-  "files": ["dist", "schemas", "migrations", "README.md", "docs/api", "examples", "fixtures", "vendor", "contracts.lock.json"],
+  "files": [
+    "dist",
+    "schemas",
+    "migrations",
+    "README.md",
+    "docs/api",
+    "examples",
+    "fixtures",
+    "vendor",
+    "contracts.lock.json"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json && node scripts/export-schemas.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -82,9 +92,14 @@
   },
   "dependencies": {
     "@jevelopers/shared-contracts": "0.3.0",
-    "@sinclair/typebox": "0.34.52"
+    "@sinclair/typebox": "0.34.52",
+    "@jevelopers/shared-contracts-reported-development": "file:vendor/jevelopers-shared-contracts-0.10.1.tgz"
   },
-  "bundleDependencies": ["@jevelopers/shared-contracts", "@sinclair/typebox"],
+  "bundleDependencies": [
+    "@jevelopers/shared-contracts",
+    "@sinclair/typebox",
+    "@jevelopers/shared-contracts-reported-development"
+  ],
   "devDependencies": {
     "pg": "8.23.1",
     "typescript": "5.9.3"

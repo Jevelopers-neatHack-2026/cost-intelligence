@@ -82,7 +82,7 @@ const LedgerAppendRequestBaseSchema = Type.Object({
   verificationStatus: Type.Union([Type.Literal('verified'), Type.Literal('unverified'), Type.Literal('unknown')]),
   eventType: LedgerEventTypeSchema,
   classification: LedgerClassificationSchema,
-  valuation: Type.Union([Type.Literal('unknown'), Type.Literal('estimated'), Type.Literal('provider_confirmed')]),
+  valuation: Type.Union([Type.Literal('unknown'), Type.Literal('estimated'), Type.Literal('provider_confirmed'), Type.Literal('provider_reported_unsettled')]),
   settlementStatus: Type.Union([Type.Literal('unpaid'), Type.Literal('partly_paid'), Type.Literal('paid')]),
   reconciliationStatus: Type.Union([Type.Literal('unmatched'), Type.Literal('matched'), Type.Literal('exception')]),
   reservationLifecycle: Type.Union([
@@ -283,6 +283,8 @@ export interface LedgerRuntimePorts {
   readonly clock: Clock;
   /** Current operation-scoped host authority; missing configuration denies writes and reads. */
   readonly financeAuthority?: FinanceAuthorizationPort;
+  readonly sourceCollector?:import('../budgets/evidence.js').BudgetCollectorBackend;
+  readonly reportedCostContractMode?:'development_0_10_1'|'finance_collector_v1';
 }
 
 type LedgerScope = Pick<TrustedScope, 'tenantId' | 'projectId' | 'environment' | 'billingMode'>;
@@ -291,6 +293,36 @@ type Binding = { kind: BindingKind; value: string };
 
 function makeError(module: string, operation: string, code: ErrorEnvelope['code'], requestId: string, message: string): ErrorEnvelope {
   return errorEnvelope(module, operation, code, requestId, message);
+}
+
+/** Expense axis follows authenticated ledger lineage; cash and payout movements never offset expense. */
+export function budgetExpenseAxisSql(alias: string): string {
+  if (!/^[a-z][a-z0-9_]*$/.test(alias)) throw new Error('Invalid internal ledger alias.');
+  return `(WITH RECURSIVE axis AS (
+    SELECT ${alias}.economic_event_type AS kind, ${alias}.economic_reverses_event_id AS target, ARRAY[${alias}.event_id]::text[] AS path
+    UNION ALL SELECT root.economic_event_type,root.economic_reverses_event_id,axis.path||root.event_id
+    FROM axis JOIN cost_intelligence.financial_ledger_events root ON root.event_id=axis.target
+      AND root.tenant_id=${alias}.tenant_id AND root.project_id=${alias}.project_id
+      AND root.environment=${alias}.environment AND root.billing_mode=${alias}.billing_mode AND root.currency=${alias}.currency
+      AND root.classification=${alias}.classification AND root.financial_effect
+    WHERE axis.kind='reversal' AND cardinality(axis.path)<33 AND NOT root.event_id=ANY(axis.path)
+  ) SELECT kind FROM axis WHERE kind<>'reversal' LIMIT 1)`;
+}
+export function budgetExpenseSql(alias: string): string {
+  return `${alias}.financial_effect AND ${alias}.classification IN ('direct_cost','supplier_expense','operating_expense','payable_labor')
+    AND ${budgetExpenseAxisSql(alias)} IN ('consumption','charge','expense','fee','tax','refund','credit','discount','reimbursement')`;
+}
+export function budgetCurrentLedgerHeadSql(alias: string): string {
+  if (!/^[a-z][a-z0-9_]*$/.test(alias)) throw new Error('Invalid internal ledger alias.');
+  return `EXISTS (SELECT 1 FROM cost_intelligence.financial_source_revision_heads h WHERE h.current_event_id=${alias}.event_id
+    AND h.tenant_id=${alias}.tenant_id AND h.project_id=${alias}.project_id AND h.environment=${alias}.environment
+    AND h.billing_mode=${alias}.billing_mode AND h.source_name=${alias}.source_name AND h.source_object_id=${alias}.source_object_id
+    AND h.source_revision_subject_id=${alias}.source_revision_subject_id)
+    AND NOT EXISTS (SELECT 1 FROM cost_intelligence.financial_ledger_events n WHERE n.supersedes_event_id=${alias}.event_id
+      AND n.tenant_id=${alias}.tenant_id AND n.project_id=${alias}.project_id AND n.environment=${alias}.environment
+      AND n.billing_mode=${alias}.billing_mode AND n.currency=${alias}.currency AND n.classification=${alias}.classification
+      AND n.economic_root_event_id=${alias}.economic_root_event_id AND n.source_name=${alias}.source_name
+      AND n.source_object_id=${alias}.source_object_id AND n.source_revision_subject_id=${alias}.source_revision_subject_id)`;
 }
 
 async function legacyFinancialScopeError(
@@ -421,6 +453,7 @@ function canonicalize(value: unknown): unknown {
   }
   return value;
 }
+function sameJson(left:unknown,right:unknown):boolean{return JSON.stringify(canonicalize(left))===JSON.stringify(canonicalize(right));}
 
 async function hashValue(value: unknown): Promise<string> {
   const bytes = new TextEncoder().encode(JSON.stringify(canonicalize(value)));
@@ -456,6 +489,14 @@ export function validateLedgerAppendRequestBoundary(value: unknown): Validation<
   }
   if (request.valuation === 'estimated' && request.pricing === null) {
     return validationFailure('ledger', 'appendLedgerEvent', requestId, 'Estimated money requires an explicit pricing policy and rule version.');
+  }
+  if(request.valuation==='provider_reported_unsettled'&&(request.money.currency!=='USD'
+    ||request.pricing?.rateCardRef!==undefined&&request.pricing.rateCardRef!==null
+    ||!request.sourceRefs.some(ref=>['ProviderReportedCostEvidence','FinanceReportedCostEvidence'].includes(ref.contract))
+    ||!request.sourceRefs.some(ref=>ref.contract==='ci-budget-source')
+    ||request.settlementStatus!=='unpaid')){
+    return validationFailure('ledger','appendLedgerEvent',requestId,
+      'Reported unsettled USD requires original collector and provider cost evidence, a null RateCard, and unpaid status.');
   }
   if (request.fxEvidence !== null) {
     if (request.fxEvidence.sourceCurrency !== request.money.currency || request.fxEvidence.targetCurrency === request.money.currency
@@ -810,10 +851,54 @@ export async function appendUsageLedgerEventInTransaction(
   return appendLedgerEventInternal(value, ports, { client, decision });
 }
 
+/** Finance-owned settlement bridge; it refreshes the operation grant independently of caller decision labels. */
+export async function appendBudgetLedgerEventInTransaction(
+  value: unknown, client: LedgerTransactionPort, ports: LedgerRuntimePorts,
+  operation: 'budgets.settle' | 'budgets.recordExpenseAdjustment',
+  retainDecision?: (decision:{verifiedAt:string;expiresAt:string})=>void,
+): Promise<ApiResult<LedgerAppendReceipt>> {
+  const validated=validateLedgerAppendRequestBoundary(value);
+  if(!validated.ok)return failure(validated.error);
+  const authorization=await authorizeFinanceOperation({module:'ledger',requestOperation:'budgetSettlement',operation,
+    scope:validated.value.scope,requestId:validated.value.requestId,clock:ports.clock,
+    ...(ports.financeAuthority?{financeAuthority:ports.financeAuthority}:{})});
+  if(!authorization.ok)return failure(authorization.error);
+  if(!('permission' in authorization.decision))return failure(makeError('ledger','budgetSettlement','FORBIDDEN_SCOPE',validated.value.requestId,'A current Finance settlement grant is required.'));
+  if(authorization.decision.status==='allowed')retainDecision?.(structuredClone(authorization.decision) as Extract<FinanceAuthorizationDecision,{status:'allowed'}>);
+  const request=validated.value;
+  if(request.valuation!=='provider_reported_unsettled'||!ports.sourceCollector||!ports.reportedCostContractMode)
+    return failure(makeError('ledger','budgetSettlement','SOURCE_UNAVAILABLE',request.requestId,'An independently authenticated reported-cost source is required.'));
+  const reference=request.sourceRefs.find(ref=>ref.contract==='ci-budget-source');
+  const reservation=await client.query(`SELECT reservation_id,authorization_request FROM cost_intelligence.budget_reservation_events
+    WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND event_sequence=1 AND billable_attempt_id=$5 AND logical_operation_id=$6`,
+    [request.scope.tenantId,request.scope.projectId,request.scope.environment,request.scope.billingMode,
+      request.postingMapping.billableAttemptId.status==='known'?request.postingMapping.billableAttemptId.id:null,request.identities.logicalOperationId]);
+  const original=reservation.rows[0]?.authorization_request as import('../budgets/index.js').ReservationRequest|undefined;
+  if(!reference||!original?.authorityBinding)return failure(makeError('ledger','budgetSettlement','SOURCE_UNAVAILABLE',request.requestId,'The durable original financial attempt binding is unavailable.'));
+  const history=await client.query(`SELECT usage_event FROM cost_intelligence.budget_reported_observations
+    WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND reservation_id=$5 ORDER BY reservation_revision DESC LIMIT 1`,
+    [request.scope.tenantId,request.scope.projectId,request.scope.environment,request.scope.billingMode,
+      // The reservation identifier is generated by Finance, not the canonical reserve request.
+      reservation.rows[0]?.reservation_id]);
+  const {resolveBudgetReportedCost}=await import('../budgets/reported-cost.js');
+  const source=await resolveBudgetReportedCost(ports.sourceCollector,ports.clock,{scope:request.scope,reference:reference as import('../budgets/authority.js').BudgetReference,
+    kind:'reported_cost',attempt:original.attemptBinding,authorityBinding:original.authorityBinding,provider:original.authorityBinding.provider,
+    model:original.authorityBinding.model,operation:original.authorityBinding.operation,targetBindingSha256:original.authorityBinding.targetBindingSha256},
+    ports.reportedCostContractMode,history.rows[0]?.usage_event as import('../budgets/reported-cost.js').BudgetReportedUsage|undefined);
+  if(!source||source.evidence.reported_cost.state!=='known'||request.money.amount===null
+    ||parseScaledDecimal(source.evidence.reported_cost.money.amount)!==parseScaledDecimal(request.money.amount)
+    ||source.usage.source_observation_id!==request.identities.sourceObservationId||source.source.record.evidenceMode!==request.evidenceMode
+    ||!sameJson(source.usage.producer,{module:request.producer.module,source_revision:request.producer.sourceRevision,build_revision:request.producer.buildRevision})
+    ||!request.sourceRefs.some(ref=>source.usage.valuation.basis==='provider_reported_unsettled'&&sameJson(ref,source.usage.valuation.provider_evidence_ref)))
+    return failure(makeError('ledger','budgetSettlement','SOURCE_UNAVAILABLE',request.requestId,'The expense differs from the authenticated original provider observation.'));
+  retainDecision?.(structuredClone(source.source));
+  return appendLedgerEventInternal(validated.value,ports,{client,decision:authorization.decision as FinanceAuthorizationDecision,budgetOperation:operation});
+}
+
 async function appendLedgerEventInternal(
   value: unknown,
   ports: LedgerRuntimePorts,
-  bridge?: { readonly client: LedgerTransactionPort; readonly decision: FinanceAuthorizationDecision },
+  bridge?: { readonly client: LedgerTransactionPort; readonly decision: FinanceAuthorizationDecision; readonly budgetOperation?: 'budgets.settle'|'budgets.recordExpenseAdjustment' },
 ): Promise<ApiResult<LedgerAppendReceipt>> {
   const quarantined = bridge ? null : await quarantineUnsupportedPayload(value, ports);
   if (quarantined !== null) return quarantined;
@@ -821,7 +906,14 @@ async function appendLedgerEventInternal(
   if (!validated.ok) return failure(validated.error);
   const request = validated.value;
   if (bridge) {
-    if (!usageDecisionIsCurrent(bridge.decision, request, ports)) {
+    const budgetCurrent=bridge.budgetOperation!==undefined&&bridge.decision.status==='allowed'
+      &&bridge.decision.operation===bridge.budgetOperation&&sameScope(bridge.decision.scope,request.scope)
+      &&bridge.decision.principal.actorId===request.scope.actorId
+      &&(bridge.decision.principal.kind==='service'?bridge.decision.principal.serviceStatus==='active'&&bridge.decision.principal.serviceGrantRevision.length>0:
+        bridge.decision.principal.membershipStatus==='active'&&bridge.decision.principal.membershipRevision.length>0)
+      &&Date.parse(bridge.decision.verifiedAt)<=ports.clock.now().getTime()
+      &&Date.parse(bridge.decision.expiresAt)>ports.clock.now().getTime();
+    if (!(bridge.budgetOperation?budgetCurrent:usageDecisionIsCurrent(bridge.decision, request, ports))) {
       return failure(makeError('ledger', 'appendLedgerEvent', 'FORBIDDEN_SCOPE', request.requestId,
         'The current metering authorization does not permit this ledger append.'));
     }
@@ -829,6 +921,8 @@ async function appendLedgerEventInternal(
     const authorizationError = await trustedScope(request, ports, 'appendLedgerEvent', 'ledger.appendLedgerEvent');
     if (authorizationError) return failure(authorizationError);
   }
+  if(request.valuation==='provider_reported_unsettled'&&!bridge?.budgetOperation)
+    return failure(makeError('ledger','appendLedgerEvent','SOURCE_UNAVAILABLE',request.requestId,'Reported-cost expense requires the independently authenticated Finance source bridge.'));
   let now: Date;
   try {
     now = ports.clock.now();
@@ -1364,7 +1458,19 @@ async function computeUnresolvedIntakeProjection(
   );
   const quarantinedObservationCount = Number(quarantined.rows[0]?.count ?? 0);
   const postedEventIds = new Set(postedEvents.rows.map(row => asString(row.event_id)));
-  const unposted = heads.rows.filter(row => !postedEventIds.has(asString(row.event_id)));
+  const capability=await client.query("SELECT to_regclass('cost_intelligence.budget_settlement_postings') IS NOT NULL AS reported_coverage");
+  const coveredObservationIds=new Set<string>();
+  if(capability.rows[0]?.reported_coverage===true){
+    const coverage=await client.query(`SELECT jsonb_array_elements_text(p.intake_observation_ids) AS observation_id
+      FROM cost_intelligence.budget_settlement_postings p
+      JOIN cost_intelligence.financial_ledger_events e ON e.event_id=p.ledger_event_id
+      WHERE p.tenant_id=$1 AND p.project_id=$2 AND p.environment=$3 AND p.billing_mode=$4
+        AND e.tenant_id=p.tenant_id AND e.project_id=p.project_id AND e.environment=p.environment AND e.billing_mode=p.billing_mode
+        AND p.amount_semantics='cumulative_attempt_total' AND p.recorded_at<=$5 AND e.ingested_at<=$5
+        AND ${budgetExpenseSql('e')} AND e.valuation='provider_reported_unsettled' AND e.currency='USD' AND e.amount IS NOT NULL`,values);
+    for(const row of coverage.rows)coveredObservationIds.add(asString(row.observation_id));
+  }
+  const unposted = heads.rows.filter(row => !postedEventIds.has(asString(row.event_id))&&!coveredObservationIds.has(asString(row.source_observation_id)));
   const awaitingEvidence = heads.rows.filter(row => asString(row.valuation_basis) === 'unknown'
     || asString(row.completeness) !== 'complete');
   const unknownEconomicExposureCount = quarantinedObservationCount + unposted.filter(row =>
@@ -1449,7 +1555,7 @@ async function inspectBudgetAuthorityCapability(client:LedgerTransactionPort,mig
   const extensionCount=Number(artifacts.extension_columns);
   const hasAny=artifacts.has_decisions===true||artifacts.has_acknowledgements===true||artifacts.has_attempt_index===true||artifacts.has_revision_function===true||extensionCount>0;
   if(migrationCount===9){if(hasAny)throw new Error('Partial budget authority artifacts cannot be accepted as legacy intake health.');return;}
-  if(migrationCount!==10||artifacts.has_decisions!==true||artifacts.has_acknowledgements!==true||extensionCount!==7)throw new Error('Budget authority capability is incomplete.');
+  if((migrationCount!==10&&migrationCount!==11)||artifacts.has_decisions!==true||artifacts.has_acknowledgements!==true||extensionCount!==7)throw new Error('Budget authority capability is incomplete.');
   const missing=await client.query(`SELECT required.table_name,required.column_name FROM unnest($1::text[],$2::text[]) AS required(table_name,column_name)
     WHERE NOT EXISTS(SELECT 1 FROM information_schema.columns c WHERE c.table_schema='cost_intelligence' AND c.table_name=required.table_name AND c.column_name=required.column_name)`,
     [BUDGET_AUTHORITY_REQUIRED_COLUMNS.map(([table])=>table),BUDGET_AUTHORITY_REQUIRED_COLUMNS.map(([,column])=>column)]);
@@ -1477,6 +1583,103 @@ async function inspectBudgetAuthorityCapability(client:LedgerTransactionPort,mig
     ||Number(row.revision_guards)!==2||Number(row.forced_rls_tables)!==2)throw new Error('Budget authority constraints or revision guards are incomplete.');
 }
 
+const SETTLEMENT_TABLES=['budget_source_observations','budget_lifecycle_observations','budget_command_receipts',
+  'budget_settlement_postings','budget_reconciliation_exceptions','budget_recovery_cursors','budget_reported_observations'] as const;
+const SETTLEMENT_REQUIRED_COLUMNS:Readonly<Record<string,readonly string[]>>={
+  budget_source_observations:['observation_id','record_id','record_revision','record_hash','predecessor_hash','source_bytes_hash','source_reference','collector_record','current_evidence','authentication_evidence','financial_source_facts'],
+  budget_lifecycle_observations:['observation_id','reservation_id','event_sequence','expected_revision','idempotency_key','event_type','consumed_amount','released_amount','usage_finality','command_request','command_evidence'],
+  budget_command_receipts:['receipt_id','idempotency_key','reservation_id','command_request','command_receipt','command_evidence','content_hash'],
+  budget_settlement_postings:['posting_id','reservation_id','reservation_revision','observation_id','ledger_event_id','amount_semantics','cumulative_amount','intake_observation_ids'],
+  budget_reconciliation_exceptions:['exception_revision_id','exception_id','revision','reservation_id','reservation_revision','idempotency_key','state','reason','owner_reference','action_reference','evidence_reference','command_request','variance_amount'],
+  budget_reported_observations:['source_observation_id','reservation_id','reservation_revision','usage_event','provider_evidence','provider_evidence_id','provider_evidence_revision','provider_evidence_hash','supersedes_observation_id','observation_digest','collector_observation_id','ledger_event_id'],
+  budget_recovery_cursors:['cursor_id','job_reference','revision','after_recorded_at','after_reservation_id','completed_cycle','command_request','command_receipt','idempotency_key'],
+};
+async function inspectBudgetSettlementCapability(client:LedgerTransactionPort,migrationCount:number):Promise<void>{
+  const presence=await client.query(`SELECT required.name,to_regclass('cost_intelligence.'||required.name) IS NOT NULL AS present
+    FROM unnest($1::text[]) AS required(name)`,[SETTLEMENT_TABLES]);
+  const constraints=await client.query(`SELECT conname,convalidated,pg_get_constraintdef(oid) AS definition FROM pg_constraint
+    WHERE connamespace='cost_intelligence'::regnamespace AND contype='c' AND
+      ((conname='financial_ledger_events_valuation_check' AND conrelid=to_regclass('cost_intelligence.financial_ledger_events'))
+      OR(conname='usage_intake_inbox_valuation_basis_check' AND conrelid=to_regclass('cost_intelligence.usage_intake_inbox'))
+      OR(conname='usage_intake_attempts_valuation_basis_check' AND conrelid=to_regclass('cost_intelligence.usage_intake_attempts')))`);
+  const privacyGuard=await client.query(`SELECT to_regprocedure('cost_intelligence.guard_financial_privacy_scope_insert()') IS NOT NULL AS present`);
+  const hasAny=privacyGuard.rows[0]?.present===true||presence.rows.some(row=>row.present===true)||constraints.rows.some(row=>String(row.definition).includes('provider_reported_unsettled'));
+  if(migrationCount!==11){if(hasAny)throw new Error('Settlement artifacts cannot masquerade as legacy finance health.');return;}
+  if(presence.rows.length!==7||presence.rows.some(row=>row.present!==true)||constraints.rows.length!==3)throw new Error('Settlement capability is incomplete.');
+  const enumColumns:Record<string,string>={financial_ledger_events_valuation_check:'valuation',
+    usage_intake_inbox_valuation_basis_check:'valuation_basis',usage_intake_attempts_valuation_basis_check:'valuation_basis'};
+  for(const row of constraints.rows){
+    const column=enumColumns[String(row.conname)];
+    const expected=`CHECK ((${column} = ANY (ARRAY['unknown'::text, 'estimated'::text, 'provider_confirmed'::text, 'provider_reported_unsettled'::text])))`;
+    if(row.convalidated!==true||String(row.definition).replace(/\s+/g,' ').trim()!==expected)
+      throw new Error('Reported valuation CHECK is not the exact known contract.');
+  }
+  const tables:string[]=[],columns:string[]=[];
+  for(const table of SETTLEMENT_TABLES)for(const column of ['tenant_id','project_id','environment','billing_mode','recorded_at',...SETTLEMENT_REQUIRED_COLUMNS[table]!]){tables.push(table);columns.push(column);}
+  const missing=await client.query(`SELECT required.table_name,required.column_name FROM unnest($1::text[],$2::text[]) AS required(table_name,column_name)
+    WHERE NOT EXISTS(SELECT 1 FROM information_schema.columns c WHERE c.table_schema='cost_intelligence' AND c.table_name=required.table_name AND c.column_name=required.column_name)`,[tables,columns]);
+  if(missing.rows.length)throw new Error('Settlement capability columns are incomplete.');
+  const security=await client.query(`SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity,pg_get_userbyid(c.relowner) AS owner,
+    (SELECT count(*) FROM pg_trigger t WHERE t.tgrelid=c.oid AND NOT t.tgisinternal AND t.tgenabled IN ('O','A')
+      AND t.tgfoid='cost_intelligence.reject_ledger_projection_mutation()'::regprocedure
+      AND NOT (SELECT p.prosecdef FROM pg_proc p WHERE p.oid=t.tgfoid)
+      AND ((t.tgname=c.relname||'_append_only' AND t.tgtype=27) OR (t.tgname=c.relname||'_no_truncate' AND t.tgtype=34)))::int AS append_guards
+    FROM pg_class c JOIN pg_namespace ns ON ns.oid=c.relnamespace WHERE ns.nspname='cost_intelligence' AND c.relname=ANY($1::text[])`,[SETTLEMENT_TABLES]);
+  if(security.rows.length!==7||security.rows.some(row=>row.owner!=='ci_finance_owner'||row.relrowsecurity!==true||row.relforcerowsecurity!==true||Number(row.append_guards)!==2))throw new Error('Settlement append-only scoped security is incomplete.');
+  const policies=await client.query(`SELECT tablename,roles::text[],cmd,permissive,qual,with_check FROM pg_policies
+    WHERE schemaname='cost_intelligence' AND tablename=ANY($1::text[])`,[SETTLEMENT_TABLES]);
+  const policyExpression=(value:unknown)=>String(value).replace(/\s|[()]/g,'').replaceAll('cost_intelligence.','');
+  const exactScope='finance_scope_matchestenant_id,project_id,environment,billing_mode';
+  if(policies.rows.length!==7||policies.rows.some(row=>JSON.stringify(row.roles)!==JSON.stringify(['ci_finance_runtime'])||row.cmd!=='ALL'||row.permissive!=='PERMISSIVE'
+    ||policyExpression(row.qual)!==exactScope||policyExpression(row.with_check)!==exactScope))throw new Error('Settlement row policies are not the exact financial scope.');
+  const expectedGuards=[
+    ['budget_lifecycle_observations','budget_lifecycle_observations_revision_guard','guard_budget_revision_append'],
+    ['budget_source_observations','budget_source_observations_revision_guard','guard_budget_source_append'],
+    ['budget_reported_observations','budget_reported_observations_revision_guard','guard_budget_reported_append'],
+    ['budget_reconciliation_exceptions','budget_reconciliation_exceptions_revision_guard','guard_budget_queue_append'],
+    ['budget_recovery_cursors','budget_recovery_cursors_revision_guard','guard_budget_queue_append'],
+    ['financial_privacy_quarantine','financial_privacy_quarantine_scope_insert_guard','guard_financial_privacy_scope_insert'],
+  ];
+  const guards=await client.query(`SELECT c.relname,t.tgname,p.proname,t.tgtype,t.tgenabled,p.prosecdef,t.tgisinternal,p.proconfig,pg_get_userbyid(p.proowner) AS function_owner
+    FROM pg_trigger t JOIN pg_proc p ON p.oid=t.tgfoid JOIN pg_class c ON c.oid=t.tgrelid
+    JOIN pg_namespace ns ON ns.oid=c.relnamespace JOIN pg_namespace pn ON pn.oid=p.pronamespace
+    WHERE ns.nspname='cost_intelligence' AND pn.nspname='cost_intelligence' AND c.relname=ANY($1::text[])
+      AND p.proname=ANY($2::text[])`,[[...SETTLEMENT_TABLES,'financial_privacy_quarantine'],expectedGuards.map(([, ,fn])=>fn)]);
+  if(guards.rows.length!==expectedGuards.length||expectedGuards.some(([table,name,fn])=>guards.rows.filter(row=>
+    row.relname===table&&row.tgname===name&&row.proname===fn&&Number(row.tgtype)===7
+    && ['O','A'].includes(String(row.tgenabled))&&row.prosecdef===false&&row.tgisinternal===false).length!==1))
+    throw new Error('Settlement guards are not the exact individual table/function/event bindings.');
+  const privacyInsertGuard=guards.rows.find(row=>row.proname==='guard_financial_privacy_scope_insert');
+  if(privacyInsertGuard?.function_owner!=='ci_finance_owner'||JSON.stringify(privacyInsertGuard.proconfig)!==JSON.stringify(['search_path=pg_catalog, cost_intelligence']))
+    throw new Error('Privacy insert serialization does not use the trusted Finance owner and fixed search path.');
+  const requiredUnique:Record<string,readonly string[]>={
+    budget_source_observations:['UNIQUE (tenant_id, project_id, environment, billing_mode, record_id, record_revision)'],
+    budget_lifecycle_observations:['UNIQUE (tenant_id, project_id, environment, billing_mode, reservation_id, event_sequence)','UNIQUE (tenant_id, project_id, environment, billing_mode, idempotency_key)'],
+    budget_command_receipts:['UNIQUE (tenant_id, project_id, environment, billing_mode, idempotency_key)'],
+    budget_settlement_postings:['UNIQUE (tenant_id, project_id, environment, billing_mode, reservation_id, reservation_revision)'],
+    budget_reconciliation_exceptions:['UNIQUE (tenant_id, project_id, environment, billing_mode, exception_id, revision)','UNIQUE (tenant_id, project_id, environment, billing_mode, exception_id, idempotency_key)'],
+    budget_recovery_cursors:['UNIQUE (tenant_id, project_id, environment, billing_mode, currency, job_reference, revision)','UNIQUE (tenant_id, project_id, environment, billing_mode, idempotency_key)'],
+    budget_reported_observations:['PRIMARY KEY (tenant_id, project_id, environment, billing_mode, source_observation_id)','UNIQUE (tenant_id, project_id, environment, billing_mode, provider_evidence_id, provider_evidence_revision)'],
+  };
+  const requiredForeign:Record<string,readonly string[]>={
+    budget_settlement_postings:['FOREIGN KEY (observation_id) REFERENCES cost_intelligence.budget_source_observations(observation_id)','FOREIGN KEY (ledger_event_id) REFERENCES cost_intelligence.financial_ledger_events(event_id)'],
+    budget_reported_observations:['FOREIGN KEY (collector_observation_id) REFERENCES cost_intelligence.budget_source_observations(observation_id)','FOREIGN KEY (ledger_event_id) REFERENCES cost_intelligence.financial_ledger_events(event_id)'],
+  };
+  const bindings=await client.query(`SELECT c.relname,k.convalidated,k.condeferrable,pg_get_constraintdef(k.oid) AS definition
+    FROM pg_constraint k JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace ns ON ns.oid=c.relnamespace
+    WHERE ns.nspname='cost_intelligence' AND c.relname=ANY($1::text[]) AND k.contype IN ('p','u','f')`,[SETTLEMENT_TABLES]);
+  for(const table of SETTLEMENT_TABLES)for(const expected of [...(requiredUnique[table]??[]),...(requiredForeign[table]??[])])
+    if(bindings.rows.filter(row=>row.relname===table&&row.convalidated===true&&row.condeferrable===false&&row.definition===expected).length!==1)
+      throw new Error('Settlement immutable identity or financial-source foreign key is incomplete.');
+
+}
+/** Internal financial producer capability: schema11 requires its actual scoped artifacts, independent of reporting migration0012. */
+export async function requireBudgetSettlementCapability(client:LedgerTransactionPort):Promise<void>{
+  const result=await client.query('SELECT migrations_ready,required_migrations_present FROM cost_intelligence.foundation_health');
+  if(result.rows[0]?.migrations_ready!==true||Number(result.rows[0]?.required_migrations_present)!==11)throw new Error('The exact Finance settlement migration is required.');
+  await inspectBudgetAuthorityCapability(client,11);await inspectBudgetSettlementCapability(client,11);
+}
+
 type IntakeProjectionCapability = 'legacy' | 'available';
 
 async function inspectIntakeProjectionCapability(client: LedgerTransactionPort): Promise<IntakeProjectionCapability> {
@@ -1485,6 +1688,7 @@ async function inspectIntakeProjectionCapability(client: LedgerTransactionPort):
   );
   const health = healthResult.rows[0];
   if (!health || health.migrations_ready !== true) throw new Error('Finance migration health is incomplete.');
+  await inspectBudgetSettlementCapability(client,Number(health.required_migrations_present));
 
   const schemaResult = await client.query(
     `SELECT
@@ -1510,10 +1714,10 @@ async function inspectIntakeProjectionCapability(client: LedgerTransactionPort):
   const unresolvedCountColumnCount = Number(schema.unresolved_count_columns);
   const hasAnyProjectionExtension = hasIncludedIn || unresolvedCountColumnCount > 0;
   const migrationCount = Number(health.required_migrations_present);
-  const currentCapabilityDetected = migrationCount===9 || migrationCount===10 || hasAnyIntakeTable || hasAnyProjectionExtension;
+  const currentCapabilityDetected = migrationCount===9 || migrationCount===10 || migrationCount===11 || hasAnyIntakeTable || hasAnyProjectionExtension;
 
   if (!currentCapabilityDetected && migrationCount >= 3 && migrationCount <= 8) return 'legacy';
-  if ((migrationCount !== 9 && migrationCount !== 10) || !hasAllIntakeTables || !hasIncludedIn || unresolvedCountColumnCount !== 4) {
+  if ((migrationCount !== 9 && migrationCount !== 10 && migrationCount!==11) || !hasAllIntakeTables || !hasIncludedIn || unresolvedCountColumnCount !== 4) {
     throw new Error('Usage intake projection capability is incomplete.');
   }
 

@@ -169,7 +169,7 @@
       "path": "schemas/cost-intelligence/1.0.0/budgets/ReservationRequestSchema.json",
       "completeness": "partial_wrapper_requires_combined_validation",
       "combined_validator": "validateReservationRequestBoundary",
-      "sha256": "23fba5747c396b1b4034be8ef96e4a5e2de426098910c3096187f96472d9c2ba"
+      "sha256": "a76d4d6ec08806a8fdabab5d7dc65ebd1a522cfb465b8827940301a4b7563499"
     },
     {
       "module": "budgets",
@@ -197,7 +197,7 @@
       "path": "schemas/cost-intelligence/1.0.0/budgets/SettleReservationCommandSchema.json",
       "completeness": "partial_wrapper_requires_combined_validation",
       "combined_validator": "validateSettleReservationCommandBoundary",
-      "sha256": "ff4045749ec0225261c27dd8fb5f7d07bb3a68709dec81eec0a4221ba92427e4"
+      "sha256": "226a1f71eee863fac4e0738f01fa4fa36294f872bd350b7c9f948a0dcf948da1"
     },
     {
       "module": "budgets",
@@ -217,7 +217,7 @@
       "path": "schemas/cost-intelligence/1.0.0/budgets/ReservationCommandSchema.json",
       "completeness": "partial_wrapper_requires_combined_validation",
       "combined_validator": "validateReservationCommandBoundary",
-      "sha256": "5d1796e42ae92610978dd2df0e091be1427802b0963775e1ecadb8ee52ea2d2b"
+      "sha256": "cb874a8b28a6ff6eaa004bd1d59265fd8ee9d2e649d92a7bf412004e55a38b32"
     },
     {
       "module": "budgets",
@@ -227,7 +227,7 @@
       "path": "schemas/cost-intelligence/1.0.0/budgets/ReservationSnapshotSchema.json",
       "completeness": "partial_wrapper_requires_combined_validation",
       "combined_validator": "validateReservationSnapshotBoundary",
-      "sha256": "f548b406444efb614c811134c965ef662f267fcb16e3ca3d78756a8894cc25f6"
+      "sha256": "87aa76b80a88b72a17bd637fa319c653487554d5ff0ec4155c3d484b50d35c52"
     },
     {
       "module": "budgets",
@@ -300,7 +300,7 @@
       "path": "schemas/cost-intelligence/1.0.0/ledger/LedgerAppendRequestSchema.json",
       "completeness": "partial_wrapper_requires_combined_validation",
       "combined_validator": "validateLedgerAppendRequestBoundary",
-      "sha256": "fb77042ccbd5de8ed85b676c203fc6697bf41ef2b46a19401038d3166d6c7227"
+      "sha256": "68072420ae324bea2f918008647a05efeabbd4f4ba446c770f00b2171bcdfcc6"
     },
     {
       "module": "ledger",
@@ -635,7 +635,7 @@
       "path": "schemas/cost-intelligence/2.0.0/integrations/ReportingExportRequestSchema.json",
       "completeness": "partial_wrapper_requires_combined_validation",
       "combined_validator": "validateReportingExportRequestBoundary",
-      "sha256": "1c97ba0d69cd0e5d18baa4b2490e87be2ea57e16a4784e54ec34497dd4989a23"
+      "sha256": "90b4ccadbfc0b790bb983ae76023816d9b8c029771a6ec637fade30ea55a57e3"
     },
     {
       "module": "integrations",
@@ -698,7 +698,7 @@
       "export_name": "ReportingDetailSchema",
       "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingDetailSchema.json",
       "completeness": "complete",
-      "sha256": "1ea9a50e51ff9ea11690f38b7adf70d91151007e01028f2089421e37f99f1e13"
+      "sha256": "efc36c2fb109c13102500c28da9169ea51907fb2e7fd177b212f3a4c174f82f7"
     },
     {
       "module": "reporting",
@@ -707,7 +707,7 @@
       "export_name": "ReportingCurrencySummarySchema",
       "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingCurrencySummarySchema.json",
       "completeness": "complete",
-      "sha256": "717278fb4b9517d75c8d9df417d69f89b735d203b3a97f1a9e8e35e6f841f4eb"
+      "sha256": "6a136f635a8b7acab9f917c7cbfad1c54705e26f6deb6e4538329ea6101a0d85"
     },
     {
       "module": "reporting",
@@ -725,7 +725,7 @@
       "export_name": "ReportingProjectionSchema",
       "path": "schemas/cost-intelligence/2.0.0/reporting/ReportingProjectionSchema.json",
       "completeness": "complete",
-      "sha256": "91a87a6bc3cb9afdd07be6b38234c33d4135b07e788465f4b6f71bac6967f712"
+      "sha256": "d2ca34e685767e24f31a592b9e55fa18e38623d3dc15dee7ed4c00e06681f569"
     },
     {
       "module": "reporting",
@@ -735,7 +735,7 @@
       "path": "schemas/cost-intelligence/2.0.0/reporting/FinancialSummaryPageSchema.json",
       "completeness": "partial_wrapper_requires_combined_validation",
       "combined_validator": "validateFinancialSummaryPageV2Boundary",
-      "sha256": "862900ad30b1e5684c98852cb93f0010eb73504d2fd9f58018673c9334ddf814"
+      "sha256": "da5b894505f5932718f950f7670dd099636b889ffb4b570cce4913dd44fe2eac"
     }
   ]
 }

@@ -5,7 +5,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { FINANCE_CORE_MIGRATIONS, EXPECTED_MIGRATIONS } from '../migrations/migration-catalog.mjs';
-import { hasDestructiveMigrationStatement, hasUnapprovedDestructiveMigrationStatement } from '../migrations/sql-safety.mjs';
+import { approvedReportedValuationReplacements, hasDestructiveMigrationStatement, hasUnapprovedDestructiveMigrationStatement } from '../migrations/sql-safety.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 const name = '0014_evidence_reader_indexes.sql';
@@ -16,7 +16,7 @@ const catalogRead = "has_table_privilege('ci_finance_runtime',c.oid,'TRUNCATE')"
 test('migration catalog includes every checked-in feature while the Finance core stays separate', async () => {
   const names = (await readdir(join(root, 'migrations'))).filter(file => file.endsWith('.sql')).sort();
   assert.deepEqual(names, EXPECTED_MIGRATIONS);
-  assert.equal(FINANCE_CORE_MIGRATIONS.length, 10);
+  assert.equal(FINANCE_CORE_MIGRATIONS.length, 11);
   assert.ok(EXPECTED_MIGRATIONS.includes(name));
   assert.equal(FINANCE_CORE_MIGRATIONS.includes(name), false);
 });
@@ -26,10 +26,101 @@ test('all exact reviewed migrations pass the conservative safety scan before dat
     const source = await readFile(join(root, 'migrations', file), 'utf8');
     const replacements = file === '0009_usage_intake.sql'
       ? [{ schema: 'cost_intelligence', table: 'financial_projection_quantities', constraint: 'financial_projection_quantities_key' }]
-      : [];
+      : approvedReportedValuationReplacements(file, source);
     assert.equal(hasUnapprovedDestructiveMigrationStatement(file, source, replacements), false, file);
   }
 });
+
+const settlementName = '0011_budget_settlement_reconciliation.sql';
+const settlementSql = await readFile(join(root, 'migrations', settlementName), 'utf8');
+const settlementPin = createHash('sha256').update(settlementSql).digest('hex');
+const settlementScanner = await readFile(join(root, 'tests/migrations/sql-safety.mjs'), 'utf8');
+const settlementReplacements = [
+  { schema: 'cost_intelligence', table: 'financial_ledger_events', constraint: 'financial_ledger_events_valuation_check', column: 'valuation' },
+  { schema: 'cost_intelligence', table: 'usage_intake_inbox', constraint: 'usage_intake_inbox_valuation_basis_check', column: 'valuation_basis' },
+  { schema: 'cost_intelligence', table: 'usage_intake_attempts', constraint: 'usage_intake_attempts_valuation_basis_check', column: 'valuation_basis' },
+];
+
+function assertSettlementRefused(source, filename = settlementName, scanner = {
+  approvedReportedValuationReplacements, hasUnapprovedDestructiveMigrationStatement,
+}) {
+  const replacements = scanner.approvedReportedValuationReplacements(filename, source);
+  assert.deepEqual(replacements, [], 'unreviewed SQL cannot inherit any constraint replacement');
+  assert.equal(scanner.hasUnapprovedDestructiveMigrationStatement(filename, source, replacements), true);
+}
+
+test('settlement replacement allowance binds the exact reviewed file and all three original pairs', () => {
+  assert.deepEqual(approvedReportedValuationReplacements(settlementName, settlementSql), settlementReplacements);
+  assert.equal(hasDestructiveMigrationStatement(settlementSql), true, 'the generic scanner still refuses the constraint removals');
+  assert.equal(hasUnapprovedDestructiveMigrationStatement(settlementName, settlementSql,
+    approvedReportedValuationReplacements(settlementName, settlementSql)), false);
+  assertSettlementRefused(settlementSql + '\n');
+});
+
+test('settlement replacement allowance refuses a wrong whole-file pin', async () => {
+  assert.equal(settlementScanner.split(`'${settlementPin}'`).length, 2, 'the reviewed file digest appears exactly once');
+  const unpinnedSource = settlementScanner.replace(`'${settlementPin}'`, `'${'0'.repeat(64)}'`);
+  const unpinned = await import(`data:text/javascript,${encodeURIComponent(unpinnedSource)}`);
+  assertSettlementRefused(settlementSql, settlementName, unpinned);
+});
+
+for (const filename of ['0010_budget_authority_bindings.sql', '0012_reporting_snapshots.sql',
+  '0014_evidence_reader_indexes.sql', '0015_stored_lineage_reader.sql', 'unreviewed.sql', 'migrations/' + settlementName]) {
+  test('settlement replacement allowance refuses filename ' + filename, () => {
+    assertSettlementRefused(settlementSql, filename);
+  });
+}
+
+for (const { schema, table, constraint, column } of settlementReplacements) {
+  const drop = `ALTER TABLE ${schema}.${table} DROP CONSTRAINT ${constraint};`;
+  const add = `ALTER TABLE ${schema}.${table} ADD CONSTRAINT ${constraint} CHECK (${column} IN ('unknown', 'estimated', 'provider_confirmed', 'provider_reported_unsettled'));`;
+  const pair = drop + '\n' + add;
+  for (const [label, extraDrop] of [
+    ['exact case', drop],
+    ['lower case', drop.toLowerCase()],
+    ['mixed case and whitespace', `AlTeR\n\tTaBlE ${schema}.${table}\n DrOp\tCoNsTrAiNt\n ${constraint};`],
+  ]) {
+    test(`settlement allowance rejects an extra unpaired ${constraint} DROP with ${label}`, () => {
+      assert.equal(settlementSql.split(pair).length, 2);
+      assertSettlementRefused(settlementSql + '\n' + extraDrop + '\n');
+    });
+  }
+
+  for (const [label, mutate] of [
+    ['a moved complete pair', source => source.replace(pair, '') + '\n' + pair],
+    ['a commented pair decoy followed by an unpaired DROP', source => source.replace(pair, '/* ' + pair + ' */') + '\n' + drop],
+  ]) {
+    test(`settlement allowance rejects ${label} for ${constraint}`, () => {
+      const changed = mutate(settlementSql);
+      assert.notEqual(changed, settlementSql);
+      assertSettlementRefused(changed);
+    });
+  }
+
+  // Even a changed digest alone must not replace the existing exact pair checks.
+  // The digest itself binds statement placement and excludes additional or
+  // commented SQL; these controls exercise invalid replacement structure.
+  for (const [label, mutate] of [
+    ['duplicate complete pair', source => source + '\n' + pair],
+    ['omitted ADD', source => source.replace(pair, drop)],
+    ['missing prior enum value', source => source.replace(pair, pair.replace("'provider_confirmed', ", ''))],
+    ['changed enum sequence', source => source.replace(pair, pair.replace("'provider_confirmed', 'provider_reported_unsettled'", "'provider_reported_unsettled', 'provider_confirmed'"))],
+    ['changed table', source => source.replace(pair, pair.replaceAll(`${schema}.${table}`, `${schema}.unreviewed_table`))],
+    ['changed constraint', source => source.replace(pair, pair.replaceAll(constraint, 'unreviewed_constraint'))],
+    ['changed checked column', source => source.replace(pair, pair.replace(`CHECK (${column} IN`, 'CHECK (unreviewed_column IN'))],
+  ]) {
+    test(`settlement pair checks refuse ${label} for ${constraint} even with a changed pin`, async () => {
+      const changed = mutate(settlementSql);
+      assert.notEqual(changed, settlementSql);
+      assertSettlementRefused(changed);
+      assert.equal(settlementScanner.split(`'${settlementPin}'`).length, 2);
+      const changedPin = createHash('sha256').update(changed).digest('hex');
+      const repinnedSource = settlementScanner.replace(`'${settlementPin}'`, `'${changedPin}'`);
+      const repinned = await import(`data:text/javascript,${encodeURIComponent(repinnedSource)}`);
+      assertSettlementRefused(changed, settlementName, repinned);
+    });
+  }
+}
 
 test('evidence readiness binds the actual predecessor guards instead of requiring an invented ledger trigger', async () => {
   for (const [file, table, trigger, type, events, level, fn] of [

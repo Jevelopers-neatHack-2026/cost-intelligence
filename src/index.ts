@@ -61,8 +61,8 @@ export type {
 export * from './budgets/index.js';
 export * from './ledger/index.js';
 export * from './reporting/index.js';
-export { startReconciliation, getReconciliation, ReconciliationRequestSchema, ReconciliationRunSchema, ReconciliationResultSchema } from './reconciliation/index.js';
-export type { ReconciliationRequest, ReconciliationRun, ReconciliationResult } from './reconciliation/index.js';
+export { startReconciliation, getReconciliation, ReconciliationRequestSchema, ReconciliationRunSchema, ReconciliationResultSchema, BudgetReconciliationRequestSchema, BudgetReconciliationQuerySchema } from './reconciliation/index.js';
+export type { ReconciliationRequest, ReconciliationRun, ReconciliationResult, BudgetReconciliationRequest, BudgetReconciliationQuery, BudgetReconciliationReceipt } from './reconciliation/index.js';
 export { startCoverageDryRun, getCoverageDryRun, CoverageSnapshotReferenceSchema, CoverageImportRecordSchema, CoverageDryRunRequestSchema, CoverageDryRunReadRequestSchema, CoverageDryRunSummarySchema, CoverageDryRunPageSchema, createPostgresCoverageRunStore, validateCoverageDryRunRequestBoundary, validateCoverageDryRunReadRequestBoundary, validateCoverageImportRecordBoundary, getCoverageImportContentHash } from './reconciliation/index.js';
 export type { CoverageSnapshotReference, CoverageImportRecord, CoverageDryRunRequest, CoverageDryRunReadRequest, CoverageDryRunSummary, CoverageDryRunPage, CoverageEntry, CoverageImportReaderPort, CoverageStoredRun, CoverageStoreAccess, CoverageRunStorePort, ReconciliationCoveragePorts } from './reconciliation/index.js';
 export type { PostgresCoverageDatabasePort, PostgresCoverageTransactionPort } from './reconciliation/index.js';

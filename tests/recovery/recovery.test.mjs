@@ -680,6 +680,16 @@ test('transactional ledger failure leaves durable retry outbox; bounded recovery
 test('posting retry uses bounded exponential backoff and dead-letters after five attempts', async () => {
   const scope = scopeFor();
   let postingAttempts = 0;
+  let postingTransactionTime;
+  const assertRetryDelay = async seconds => {
+    const result = await observer.query(
+      `SELECT available_at = $5::timestamptz + make_interval(secs => $6) AS exact_delay
+       FROM cost_intelligence.usage_intake_outbox
+       WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4`,
+      [scope.tenantId,scope.projectId,scope.environment,scope.billingMode,postingTransactionTime,seconds]);
+    assert.equal(result.rows.length,1);
+    assert.equal(result.rows[0].exact_delay,true,`retry schedules the exact ${seconds}s policy delay from its database transaction`);
+  };
   const failingDatabase = {
     connect: async () => {
       const client = await runtime.connect();
@@ -687,6 +697,7 @@ test('posting retry uses bounded exponential backoff and dead-letters after five
         query: async (text, values) => {
           if (/^INSERT INTO cost_intelligence\.financial_ledger_events/i.test(text)) {
             postingAttempts++;
+            postingTransactionTime = (await client.query('SELECT now()::text AS transaction_time')).rows[0].transaction_time;
             throw new Error('ci04a synthetic repeated pre-insert failure');
           }
           return client.query(text, values);
@@ -701,8 +712,7 @@ test('posting retry uses bounded exponential backoff and dead-letters after five
   assert.equal(accepted.value.outboxStatus, 'retry');
   const initialRow = (await outboxRows(scope))[0];
   assert.equal(initialRow.retry_count, 1);
-  assert.ok(Date.parse(initialRow.available_at) - Date.now() >= 1_000
-    && Date.parse(initialRow.available_at) - Date.now() <= 4_000, 'first retry is scheduled about two seconds later');
+  await assertRetryDelay(2);
 
   for (const [index, expectedDelaySeconds] of [4, 8, 16].entries()) {
     await observer.query(
@@ -710,17 +720,13 @@ test('posting retry uses bounded exponential backoff and dead-letters after five
        WHERE tenant_id=$1 AND project_id=$2 AND environment=$3 AND billing_mode=$4 AND status='retry'`,
       [scope.tenantId, scope.projectId, scope.environment, scope.billingMode],
     );
-    const before = Date.now();
     const replay = await replayUsageOutbox({ schemaVersion: '1.0.0', requestId: `ci04a-retry-${index}-${randomUUID()}`, scope, limit: 100 },
       portsFor(scope, failingDatabase));
     assert.equal(replay.ok, true, replay.ok ? '' : replay.error.code);
     assert.equal(replay.value.retried, 1);
     const row = (await outboxRows(scope))[0];
     assert.equal(row.retry_count, index + 2);
-    const delay = Date.parse(row.available_at) - before;
-    assert.ok(delay >= expectedDelaySeconds * 1_000 - 1_000
-      && delay <= expectedDelaySeconds * 1_000 + 2_000,
-    `retry ${index + 2} uses an approximately ${expectedDelaySeconds}s bounded delay`);
+    await assertRetryDelay(expectedDelaySeconds);
   }
 
   await observer.query(

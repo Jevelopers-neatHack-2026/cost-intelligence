@@ -1,5 +1,24 @@
 import { createHash } from 'node:crypto';
 
+// Bind every statement and its placement, including extra removals of otherwise
+// allowed constraint names. The exact replacement pairs remain required below.
+const REVIEWED_REPORTED_VALUATION_SHA256 = '42d9469c46b7a40ba021e988556816f32022ade03a1e937cf5f3dd9621cf2e4a';
+
+const reportedValuationReplacements=[
+  {schema:'cost_intelligence',table:'financial_ledger_events',constraint:'financial_ledger_events_valuation_check',column:'valuation'},
+  {schema:'cost_intelligence',table:'usage_intake_inbox',constraint:'usage_intake_inbox_valuation_basis_check',column:'valuation_basis'},
+  {schema:'cost_intelligence',table:'usage_intake_attempts',constraint:'usage_intake_attempts_valuation_basis_check',column:'valuation_basis'},
+];
+export function approvedReportedValuationReplacements(filename,sql){
+  if(filename!=='0011_budget_settlement_reconciliation.sql')return [];
+  if(createHash('sha256').update(sql).digest('hex')!==REVIEWED_REPORTED_VALUATION_SHA256)return [];
+  for(const {schema,table,constraint,column} of reportedValuationReplacements){
+    const exact=`ALTER TABLE ${schema}.${table} DROP CONSTRAINT ${constraint};\nALTER TABLE ${schema}.${table} ADD CONSTRAINT ${constraint} CHECK (${column} IN ('unknown', 'estimated', 'provider_confirmed', 'provider_reported_unsettled'));`;
+    if(sql.split(exact).length!==2)return [];
+  }
+  return reportedValuationReplacements;
+}
+
 // A whole-file fingerprint binds the paired temporary CREATE/cleanup statements,
 // their transactional DO block, and any exact read-only catalog expressions.
 // Drift never inherits these narrow exceptions; the generic scanner is unchanged.
