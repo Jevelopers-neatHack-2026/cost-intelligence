@@ -34,7 +34,7 @@ export const ReportingAmountSchema = Type.Object({
 const Dimensions = Type.Object(Object.fromEntries(REPORTING_DIMENSIONS.map(key => [key, Type.Union([Identifier, Type.Null()])])), { additionalProperties: false });
 export const ReportingDetailSchema = Type.Object({
   detailId: Hash, currency: CurrencySchema, eventType: Identifier, classification: Identifier,
-  occurredAt: Instant, valuation: Type.Union([Type.Literal('estimated'), Type.Literal('provider_confirmed'), Type.Literal('unknown')]),
+  occurredAt: Instant, valuation: Type.Union([Type.Literal('estimated'), Type.Literal('provider_confirmed'), Type.Literal('provider_reported_unsettled'), Type.Literal('unknown')]),
   reconciliation: Type.Union([Type.Literal('unmatched'), Type.Literal('matched'), Type.Literal('exception')]),
   settlement: Type.Union([Type.Literal('unpaid'), Type.Literal('partly_paid'), Type.Literal('paid')]),
   dimensions: Dimensions,
@@ -49,7 +49,7 @@ const Metrics = Type.Object({ expense: ReportingAmountSchema, grossSales: Report
   contribution: ReportingAmountSchema, cashReceipts: ReportingAmountSchema, cashPayouts: ReportingAmountSchema }, { additionalProperties: false });
 export const ReportingCurrencySummarySchema = Type.Object({
   currency: CurrencySchema, scale: Type.Literal(18), metrics: Metrics,
-  valuation: Type.Object({ estimated: ReportingAmountSchema, confirmed: ReportingAmountSchema, unknownCount: Type.Integer({ minimum: 0 }) }, { additionalProperties: false }),
+  valuation: Type.Object({ estimated: ReportingAmountSchema, confirmed: ReportingAmountSchema, reportedUnsettled: Type.Optional(ReportingAmountSchema), unknownCount: Type.Integer({ minimum: 0 }) }, { additionalProperties: false }),
   reconciliation: Type.Object({ matchedCount: Type.Integer({ minimum: 0 }), unmatchedCount: Type.Integer({ minimum: 0 }), exceptionCount: Type.Integer({ minimum: 0 }) }, { additionalProperties: false }),
   simulated: Type.Object({ expense: ReportingAmountSchema, grossSales: ReportingAmountSchema, netSales: ReportingAmountSchema, directCosts: ReportingAmountSchema }, { additionalProperties: false }),
   groups: Type.Array(Type.Object({ dimension: ReportingDimensionSchema, value: Type.Union([Identifier, Type.Null()]), bucket: Type.Union([Type.Literal('known'), Type.Literal('unknown_unallocated')]),

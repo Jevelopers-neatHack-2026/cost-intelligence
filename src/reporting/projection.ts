@@ -101,9 +101,15 @@ export function projectReporting(args: { query: FinancialSummaryQueryV2; asOf: s
       const group = rows.filter(row => row.dimensions[dimension] === value);
       return { dimension, value, bucket: value === null ? 'unknown_unallocated' as const : 'known' as const, eventCount: group.length, metrics: summarizeMetrics(group, currency) };
     }));
-    const valuation = (basis: 'estimated' | 'provider_confirmed') => { const subset = rows.filter(row => row.valuation === basis && row.status === 'recognized');
-      return { status: subset.length ? 'known' as const : 'unknown' as const, knownSubtotal: subset.length ? amount(subset.reduce((n,row) => n + decimal(row.metrics.expense), 0n)) : null,
-        total: subset.length ? amount(subset.reduce((n,row) => n + decimal(row.metrics.expense), 0n)) : null, unknownCount: 0 }; };
+    const valuation = (basis: 'estimated' | 'provider_confirmed' | 'provider_reported_unsettled') => {
+      const subset = rows.filter(row => row.valuation === basis && (basis === 'provider_reported_unsettled'
+        ? affects(row, 'expense') && query.scope.billingMode === 'live' : row.status === 'recognized'));
+      const known = subset.filter(row => row.status === 'recognized');
+      const unknownCount = subset.length - known.length;
+      const subtotal = known.length ? amount(known.reduce((n,row) => n + decimal(row.metrics.expense), 0n)) : null;
+      return { status: unknownCount ? known.length ? 'partial' as const : 'unknown' as const : known.length ? 'known' as const : 'unknown' as const,
+        knownSubtotal: subtotal, total: unknownCount ? null : subtotal, unknownCount };
+    };
     const simulatedAmount = (key: 'simulatedGrossSales' | 'simulatedNetSales' | 'simulatedDirectCosts' | 'simulatedExpense') => {
       const source = key === 'simulatedExpense' || key === 'simulatedDirectCosts' ? 'expense' : 'revenue';
       const relevant = query.scope.billingMode === 'live' ? [] : rows.filter(row => row.status === 'unsupported' || affects(row, source));
@@ -114,7 +120,7 @@ export function projectReporting(args: { query: FinancialSummaryQueryV2; asOf: s
       return { status: unknown || !covered ? known ? 'partial' as const : 'unknown' as const : 'known' as const,
         knownSubtotal: known || covered ? subtotal : null, total: covered && !unknown ? subtotal : null, unknownCount: unknown };
     };
-    return { currency, scale: 18 as const, metrics: summarizeMetrics(rows, currency), valuation: { estimated: valuation('estimated'), confirmed: valuation('provider_confirmed'), unknownCount: rows.filter(row => row.valuation === 'unknown').length },
+    return { currency, scale: 18 as const, metrics: summarizeMetrics(rows, currency), valuation: { estimated: valuation('estimated'), confirmed: valuation('provider_confirmed'), reportedUnsettled: valuation('provider_reported_unsettled'), unknownCount: rows.filter(row => row.valuation === 'unknown').length },
       reconciliation: { matchedCount: rows.filter(row => row.reconciliation === 'matched').length, unmatchedCount: rows.filter(row => row.reconciliation === 'unmatched').length, exceptionCount: rows.filter(row => row.reconciliation === 'exception').length },
       simulated: { expense: simulatedAmount('simulatedExpense'), grossSales: simulatedAmount('simulatedGrossSales'), netSales: simulatedAmount('simulatedNetSales'), directCosts: simulatedAmount('simulatedDirectCosts') }, groups };
   });
