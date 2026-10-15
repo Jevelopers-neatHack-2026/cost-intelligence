@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -8,6 +9,7 @@ import test, { after } from 'node:test';
 import { foundationTestFiles, databaseTestFiles, deferredDomainSuites, requiredDomainSuites, suitePlan } from '../../scripts/suite-policy.mjs';
 import { sanitizeOutput } from '../../scripts/sanitize.mjs';
 import { requiredFilesHavePassingEvidence, runTestFile } from '../../scripts/test-file-evidence.mjs';
+import testEventReporter from '../../scripts/test-event-reporter.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const evidenceFixtureDirectory = await mkdtemp(join(tmpdir(), 'ci01-test-evidence-'));
@@ -217,6 +219,92 @@ test('missing required file cannot produce structured test evidence', async () =
   assert.equal(evidence.passed, false);
   assert.equal(evidence.reason, 'structured_file_summary_missing');
   assert.equal(evidence.registeredTestCaseCount, 0);
+});
+
+test('failed test evidence identifies the registered case without exposing private names, values or output', async () => {
+  const privateValue = 'CI11_PRIVATE_DIAGNOSTIC_CANARY';
+  const title = `synthetic failure ${privateValue}`;
+  const source = [
+    "import assert from 'node:assert/strict';",
+    "import test from 'node:test';",
+    `test(${JSON.stringify(title)}, () => {`,
+    `  console.log(${JSON.stringify(privateValue)}); console.error(${JSON.stringify(privateValue)});`,
+    `  assert.equal(${JSON.stringify(privateValue)}, 'private-expected-value');`,
+    '});',
+  ].join('\n');
+  const file = await writeTestFixture('private-assertion.test.mjs', source);
+  const evidence = runTestFile(file, { cwd: evidenceFixtureDirectory });
+  assert.equal(evidence.passed, false);
+  assert.equal(evidence.reason, 'test_case_failed');
+  assert.equal(evidence.failedTestCaseCount, 1);
+  assert.equal(evidence.omittedFailedTestCaseCount, 0);
+  assert.deepEqual(evidence.failedTestCases, [{
+    titleHash: createHash('sha256').update(title).digest('hex'),
+    registrationLine: 3, registrationColumn: 1,
+    code: 'ERR_ASSERTION',
+  }]);
+  const serialized = JSON.stringify(evidence);
+  for (const forbidden of [privateValue, title, 'private-expected-value', evidenceFixtureDirectory, 'AssertionError', 'console.log']) {
+    assert.equal(serialized.includes(forbidden), false, forbidden);
+  }
+});
+
+test('source-looking error messages cannot invent diagnostic coordinates', async () => {
+  for (const messagePrefix of ['CI11_PRIVATE_LOCATION_CANARY ', 'CI11_PRIVATE_LOCATION_CANARY\n    at ']) {
+    const file = await writeTestFixture('spoofed-location.test.mjs', [
+      "import test from 'node:test';",
+      "import { fileURLToPath } from 'node:url';",
+      "test('synthetic source-looking message', () => {",
+      `  throw new Error(${JSON.stringify(messagePrefix)} + fileURLToPath(import.meta.url) + ':999:888');`,
+      '});',
+    ].join('\n'));
+    const evidence = runTestFile(file, { cwd: evidenceFixtureDirectory });
+    assert.equal(evidence.passed, false);
+    assert.deepEqual(evidence.failedTestCases, [{
+      titleHash: createHash('sha256').update('synthetic source-looking message').digest('hex'),
+      registrationLine: 3, registrationColumn: 1, code: 'bounded_other',
+    }]);
+    assert.doesNotMatch(JSON.stringify(evidence), /CI11_PRIVATE_LOCATION_CANARY|999|888|failureLine|failureColumn/);
+  }
+});
+
+test('failure diagnostics admit only known error codes and never change failing gate status', async () => {
+  const privateValue = 'CI11_PRIVATE_ERROR_CODE_CANARY';
+  const file = await writeTestFixture('private-error.test.mjs', [
+    "import test from 'node:test';",
+    "test('synthetic private error', () => {",
+    `  const error = new Error(${JSON.stringify(privateValue)});`,
+    `  error.code = ${JSON.stringify(privateValue)};`,
+    '  throw error;',
+    '});',
+  ].join('\n'));
+  const evidence = runTestFile(file, { cwd: evidenceFixtureDirectory });
+  assert.equal(evidence.passed, false);
+  assert.equal(evidence.failedTestCaseCount, 1);
+  assert.equal(evidence.failedTestCases[0].code, 'bounded_other');
+  assert.equal(evidence.failedTestCases[0].registrationLine, 2);
+  assert.equal(JSON.stringify(evidence).includes(privateValue), false);
+  assert.equal(requiredFilesHavePassingEvidence(['required.test.mjs'], [{ path: 'required.test.mjs', ...evidence }]), false);
+});
+
+test('failure diagnostics stay bounded while retaining the complete failure count', async () => {
+  async function* events() {
+    for (let index = 0; index < 300; index++) {
+      yield { type: 'test:fail', data: {
+        name: `synthetic failure ${index}`, file: '/synthetic/private.test.mjs', line: index + 1, column: 1,
+        details: { type: 'test', error: new Error('CI11_PRIVATE_BOUNDED_CANARY') },
+      } };
+    }
+  }
+  let output = '';
+  for await (const chunk of testEventReporter(events())) output += chunk;
+  const evidence = JSON.parse(output);
+  assert.equal(evidence.failedTestCaseCount, 300);
+  assert.equal(evidence.failedTestCases.length, 128);
+  assert.equal(evidence.omittedFailedTestCaseCount, 172);
+  assert.equal(evidence.failedTestCases[0].registrationLine, 1);
+  assert.equal(evidence.failedTestCases.at(-1).registrationLine, 128);
+  assert.doesNotMatch(output, /CI11_PRIVATE_BOUNDED_CANARY|synthetic failure|\/synthetic\//);
 });
 
 test('child output redacts database URLs, bearer tokens, password fields, and canaries', () => {

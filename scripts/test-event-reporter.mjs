@@ -1,4 +1,24 @@
-/** Node 22 structured reporter. Emits counts only; test names and stdout are omitted. */
+/** Node 22 structured reporter. Private names, assertions and stdout are omitted. */
+import { createHash } from 'node:crypto';
+
+const failureCodes = new Set(['ERR_ASSERTION', '42P01', '42703', '42883', '42501', '23505', '23514', '57014', '55P03', 'P0001']);
+const positiveInteger = value => Number.isSafeInteger(value) && value > 0 ? value : null;
+
+function boundedFailure(data) {
+  let code = 'bounded_other';
+  let error = data.details?.error;
+  // Node wraps the assertion in a test failure. Inspect only a bounded cause
+  // chain for allowlisted codes; message and stack text cannot supply locations.
+  for (let depth = 0; depth < 4 && error && typeof error === 'object'; depth++, error = error.cause) {
+    if (failureCodes.has(error.code)) code = error.code;
+  }
+  return {
+    titleHash: typeof data.name === 'string' ? createHash('sha256').update(data.name).digest('hex') : null,
+    registrationLine: positiveInteger(data.line), registrationColumn: positiveInteger(data.column),
+    code,
+  };
+}
+
 export default async function* testEventReporter(source) {
   let registeredTestCaseCount = 0;
   let completedTestCaseCount = 0;
@@ -7,6 +27,8 @@ export default async function* testEventReporter(source) {
   let skippedTestCaseCount = 0;
   let todoTestCaseCount = 0;
   let fileSummary = null;
+  const failedTestCases = [];
+  let omittedFailedTestCaseCount = 0;
 
   const isNodeFileWrapper = data => {
     const name = typeof data.name === 'string' ? data.name.replaceAll('\\', '/') : '';
@@ -28,7 +50,11 @@ export default async function* testEventReporter(source) {
         && data.details?.type !== 'suite'
         && Number.isInteger(data.line) && Number.isInteger(data.column)) {
       completedTestCaseCount += 1;
-      if (event.type === 'test:fail') failedTestCaseCount += 1;
+      if (event.type === 'test:fail') {
+        failedTestCaseCount += 1;
+        if (failedTestCases.length < 128) failedTestCases.push(boundedFailure(data));
+        else omittedFailedTestCaseCount += 1;
+      }
       else if (data.skip) skippedTestCaseCount += 1;
       else if (data.todo) todoTestCaseCount += 1;
       else passedTestCaseCount += 1;
@@ -58,5 +84,7 @@ export default async function* testEventReporter(source) {
     skippedTestCaseCount,
     todoTestCaseCount,
     fileSummary,
+    failedTestCases,
+    omittedFailedTestCaseCount,
   })}\n`;
 }
