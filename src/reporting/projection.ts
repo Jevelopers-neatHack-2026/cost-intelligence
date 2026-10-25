@@ -80,7 +80,9 @@ export function projectReporting(args: { query: FinancialSummaryQueryV2; asOf: s
   const { query, asOf, intake, productEvidence } = args;
   const events = args.events.filter(event => matchesFilters(event.payload, query));
   const details = events.map(event => eventDetail(event, asOf)).sort((a, b) => a.detailId.localeCompare(b.detailId));
-  const currencies = [...new Set([...details.map(detail => detail.currency), ...args.budgetSources.map(row => row.currency), ...(query.filters.currency ? [query.filters.currency] : [])])].filter(value => !query.filters.currency || value === query.filters.currency).sort();
+  const currencies = [...new Set([...details.map(detail => detail.currency), ...args.budgetSources.map(row => row.currency),
+    ...(productEvidence?.sourceCoverage.map(row => row.currency) ?? []), ...(query.filters.currency ? [query.filters.currency] : [])])]
+    .filter(value => !query.filters.currency || value === query.filters.currency).sort();
   const complete = (currency: string, source: 'expense' | 'revenue' | 'cash') => {
     const record = productEvidence?.sourceCoverage.find(row => row.currency === currency && row.source === source);
     const observed = details.filter(row => row.currency === currency && affects(row,source) ).length;
@@ -167,7 +169,7 @@ export function projectReporting(args: { query: FinancialSummaryQueryV2; asOf: s
   if (!productEvidence) missingSources.push('approved_product_denominators');
   const unknownAmountCount = details.filter(row => row.amount === null).length;
   const unsupportedEventCount = details.filter(row => row.status === 'unsupported').length;
-  const expectedRows = productEvidence?.sourceCoverage.map(row => row.expected) ?? [];
+  const expectedRows = productEvidence?.sourceCoverage.filter(row => currencies.includes(row.currency)).map(row => row.expected) ?? [];
   const expected = expectedRows.length && expectedRows.every(value => value !== null) ? expectedRows.reduce<number>((n,value) => n + (value ?? 0), 0) : null;
   if(expected !== null && expected !== details.length)missingSources.push('source_count_mismatch');
   return { details, summary: { policyVersion: REPORTING_POLICY_VERSION, accountingPolicyVersion: ACCOUNTING_POLICY_VERSION, definitionsStatus: ACCOUNTING_DEFINITIONS_STATUS,

@@ -1,5 +1,6 @@
 import './partition-binding-selected.test.mjs';
 import './database-snapshot-clock.test.mjs';
+import './explicit-zero.test.mjs';
 import { databaseSnapshotClock } from './database-snapshot-clock.mjs';
 import assert from 'node:assert/strict';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
@@ -157,7 +158,7 @@ await test('CI-08 real scoped PostgreSQL public query and immutable financial or
     await run('approved denominator and explicit complete-zero source require pinned host evidence',async()=>{
       const next=scope();let evidence;
       const productEvidence={resolveSnapshot:async(q,asOf)=>{const content={version:'1.0.0',queryContentHash:reporting.reportingEvidenceQueryHash(q,asOf),scope:next,period:q.period,asOf,denominators:[{kind:'design',status:'complete',count:'0',approvalReference:{id:'synthetic-approved-designs',revision:1,contentHash:hash('no-approved-designs')}}],sourceCoverage:['expense','revenue','cash'].map(source=>({currency:'USD',source,status:'complete',expected:0}))};evidence={...content,reference:{id:'synthetic-product-source',revision:1,contentHash:hash(content)}};return evidence;}};
-      const {ports:p}=makePorts(pool,next,clock,{productEvidence});const q0=query(next,{filters:{environments:['test'],billingModes:['live'],currency:'USD'}});const page=await checked(root.querySummary(q0,p));assert.equal(page.summary.currencies[0].metrics.directCosts.total,'0');assert.equal(page.summary.currencies[0].metrics.cashReceipts.total,'0');assert.equal(page.summary.unitCosts.find(row=>row.kind==='design').status,'zero_denominator');assert.equal(page.summary.unitCosts.find(row=>row.kind==='workflow').status,'unknown');
+      const {ports:p}=makePorts(pool,next,clock,{productEvidence});const q0=query(next);const page=await checked(root.querySummary(q0,p));assert.equal(page.summary.currencies[0].currency,'USD');assert.equal(page.summary.currencies[0].metrics.directCosts.total,'0');assert.equal(page.summary.currencies[0].metrics.cashReceipts.total,'0');assert.equal(page.summary.unitCosts.find(row=>row.kind==='design').status,'zero_denominator');assert.equal(page.summary.unitCosts.find(row=>row.kind==='workflow').status,'unknown');
       const wrong={...p,reporting:{...p.reporting,productEvidence:{resolveSnapshot:async()=>({...evidence,scope:{...next,projectId:randomUUID()}})}}};assert.equal((await root.querySummary(q0,wrong)).ok,false);
     });
     await run('explicit proposed Product Context2 READ/EXPORT policy checks current source proof and grants no commands',async()=>{

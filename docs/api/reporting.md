@@ -111,7 +111,12 @@ or hidden from details.
 `status: partial` retains `knownSubtotal` while `total` is null; missing source
 coverage and unknown amounts do not become zero. An explicit complete-zero
 requires independently resolved scoped coverage with expected zero observed
-postings. Coverage counting units are financial postings per currency/source;
+postings. Validated source coverage retains its currency in the rich projection
+and prepared export even when no ledger or budget record exists and no currency
+filter is supplied. An explicit currency filter limits both those blocks and
+the expected source count. Partial or unknown coverage keeps null totals;
+recordless currencies do not create legacy canonical summaries or settlement
+claims. Coverage counting units are financial postings per currency/source;
 source count mismatches retain a missing-coverage marker. Accepted but unposted
 usage, incomplete attempts, and quarantine counts are visible and cannot be
 booked as observed expense. Their scope-wide counts are conservative; without
