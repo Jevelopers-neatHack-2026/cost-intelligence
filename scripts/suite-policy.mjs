@@ -26,7 +26,7 @@ const leafPaths = Object.freeze({
   ledger: ['tests/ledger/ledger.test.mjs'],
   metering: ['tests/metering/metering.test.mjs'],
   migrations: databaseTestFiles,
-  pricing: ['tests/pricing/pricing.test.mjs'],
+  pricing: ['tests/pricing/pricing.test.mjs', 'tests/pricing/clock-boundary.test.mjs'],
   reconciliation: ['tests/reconciliation/reconciliation.test.mjs'],
   recovery: ['tests/recovery/recovery.test.mjs'],
   release: [...foundationTestFiles, ...databaseTestFiles],

@@ -567,8 +567,14 @@ export async function estimateV2(request: EstimateRequest, ports: PricingRuntime
 
   const denied = await authorizePricingOperation(parsed.scope, ports, 'estimate', parsed.requestId);
   if (denied) return failure(denied);
-  const clock = ports.clock.now();
-  const estimatedAt = clock.toISOString();
+  let estimatedAt: string;
+  try {
+    const clock = ports.clock.now();
+    if (!(clock instanceof Date) || !Number.isFinite(clock.getTime())) throw new Error('invalid clock');
+    estimatedAt = clock.toISOString();
+  } catch {
+    return failure(safeError('SOURCE_UNAVAILABLE', parsed.requestId, 'The trusted pricing clock is temporarily unavailable.', true));
+  }
 
   if (parsed.selection.policy === 'contract_time') {
     const evidenceRef = parsed.selection.contractTimeEvidenceRef;
